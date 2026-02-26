@@ -17,7 +17,7 @@ export default function Home() {
     <div className="container">
       <div className="h1">Dashboard</div>
       <div className="grid">
-        <Tile to="/tickets" title="Log A Call" desc="Create a work order ticket (SLA 1 hour)." />
+        <Tile to="/tickets/new" title="Log A Call" desc="Create a work order ticket (SLA 1 hour)." />
         <Tile to="/tickets" title="Ticket Dashboard" desc="View tickets prioritized by SLA." />
         <Tile to="/projects" title="Projects" desc="Track longer-term items (SLA 14 days)." />
         <Tile to="/eod" title="End of Day Report" desc="Generate and email the team recap for today." />

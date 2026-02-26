@@ -45,3 +45,44 @@ export async function notifyEvent(type: string, message: string) {
 export async function sendEod(payload: { report_date?: string; notes: string; handoff_notes: string }) {
   return api("/api/send-eod", { method: "POST", body: JSON.stringify(payload) });
 }
+
+
+export type Ticket = {
+  id: string;
+  title: string;
+  location: string;
+  details: string;
+  status: string;
+  created_at: string;
+  sla_due_at: string;
+  sla_minutes: number;
+  created_by: string;
+  created_by_name?: string;
+  ms_left?: number;
+  is_overdue?: boolean;
+};
+
+export async function listTickets(includeClosed = false) {
+  const qs = includeClosed ? "?includeClosed=1" : "";
+  return api(`/api/tickets-list${qs}`, { method: "GET" });
+}
+
+export async function createTicket(payload: { title: string; location: string; details: string; sla_minutes?: number }) {
+  return api("/api/tickets-create", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function getTicket(id: string) {
+  return api(`/api/tickets-get?id=${encodeURIComponent(id)}`, { method: "GET" });
+}
+
+export async function addTicketComment(payload: { ticket_id: string; comment: string }) {
+  return api("/api/tickets-comment", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function closeTicket(payload: { id: string; comment?: string }) {
+  return api("/api/tickets-close", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function convertTicket(payload: { ticket_id: string }) {
+  return api("/api/tickets-convert", { method: "POST", body: JSON.stringify(payload) });
+}

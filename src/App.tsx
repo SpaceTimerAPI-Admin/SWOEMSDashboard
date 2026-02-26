@@ -4,6 +4,8 @@ import Login from "./pages/Login";
 import Enroll from "./pages/Enroll";
 import Home from "./pages/Home";
 import Tickets from "./pages/Tickets";
+import TicketNew from "./pages/TicketNew";
+import TicketDetail from "./pages/TicketDetail";
 import Projects from "./pages/Projects";
 import EOD from "./pages/EOD";
 import Settings from "./pages/Settings";
@@ -27,6 +29,8 @@ export default function App() {
         <Route path="/enroll" element={<Enroll />} />
         <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
         <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
+        <Route path="/tickets/new" element={<RequireAuth><TicketNew /></RequireAuth>} />
+        <Route path="/tickets/:id" element={<RequireAuth><TicketDetail /></RequireAuth>} />
         <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
         <Route path="/eod" element={<RequireAuth><EOD /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />

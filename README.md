@@ -60,3 +60,12 @@ In GroupMe bot settings, set callback URL to:
 - Implement Projects CRUD + conversion flow
 - Implement Open/Close procedure UI + step editor
 - Add photo upload (Storage) (recommended via signed upload URLs)
+
+
+## Ticket API endpoints
+- GET /api/tickets-list
+- POST /api/tickets-create
+- GET /api/tickets-get?id=...
+- POST /api/tickets-comment
+- POST /api/tickets-close
+- POST /api/tickets-convert
