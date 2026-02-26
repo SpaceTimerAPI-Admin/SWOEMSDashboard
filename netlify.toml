@@ -1,11 +1,15 @@
 [build]
   command = "npm run build"
   publish = "dist"
-
-[functions]
-  directory = "netlify/functions"
+  functions = "netlify/functions"
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback so deep links like /tickets/<id> work
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200
