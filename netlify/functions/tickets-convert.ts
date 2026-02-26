@@ -46,6 +46,9 @@ export const handler: Handler = async (event) => {
 
     if (pErr) return json({ ok: false, error: pErr.message }, 500);
 
+
+// Mark ticket as converted so it no longer appears in the Tickets list
+await supabase.from("tickets").update({ status: "converted" }).eq("id", ticket.id);
     await supabase.from("ticket_comments").insert({
       ticket_id: ticket.id,
       employee_id: session.employee.id,

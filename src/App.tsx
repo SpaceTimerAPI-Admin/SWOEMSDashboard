@@ -32,6 +32,8 @@ export default function App() {
         <Route path="/tickets/new" element={<RequireAuth><TicketNew /></RequireAuth>} />
         <Route path="/tickets/:id" element={<RequireAuth><TicketDetail /></RequireAuth>} />
         <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
+        <Route path="/projects/new" element={<RequireAuth><ProjectNew /></RequireAuth>} />
+        <Route path="/projects/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
         <Route path="/eod" element={<RequireAuth><EOD /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />

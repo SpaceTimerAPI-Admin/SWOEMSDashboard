@@ -14,32 +14,31 @@ export const handler: Handler = async (event) => {
     const includeClosed = (event.queryStringParameters?.includeClosed || "") === "1";
 
     let q = supabase
-      .from("tickets")
+      .from("projects")
       .select(`
-        id, title, location, details, status, created_at, sla_due_at, sla_minutes,
-        created_by,
-        employees!tickets_created_by_fkey(name)
+        id, title, location, details, status, created_at, sla_due_at, sla_days,
+        created_by, source_ticket_id,
+        employees!projects_created_by_fkey(name)
       `)
       .order("sla_due_at", { ascending: true });
 
-    if (!includeClosed) q = q.eq("status", "open");
+    if (!includeClosed) q = q.neq("status", "closed");
 
     const { data, error } = await q;
     if (error) return json({ ok: false, error: error.message }, 500);
 
     const now = Date.now();
-    const items = (data || []).map((t: any) => {
-      const due = new Date(t.sla_due_at).getTime();
+    const items = (data || []).map((p: any) => {
+      const due = new Date(p.sla_due_at).getTime();
       const msLeft = due - now;
       return {
-        ...t,
-        created_by_name: t.employees?.name || "Unknown",
+        ...p,
+        created_by_name: p.employees?.name || "Unknown",
         ms_left: msLeft,
         is_overdue: msLeft < 0,
       };
     });
 
-    // overdue first, then due soonest
     items.sort((a: any, b: any) => {
       const ao = a.is_overdue ? 0 : 1;
       const bo = b.is_overdue ? 0 : 1;
@@ -47,7 +46,7 @@ export const handler: Handler = async (event) => {
       return a.ms_left - b.ms_left;
     });
 
-    return json({ ok: true, tickets: items });
+    return json({ ok: true, projects: items });
   } catch (e: any) {
     return json({ ok: false, error: e?.message || "Server error" }, 500);
   }

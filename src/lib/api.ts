@@ -95,3 +95,49 @@ export async function getTicketPhotoUploadUrl(payload: { ticket_id: string; file
 export async function confirmTicketPhoto(payload: { ticket_id: string; storage_path: string }) {
   return api("/api/tickets-photo-confirm", { method: "POST", body: JSON.stringify(payload) });
 }
+
+
+export type Project = {
+  id: string;
+  title: string;
+  location: string;
+  details: string;
+  status: string;
+  created_at: string;
+  sla_due_at: string;
+  sla_days: number;
+  created_by: string;
+  created_by_name?: string;
+  source_ticket_id?: string | null;
+  ms_left?: number;
+  is_overdue?: boolean;
+};
+
+export async function listProjects(includeClosed = false) {
+  const qs = includeClosed ? "?includeClosed=1" : "";
+  return api(`/api/projects-list${qs}`, { method: "GET" });
+}
+
+export async function createProject(payload: { title: string; location: string; details: string; sla_days?: number }) {
+  return api("/api/projects-create", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function getProject(id: string) {
+  return api(`/api/projects-get?id=${encodeURIComponent(id)}`, { method: "GET" });
+}
+
+export async function addProjectComment(payload: { project_id: string; comment: string }) {
+  return api("/api/projects-comment", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function closeProject(payload: { id: string; comment?: string }) {
+  return api("/api/projects-close", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function getProjectPhotoUploadUrl(payload: { project_id: string; file_name: string; content_type: string }) {
+  return api("/api/projects-photo-upload-url", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function confirmProjectPhoto(payload: { project_id: string; storage_path: string }) {
+  return api("/api/projects-photo-confirm", { method: "POST", body: JSON.stringify(payload) });
+}
