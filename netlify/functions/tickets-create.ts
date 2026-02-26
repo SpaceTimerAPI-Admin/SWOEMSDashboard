@@ -46,7 +46,9 @@ export const handler: Handler = async (event) => {
     if (error) return json({ ok: false, error: error.message }, 500);
 
     try {
-      const msg = `🆕 Ticket: ${title} @ ${location} — logged by ${session.employee.name} — SLA ${sla_minutes}m`;
+      const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
+      const link = base ? `${base}/tickets/${data.id}` : "";
+      const msg = `🆕 Ticket: ${title} @ ${location} — logged by ${session.employee.name} — SLA ${sla_minutes}m${link ? ` — ${link}` : ""}`;
       await postGroupMe(msg);
     } catch {}
 

@@ -39,7 +39,7 @@ export default function TicketNew() {
           <div style={{marginTop:12}}>
             <button className="btn" disabled={busy}>{busy ? "Creating..." : "Create ticket (SLA 1 hour)"}</button>
           </div>
-          <div style={{marginTop:10}} className="muted">Photos will be added next.</div>
+          <div style={{marginTop:10}} className="muted">After creating, you can add photos in the ticket.</div>
         </form>
       </div>
       <div className="spacer" />

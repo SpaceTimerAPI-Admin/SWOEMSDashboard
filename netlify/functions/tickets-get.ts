@@ -38,12 +38,25 @@ export const handler: Handler = async (event) => {
 
     if (cErr) return json({ ok: false, error: cErr.message }, 500);
 
+
+    const { data: photos, error: pErr } = await supabase
+      .from("ticket_photos")
+      .select("id, ticket_id, storage_path, public_url, created_at, uploaded_by, employees!ticket_photos_uploaded_by_fkey(name)")
+      .eq("ticket_id", id)
+      .order("created_at", { ascending: true });
+
+    if (pErr) return json({ ok: false, error: pErr.message }, 500);
+
     return json({
       ok: true,
       ticket: {
         ...ticket,
         created_by_name: (ticket as any).employees?.name || "Unknown",
       },
+      photos: (photos || []).map((p: any) => ({
+        ...p,
+        uploaded_by_name: p.employees?.name || "Unknown",
+      })),
       comments: (comments || []).map((c: any) => ({
         ...c,
         employee_name: c.employees?.name || "Unknown",

@@ -86,3 +86,12 @@ export async function closeTicket(payload: { id: string; comment?: string }) {
 export async function convertTicket(payload: { ticket_id: string }) {
   return api("/api/tickets-convert", { method: "POST", body: JSON.stringify(payload) });
 }
+
+
+export async function getTicketPhotoUploadUrl(payload: { ticket_id: string; file_name: string; content_type: string }) {
+  return api("/api/tickets-photo-upload-url", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function confirmTicketPhoto(payload: { ticket_id: string; storage_path: string }) {
+  return api("/api/tickets-photo-confirm", { method: "POST", body: JSON.stringify(payload) });
+}

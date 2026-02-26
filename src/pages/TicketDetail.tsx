@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { addTicketComment, closeTicket, convertTicket, getTicket } from "../lib/api";
+import { addTicketComment, closeTicket, convertTicket, getTicket, getTicketPhotoUploadUrl, confirmTicketPhoto } from "../lib/api";
 
 function fmt(ms: number) {
   const abs = Math.abs(ms);
@@ -20,6 +20,8 @@ export default function TicketDetail() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
 
   async function load() {
     setErr(null);
@@ -54,7 +56,39 @@ export default function TicketDetail() {
     }
   }
 
-  async function onClose() {
+async function onUploadPhoto(file: File) {
+  setUploadErr(null);
+  setUploading(true);
+  try {
+    const up = await getTicketPhotoUploadUrl({
+      ticket_id: String(id),
+      file_name: file.name,
+      content_type: file.type || "application/octet-stream",
+    });
+
+    // Upload directly to Supabase Storage signed URL
+    const putRes = await fetch(up.signed_url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+      },
+      body: file,
+    });
+
+    const putText = await putRes.text().catch(() => "");
+    if (!putRes.ok) throw new Error(`Upload failed: ${putRes.status} ${putText}`);
+
+    await confirmTicketPhoto({ ticket_id: String(id), storage_path: up.storage_path });
+    await load();
+  } catch (e: any) {
+    setUploadErr(e.message || "Upload failed");
+  } finally {
+    setUploading(false);
+  }
+}
+
+async function onClose() {
+
     setBusy(true);
     try {
       await closeTicket({ id: String(id) });
@@ -125,7 +159,46 @@ export default function TicketDetail() {
           </div>
 
           <div className="card" style={{marginTop:12}}>
-            <div className="h2">Updates</div>
+  <div className="h2">Photos</div>
+  {uploadErr ? <div style={{marginTop:10,color:"#ff8b8b"}}>{uploadErr}</div> : null}
+  <div className="row" style={{marginTop:10, alignItems:"center"}}>
+    <div className="col">
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onUploadPhoto(f);
+          e.currentTarget.value = "";
+        }}
+        disabled={uploading}
+      />
+    </div>
+    <div className="col" style={{textAlign:"right"}}>
+      <span className="muted">{uploading ? "Uploading..." : "Optional"}</span>
+    </div>
+  </div>
+
+  {data?.photos?.length ? (
+    <div style={{marginTop:12, display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 1fr))", gap:10}}>
+      {data.photos.map((p: any) => (
+        <a key={p.id} href={p.public_url} target="_blank" rel="noreferrer" style={{textDecoration:"none"}}>
+          <div style={{border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, overflow:"hidden"}}>
+            <img src={p.public_url} alt="ticket" style={{width:"100%", height:160, objectFit:"cover", display:"block"}} />
+            <div style={{padding:8}} className="muted">
+              {p.uploaded_by_name} • {new Date(p.created_at).toLocaleString()}
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+  ) : (
+    <div className="muted" style={{marginTop:10}}>No photos yet.</div>
+  )}
+</div>
+
+<div className="card" style={{marginTop:12}}>
+  <div className="h2">Updates</div>
             {comments.length ? (
               <div style={{display:"grid", gap:10}}>
                 {comments.map((c: any) => (
