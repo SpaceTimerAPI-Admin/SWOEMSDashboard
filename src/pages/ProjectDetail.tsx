@@ -151,7 +151,7 @@ export default function ProjectDetail() {
 
   return (
     <div className="page">
-      <div className="row between">
+      <div className="row between detail-actions">
         <Link className="btn" to="/projects">← Back</Link>
         <button className="btn" onClick={handleClose} disabled={busy}>Close</button>
       </div>
@@ -172,8 +172,8 @@ export default function ProjectDetail() {
               placeholder="Add an update, note, or status change…"
               rows={4}
             />
-            <div className="row between" style={{ marginTop: 8, gap: 12 }}>
-              <label className="btn">
+            <div className="row" style={{ marginTop: 10, gap: 12 }}>
+              <label className="btn secondary">
                 Add photos
                 <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
               </label>
