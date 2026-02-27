@@ -38,11 +38,8 @@ export async function enroll(payload: { enrollment_code: string; employee_id: st
   return api("/api/enroll", { method: "POST", body: JSON.stringify(payload) });
 }
 
-export async function resetPin(employee_id: string) {
-  return api("/api/reset-pin", {
-    method: "POST",
-    body: JSON.stringify({ employee_id }),
-  });
+export async function resetPin(payload: { employee_id: string; code: string; pin: string }) {
+  return api("/api/reset-pin", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export async function notifyEvent(type: string, message: string) {

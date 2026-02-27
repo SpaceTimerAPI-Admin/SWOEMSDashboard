@@ -23,6 +23,16 @@ export function badRequest(message: string) {
   return json({ ok: false, error: message }, 400);
 }
 
+export function methodNotAllowed() {
+  return json({ ok: false, error: "Method not allowed" }, 405);
+}
+
+export function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing required env var: ${name}`);
+  return v;
+}
+
 export function unauthorized(message = "Unauthorized") {
   return json({ ok: false, error: message }, 401);
 }

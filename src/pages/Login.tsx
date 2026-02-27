@@ -1,75 +1,68 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { isAuthed } from "../lib/auth";
-
-const PENDING_KEY = "md_pending_employee_id";
+import { resetPin } from "../lib/api";
 
 export default function Login() {
   const nav = useNavigate();
-  const authed = useMemo(() => isAuthed(), []);
   const [employeeId, setEmployeeId] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const idRef = useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => {
-    if (authed) nav("/");
-  }, [authed, nav]);
+  useEffect(() => { idRef.current?.focus(); }, []);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-
+    setErr(null);
+    setInfo(null);
     const id = employeeId.trim();
-    if (!id) {
-      setError("Employee ID required");
-      return;
-    }
+    if (!id) return setErr("Employee ID required");
+    sessionStorage.setItem("pending_employee_id", id);
+    nav("/login/pin");
+  }
 
-    sessionStorage.setItem(PENDING_KEY, id);
-    nav("/login-pin");
+  async function onResetPin() {
+    setErr(null);
+    setInfo(null);
+    const id = employeeId.trim();
+    if (!id) return setErr("Enter your Employee ID first");
+    setBusy(true);
+    try {
+      const res = await resetPin(id);
+      if (!res.ok) return setErr(res.error);
+      setInfo("Temporary PIN sent to your email.");
+    } catch (e: any) {
+      setErr(e.message || "Reset failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-slate-900/40 border border-slate-700/40 rounded-2xl shadow-xl p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold">Sign in</h1>
-          <p className="text-slate-300 mt-1">
-            Enter your Employee ID. You will enter your PIN on the next screen.
-          </p>
-        </div>
+    <div className="container">
+      <div className="card">
+        <div className="h1">Maintenance Dashboard</div>
+        <div className="muted">Enter your Employee ID to continue.</div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm text-slate-300">Employee ID</label>
-            <input
-              className="mt-1 w-full rounded-xl bg-slate-950/50 border border-slate-700/50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              inputMode="numeric"
-              autoComplete="username"
-              placeholder="e.g. 12345"
-            />
+        <form onSubmit={onSubmit}>
+          <label>Employee ID</label>
+          <input ref={idRef} className="input" inputMode="numeric" value={employeeId} onChange={(e)=>setEmployeeId(e.target.value)} placeholder="Type ID" />
+          {err ? <div style={{marginTop:10,color:"#ff8b8b"}}>{err}</div> : null}
+          {info ? <div style={{marginTop:10,color:"#8bffb0"}}>{info}</div> : null}
+          <div style={{marginTop:12}}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button className="btn" type="submit" disabled={busy}>{busy ? "Working..." : "Continue"}</button>
+              <button className="btn" type="button" onClick={onResetPin} disabled={busy}>Reset PIN</button>
+            </div>
           </div>
-
-          {error ? <div className="text-red-400 text-sm">{error}</div> : null}
-
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 transition px-4 py-3 font-semibold"
-          >
-            Continue
-          </button>
         </form>
 
-        <div className="mt-5 flex items-center justify-between text-sm">
-          <Link className="text-slate-300 hover:text-white" to="/reset-pin">
-            Reset PIN
-          </Link>
-          <Link className="text-slate-300 hover:text-white" to="/enroll">
-            New user?
-          </Link>
+        <div style={{marginTop:12}} className="muted">
+          New user? <Link to="/enroll">Enroll</Link>
         </div>
       </div>
+      <div className="spacer" />
     </div>
   );
 }
