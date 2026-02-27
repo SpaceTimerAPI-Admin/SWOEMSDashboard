@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createProject } from "../lib/api";
 
 export default function ProjectNew() {
@@ -40,36 +40,40 @@ export default function ProjectNew() {
 
   return (
     <div className="page">
-      <div className="card">
-        <h1>Create Project</h1>
+      <div className="row between wrap" style={{ gap: 10 }}>
+        <Link className="btn inline ghost" to="/projects">← Back</Link>
+        <span className="badge neutral">SLA 7 days</span>
+      </div>
 
-        <form onSubmit={onSubmit} className="form">
+      <div className="card" style={{ marginTop: 12 }}>
+        <h1 style={{ marginBottom: 8 }}>Create Project</h1>
+        <div className="muted">Projects are longer work items with updates, photos, and a due date.</div>
+
+        <form onSubmit={onSubmit} className="form" style={{ marginTop: 12 }}>
           <label>
             Project title
-            <input value={title} onChange={(e) => setTitle(e.target.value)} />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short summary" />
           </label>
 
           <label>
             Location
-            <input value={location} onChange={(e) => setLocation(e.target.value)} />
+            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Where is this happening?" />
           </label>
 
           <label>
             Details
-            <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={8} />
+            <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={7} placeholder="What’s the scope? Any blockers or parts needed?" />
           </label>
 
           {error && <div className="error">{error}</div>}
 
-          <button className="btn primary" disabled={loading}>
-            {loading ? "Creating..." : "Create project (SLA 14 days)"}
+          <button className="btn" disabled={loading}>
+            {loading ? "Creating..." : "Create project"}
           </button>
-
-          <div className="muted" style={{ marginTop: 8 }}>
-            You can add photos after creating.
-          </div>
         </form>
       </div>
+
+      <div className="spacer" />
     </div>
   );
 }

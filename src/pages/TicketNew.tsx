@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createTicket } from "../lib/api";
 
 export default function TicketNew() {
@@ -17,7 +17,6 @@ export default function TicketNew() {
     const payload = {
       title: title.trim(),
       location: location.trim(),
-      // backend expects description; api helper maps details->description
       details: details.trim(),
     };
 
@@ -41,36 +40,40 @@ export default function TicketNew() {
 
   return (
     <div className="page">
-      <div className="card">
-        <h1>Create Ticket</h1>
+      <div className="row between wrap" style={{ gap: 10 }}>
+        <Link className="btn inline ghost" to="/tickets">← Back</Link>
+        <span className="badge neutral">SLA 1 hour</span>
+      </div>
 
-        <form onSubmit={onSubmit} className="form">
+      <div className="card" style={{ marginTop: 12 }}>
+        <h1 style={{ marginBottom: 8 }}>Create Ticket</h1>
+        <div className="muted">After creating, you can add photos and updates inside the ticket.</div>
+
+        <form onSubmit={onSubmit} className="form" style={{ marginTop: 12 }}>
           <label>
             Ticket title
-            <input value={title} onChange={(e) => setTitle(e.target.value)} />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short summary" />
           </label>
 
           <label>
             Location
-            <input value={location} onChange={(e) => setLocation(e.target.value)} />
+            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Where is this happening?" />
           </label>
 
           <label>
             Details
-            <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={8} />
+            <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={7} placeholder="What’s happening? Any troubleshooting already done?" />
           </label>
 
           {error && <div className="error">{error}</div>}
 
-          <button className="btn primary" disabled={loading}>
-            {loading ? "Creating..." : "Create ticket (SLA 1 hour)"}
+          <button className="btn" disabled={loading}>
+            {loading ? "Creating..." : "Create ticket"}
           </button>
-
-          <div className="muted" style={{ marginTop: 8 }}>
-            After creating, you can add photos in the ticket.
-          </div>
         </form>
       </div>
+
+      <div className="spacer" />
     </div>
   );
 }

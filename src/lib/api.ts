@@ -77,16 +77,6 @@ export async function enroll(payload: { employee_id: string; name: string; pin: 
 // Backwards-compat re-exports (some pages historically imported these from lib/api)
 export { setToken, getToken, clearToken, isExpired };
 
-export async function resetPin(payload: { employee_id: string; admin_code?: string; code?: string; new_pin: string }): Promise<ApiResult<{}>> {
-  // accept legacy "code" and newer "admin_code"
-  const body = {
-    employee_id: payload.employee_id,
-    new_pin: payload.new_pin,
-    admin_code: payload.admin_code ?? payload.code ?? "",
-  };
-  return apiFetch<{}>("/api/reset-pin", { method: "POST", body });
-}
-
 // -------------------- Tickets --------------------
 
 export type Ticket = {
@@ -101,12 +91,13 @@ export type Ticket = {
 };
 
 export async function listTickets(opts?: { includeClosed?: boolean }): Promise<ApiResult<{ tickets: Ticket[] }>> {
+  // server-side can ignore includeClosed; UI will filter if needed
   const qs = opts?.includeClosed ? "?includeClosed=1" : "";
-  return apiFetch<{ tickets: Ticket[] }>(`/api/tickets-list${qs}`, { method: "GET" });
+  return apiFetch<{ tickets: Ticket[] }>(`/api/tickets-list${qs}`);
 }
 
 export async function getTicket(id: string): Promise<ApiResult<{ ticket: Ticket; comments?: any[] }>> {
-  return apiFetch<{ ticket: Ticket; comments?: any[] }>(`/api/tickets-get?id=${encodeURIComponent(id)}`, { method: "GET" });
+  return apiFetch<{ ticket: Ticket; comments?: any[] }>(`/api/tickets-get?id=${encodeURIComponent(id)}`);
 }
 
 export async function createTicket(input: {
@@ -179,11 +170,11 @@ export type Project = {
 
 export async function listProjects(opts?: { includeClosed?: boolean }): Promise<ApiResult<{ projects: Project[] }>> {
   const qs = opts?.includeClosed ? "?includeClosed=1" : "";
-  return apiFetch<{ projects: Project[] }>(`/api/projects-list${qs}`, { method: "GET" });
+  return apiFetch<{ projects: Project[] }>(`/api/projects-list${qs}`);
 }
 
 export async function getProject(id: string): Promise<ApiResult<{ project: Project; comments?: any[] }>> {
-  return apiFetch<{ project: Project; comments?: any[] }>(`/api/projects-get?id=${encodeURIComponent(id)}`, { method: "GET" });
+  return apiFetch<{ project: Project; comments?: any[] }>(`/api/projects-get?id=${encodeURIComponent(id)}`);
 }
 
 export async function createProject(input: {
@@ -249,5 +240,5 @@ export async function notifyEvent(payload: { type: string; message: string }): P
 }
 
 
-// Backwards-compatible alias (older UI used this name)
+// Backwards compat alias
 export const convertTicketToProject = convertTicket;

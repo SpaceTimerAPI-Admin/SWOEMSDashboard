@@ -11,6 +11,37 @@ import {
 
 type Ticket = any;
 
+function fmtDate(d?: string): string {
+  if (!d) return "";
+  const ms = Date.parse(d);
+  if (!ms) return d;
+  return new Date(ms).toLocaleString([], { weekday: "short", month: "short", day: "2-digit", hour: "numeric", minute: "2-digit" });
+}
+
+function humanMs(ms: number): string {
+  const a = Math.abs(ms);
+  const mins = Math.round(a / 60000);
+  if (mins < 1) return "seconds";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.round(hrs / 24);
+  return `${days}d`;
+}
+
+function slaBadge(t: any): { cls: string; text: string } {
+  const status = (t?.status || "").toString().toLowerCase();
+  if (status === "closed") return { cls: "neutral", text: "Closed" };
+  if (status === "project") return { cls: "neutral", text: "Converted" };
+
+  const msLeft = typeof t?.ms_left === "number" ? t.ms_left : (t?.sla_due_at ? Date.parse(t.sla_due_at) - Date.now() : NaN);
+  if (!isFinite(msLeft)) return { cls: "neutral", text: "No SLA" };
+
+  if (msLeft < 0) return { cls: "bad", text: `Overdue ${humanMs(msLeft)}` };
+  if (msLeft <= 15 * 60 * 1000) return { cls: "warn", text: `Due ${humanMs(msLeft)}` };
+  return { cls: "good", text: `Due ${humanMs(msLeft)}` };
+}
+
 export default function TicketDetail() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -30,7 +61,7 @@ export default function TicketDetail() {
     try {
       const res: any = await getTicket(ticketId);
       if (!res?.ok) throw new Error(res?.error || "Failed to load ticket");
-      setTicket(res?.ticket || res?.data?.ticket || res?.data || null);
+      setTicket(res?.data?.ticket || res?.ticket || res?.data || null);
     } catch (e: any) {
       setError(e?.message || "Failed to load ticket");
     } finally {
@@ -44,6 +75,8 @@ export default function TicketDetail() {
     const arr = ticket?.photos || ticket?.photo_urls || ticket?.photoUrls || [];
     return Array.isArray(arr) ? arr : [];
   }, [ticket]);
+
+  const isClosed = ((ticket?.status || "").toString().toLowerCase() === "closed") || !!ticket?.closed_at;
 
   async function handleAddComment(photoKeys?: string[]) {
     setCommentError(null);
@@ -101,7 +134,6 @@ export default function TicketDetail() {
   }
 
   async function uploadPhoto(file: File): Promise<string> {
-    // returns storage_key
     const res: any = await getTicketPhotoUploadUrl({
       ticket_id: ticketId,
       filename: file.name,
@@ -139,7 +171,6 @@ export default function TicketDetail() {
     try {
       const keys: string[] = [];
       for (const f of files) keys.push(await uploadPhoto(f));
-      // add as a comment (optional)
       await handleAddComment(keys);
     } catch (err: any) {
       alert(err?.message || "Photo upload failed");
@@ -148,65 +179,136 @@ export default function TicketDetail() {
     }
   }
 
+  const sla = ticket ? slaBadge(ticket) : { cls: "neutral", text: "—" };
+
   return (
     <div className="page">
-      <div className="row between">
-        <Link className="btn" to="/tickets">← Back</Link>
-        <div className="row" style={{ gap: 8 }}>
-          <button className="btn" onClick={handleConvertToProject} disabled={busy}>Move to project</button>
-          <button className="btn" onClick={handleClose} disabled={busy}>Close</button>
+      <div className="row between wrap" style={{ gap: 10 }}>
+        <Link className="btn inline ghost" to="/tickets">← Back</Link>
+
+        <div className="row wrap" style={{ gap: 8, justifyContent: "flex-end" }}>
+          {!isClosed && (
+            <button className="btn inline" onClick={handleConvertToProject} disabled={busy}>
+              Move to project
+            </button>
+          )}
+          {!isClosed && (
+            <button className="btn inline danger" onClick={handleClose} disabled={busy}>
+              Close
+            </button>
+          )}
         </div>
       </div>
 
-      {loading && <div>Loading…</div>}
-      {error && <div className="error">{error}</div>}
+      {loading && <div className="muted" style={{ marginTop: 14 }}>Loading…</div>}
+      {error && <div className="error" style={{ marginTop: 14 }}>{error}</div>}
 
       {!loading && ticket && (
         <>
-          <h1 style={{ marginTop: 12 }}>{ticket.title}</h1>
-          <div className="muted">{ticket.location}</div>
+          <div style={{ marginTop: 12 }}>
+            <div className="row between wrap" style={{ gap: 10, alignItems: "flex-start" }}>
+              <div className="grow">
+                <h1 style={{ marginBottom: 8 }}>{ticket.title || "Ticket"}</h1>
+                <div className="muted">{ticket.location || "No location"}</div>
+              </div>
+              <div className="badges">
+                <span className={"badge " + sla.cls}>{sla.text}</span>
+                <span className="badge">{(ticket.status || "open").toString().toUpperCase()}</span>
+              </div>
+            </div>
+          </div>
 
-          <div className="card" style={{ marginTop: 16 }}>
-            <h2>Update / Comment</h2>
-            <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={4} />
-            <div className="row between" style={{ marginTop: 8 }}>
-              <label className="btn">
+          <div className="card" style={{ marginTop: 14 }}>
+            <div className="kv">
+              <div className="cell">
+                <div className="k">Created</div>
+                <div className="v">{fmtDate(ticket.created_at)}</div>
+              </div>
+              <div className="cell">
+                <div className="k">SLA Due</div>
+                <div className="v">{ticket.sla_due_at ? fmtDate(ticket.sla_due_at) : "—"}</div>
+              </div>
+              <div className="cell">
+                <div className="k">Created By</div>
+                <div className="v">{ticket.created_by_name || ticket.created_by || "—"}</div>
+              </div>
+              <div className="cell">
+                <div className="k">SLA</div>
+                <div className="v">{ticket.sla_minutes ? `${ticket.sla_minutes} min` : "—"}</div>
+              </div>
+            </div>
+
+            {ticket.details && (
+              <div style={{ marginTop: 12 }}>
+                <div className="k" style={{ fontSize: 12, color: "rgba(230,232,239,0.70)" }}>Details</div>
+                <div style={{ marginTop: 6, whiteSpace: "pre-wrap", lineHeight: 1.35 }}>{ticket.details}</div>
+              </div>
+            )}
+          </div>
+
+          <div className="card" style={{ marginTop: 14 }}>
+            <div className="section-title">
+              <h2 style={{ margin: 0 }}>Update / Comment</h2>
+              <span className="badge neutral">{busy ? "Saving…" : "Ready"}</span>
+            </div>
+
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={4}
+              placeholder="Add an update, note, or status change…"
+              style={{ marginTop: 10 }}
+            />
+
+            <div className="row between wrap" style={{ marginTop: 10, gap: 10 }}>
+              <label className="btn inline secondary" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
                 Upload photo
-                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
+                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} disabled={busy} />
               </label>
-              <button className="btn primary" disabled={busy} onClick={() => handleAddComment()}>
-                {busy ? "Saving..." : "Add comment"}
+
+              <button className="btn inline" disabled={busy} onClick={() => handleAddComment()}>
+                Add comment
               </button>
             </div>
-            {commentError && <div className="error" style={{ marginTop: 8 }}>{commentError}</div>}
+
+            {commentError && <div className="error">{commentError}</div>}
           </div>
 
           {photos.length > 0 && (
-            <div className="card" style={{ marginTop: 16 }}>
-              <h2>Photos</h2>
-              <div className="grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+            <div className="card" style={{ marginTop: 14 }}>
+              <div className="section-title">
+                <h2 style={{ margin: 0 }}>Photos</h2>
+                <span className="badge neutral">{photos.length}</span>
+              </div>
+              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
                 {photos.map((p: any, idx: number) => (
                   <a key={idx} href={p.url || p} target="_blank" rel="noreferrer">
-                    <img src={p.url || p} style={{ width: "100%", borderRadius: 12 }} />
+                    <img src={p.url || p} style={{ width: "100%", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)" }} />
                   </a>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="card" style={{ marginTop: 16 }}>
-            <h2>History</h2>
-            <div className="list">
+          <div className="card" style={{ marginTop: 14 }}>
+            <div className="section-title">
+              <h2 style={{ margin: 0 }}>History</h2>
+              <span className="badge neutral">{(ticket.comments || ticket.history || []).length}</span>
+            </div>
+
+            <div className="list" style={{ marginTop: 12 }}>
               {(ticket.comments || ticket.history || []).map((c: any, idx: number) => (
                 <div key={idx} className="list-item">
-                  <div className="title">{c.comment || c.text || c.message}</div>
-                  <div className="meta">{c.created_at || c.createdAt || ""}</div>
+                  <div className="title" style={{ fontSize: 16 }}>{c.comment || c.text || c.message || "Update"}</div>
+                  <div className="meta">{fmtDate(c.created_at || c.createdAt)} {c.created_by_name ? `• ${c.created_by_name}` : ""}</div>
                 </div>
               ))}
             </div>
           </div>
         </>
       )}
+
+      <div className="spacer" />
     </div>
   );
 }

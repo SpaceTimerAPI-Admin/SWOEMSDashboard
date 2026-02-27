@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { login } from "../lib/api";
-import { setToken } from "../lib/auth";
 
 export default function Login() {
   const nav = useNavigate();
@@ -24,15 +23,11 @@ export default function Login() {
 
     setLoading(true);
     try {
-      // login(employee_id, pin)
       const res = await login(eid, p);
-
       if (!res.ok) {
         setError(res.error || "Login failed.");
         return;
       }
-
-      setToken(res.data.token);
       nav("/tickets");
     } catch (err: any) {
       setError(err?.message || "Login failed.");
@@ -43,8 +38,11 @@ export default function Login() {
 
   return (
     <div className="page">
-      <div className="card">
+      <div className="card" style={{ maxWidth: 520, margin: "0 auto" }}>
         <h1>Login</h1>
+        <div className="muted" style={{ marginBottom: 10 }}>
+          Sign in with your Employee ID and 4‑digit PIN.
+        </div>
 
         <form onSubmit={onSubmit} className="form">
           <label>
@@ -54,6 +52,7 @@ export default function Login() {
               onChange={(e) => setEmployeeId(e.target.value)}
               autoComplete="username"
               inputMode="numeric"
+              placeholder="e.g. 12345"
             />
           </label>
 
@@ -65,19 +64,24 @@ export default function Login() {
               type="password"
               autoComplete="current-password"
               inputMode="numeric"
+              placeholder="••••"
             />
           </label>
 
           {error && <div className="error">{error}</div>}
 
-          <button className="btn primary" disabled={loading}>
+          <button className="btn" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </button>
 
-          <button type="button" className="btn secondary" onClick={() => nav("/reset-pin")} disabled={loading} style={{ marginTop: 10 }}>
+          <Link className="btn secondary" to="/reset-pin" style={{ textAlign: "center" }}>
             Reset PIN
-          </button>
+          </Link>
         </form>
+
+        <div className="muted" style={{ marginTop: 10 }}>
+          New here? <Link to="/enroll" style={{ textDecoration: "underline" }}>Enroll</Link>
+        </div>
       </div>
     </div>
   );
