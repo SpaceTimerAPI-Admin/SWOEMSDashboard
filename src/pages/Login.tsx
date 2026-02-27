@@ -1,54 +1,71 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { login, setToken } from "../lib/api";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { login } from "../lib/api";
+import { setToken } from "../lib/auth";
 
 export default function Login() {
   const nav = useNavigate();
   const [employeeId, setEmployeeId] = useState("");
   const [pin, setPin] = useState("");
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const idRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { idRef.current?.focus(); }, []);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(null);
-    setBusy(true);
+    setError(null);
+    setLoading(true);
     try {
-      const res = await login(employeeId, pin);
-      setToken(res.token, res.expires_at);
+      const res = await login({ employee_id: employeeId.trim(), pin: pin.trim() });
+      // Expected response shape: { ok: true, token: string } OR { token: string }
+      const token = (res as any)?.token;
+      if (!token) throw new Error("Login did not return a token");
+      setToken(token);
       nav("/");
-    } catch (e: any) {
-      setErr(e.message || "Login failed");
+    } catch (err: any) {
+      setError(err?.message || "Login failed");
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   }
 
   return (
-    <div className="container">
+    <div className="page">
       <div className="card">
-        <div className="h1">Maintenance Dashboard</div>
-        <div className="muted">Scan badge or enter Employee ID, then your 4-digit PIN.</div>
+        <h1>Login</h1>
+        <p className="muted">Enter your Employee ID and 4-digit PIN.</p>
 
-        <form onSubmit={onSubmit}>
-          <label>Employee ID</label>
-          <input ref={idRef} className="input" inputMode="numeric" value={employeeId} onChange={(e)=>setEmployeeId(e.target.value)} placeholder="Scan or type ID" />
-          <label>PIN</label>
-          <input className="input" inputMode="numeric" maxLength={4} value={pin} onChange={(e)=>setPin(e.target.value)} placeholder="4 digits" />
-          {err ? <div style={{marginTop:10,color:"#ff8b8b"}}>{err}</div> : null}
-          <div style={{marginTop:12}}>
-            <button className="btn" disabled={busy}>{busy ? "Signing in..." : "Sign in"}</button>
-          </div>
+        <form onSubmit={onSubmit} className="form">
+          <label className="label">
+            Employee ID
+            <input
+              className="input"
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              inputMode="numeric"
+              autoComplete="username"
+              required
+            />
+          </label>
+
+          <label className="label">
+            PIN
+            <input
+              className="input"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              inputMode="numeric"
+              autoComplete="current-password"
+              required
+            />
+          </label>
+
+          {error ? <div className="error">{error}</div> : null}
+
+          <button className="btn" type="submit" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
         </form>
-
-        <div style={{marginTop:12}} className="muted">
-          New user? <Link to="/enroll">Enroll</Link>
-        </div>
       </div>
-      <div className="spacer" />
     </div>
   );
 }

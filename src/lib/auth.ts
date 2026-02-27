@@ -1,15 +1,9 @@
-// Token utilities for the SWOEMS dashboard.
-// Kept separate from api.ts to avoid circular imports and TS build failures.
+/**
+ * Client-side auth helpers for SWOEMS Dashboard
+ * Stores a session token in localStorage and provides simple helpers.
+ */
 
 const TOKEN_KEY = "md_session_token";
-
-export function setToken(token: string) {
-  try {
-    localStorage.setItem(TOKEN_KEY, token);
-  } catch {
-    // ignore
-  }
-}
 
 export function getToken(): string | null {
   try {
@@ -19,7 +13,15 @@ export function getToken(): string | null {
   }
 }
 
-export function clearToken() {
+export function setToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // ignore
+  }
+}
+
+export function clearToken(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
   } catch {
@@ -27,24 +29,45 @@ export function clearToken() {
   }
 }
 
-/**
- * Best-effort JWT expiry check.
- * Returns false if token can't be parsed.
- */
-export function isExpired(token?: string | null): boolean {
-  const t = token ?? getToken();
-  if (!t) return true;
-
+function parseJwt(token: string): any | null {
   try {
-    const parts = t.split(".");
-    if (parts.length < 2) return false;
-    const payloadJson = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
-    const payload = JSON.parse(payloadJson);
-    const exp = payload?.exp;
-    if (!exp || typeof exp !== "number") return false;
-    const now = Math.floor(Date.now() / 1000);
-    return now >= exp;
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(payload)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(json);
   } catch {
-    return false;
+    return null;
   }
+}
+
+/**
+ * Returns true if token has an `exp` claim and it is in the past.
+ * If token isn't a JWT or has no exp, we treat it as non-expiring.
+ */
+export function isExpired(token: string): boolean {
+  const payload = parseJwt(token);
+  const exp = payload?.exp;
+  if (!exp || typeof exp !== "number") return false;
+  const nowSec = Math.floor(Date.now() / 1000);
+  return nowSec >= exp;
+}
+
+/** Convenience: token exists and not expired */
+export function isAuthed(): boolean {
+  const t = getToken();
+  if (!t) return false;
+  return !isExpired(t);
+}
+
+/** Clears auth and returns user to login screen */
+export function logout(): void {
+  clearToken();
+  // Hard redirect keeps things simple for SPA + Netlify
+  window.location.href = "/login";
 }
