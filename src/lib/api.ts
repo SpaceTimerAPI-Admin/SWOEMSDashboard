@@ -130,14 +130,17 @@ export async function convertTicket(id: string): Promise<ApiResult<{}>> {
   return apiFetch<{}>("/api/tickets-convert", { method: "POST", body: { id } });
 }
 
+// Backwards-compat alias used by some pages
+export const convertTicketToProject = convertTicket;
+
 // Photo upload helpers (Supabase storage presign)
 export async function getTicketPhotoUploadUrl(input: {
   ticket_id: string;
   filename?: string;
   file_name?: string; // legacy
   content_type: string;
-}): Promise<ApiResult<{ upload_url: string; storage_key: string }>> {
-  return apiFetch<{ upload_url: string; storage_key: string }>("/api/tickets-photo-upload-url", {
+}): Promise<ApiResult<{ upload_url: string; storage_key: string; signed_url?: string; storage_path?: string }>> {
+  const r = await apiFetch<{ upload_url: string; storage_key: string }>("/api/tickets-photo-upload-url", {
     method: "POST",
     body: {
       ticket_id: input.ticket_id,
@@ -145,6 +148,20 @@ export async function getTicketPhotoUploadUrl(input: {
       content_type: input.content_type,
     },
   });
+
+  // Backwards-compatible aliases some pages used historically
+  if (r.ok) {
+    return {
+      ok: true,
+      data: {
+        upload_url: r.data.upload_url,
+        storage_key: r.data.storage_key,
+        signed_url: r.data.upload_url,
+        storage_path: r.data.storage_key,
+      },
+    };
+  }
+  return r;
 }
 
 export async function confirmTicketPhoto(input: { ticket_id: string; storage_key?: string; storage_path?: string }): Promise<ApiResult<{}>> {
@@ -207,8 +224,8 @@ export async function getProjectPhotoUploadUrl(input: {
   filename?: string;
   file_name?: string; // legacy
   content_type: string;
-}): Promise<ApiResult<{ upload_url: string; storage_key: string }>> {
-  return apiFetch<{ upload_url: string; storage_key: string }>("/api/projects-photo-upload-url", {
+}): Promise<ApiResult<{ upload_url: string; storage_key: string; signed_url?: string; storage_path?: string }>> {
+  const r = await apiFetch<{ upload_url: string; storage_key: string }>("/api/projects-photo-upload-url", {
     method: "POST",
     body: {
       project_id: input.project_id,
@@ -216,6 +233,19 @@ export async function getProjectPhotoUploadUrl(input: {
       content_type: input.content_type,
     },
   });
+
+  if (r.ok) {
+    return {
+      ok: true,
+      data: {
+        upload_url: r.data.upload_url,
+        storage_key: r.data.storage_key,
+        signed_url: r.data.upload_url,
+        storage_path: r.data.storage_key,
+      },
+    };
+  }
+  return r;
 }
 
 export async function confirmProjectPhoto(input: { project_id: string; storage_key?: string; storage_path?: string }): Promise<ApiResult<{}>> {
