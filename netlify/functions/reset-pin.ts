@@ -17,7 +17,7 @@ export const handler: Handler = async (event) => {
     const new_pin = String(body.new_pin || body.pin || "").trim();
 
     if (!employee_id) return badRequest("Employee ID required");
-    if (!code) return badRequest("Enrollment code required");
+    if (!admin_code) return badRequest("Admin reset code required");
     if (!/^\d{4}$/.test(new_pin)) return badRequest("PIN must be 4 digits");
 
     const expected = String(process.env.PIN_RESET_ADMIN_CODE || "").trim();
