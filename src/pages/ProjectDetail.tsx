@@ -25,6 +25,9 @@ export default function ProjectDetail() {
   const [error, setError] = useState<string | null>(null);
 
   const [comment, setComment] = useState("");
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [resolution, setResolution] = useState("");
+  const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -88,13 +91,31 @@ export default function ProjectDetail() {
   }
 
   async function handleClose() {
+    setResolutionError(null);
+    setResolution("");
+    setShowCloseModal(true);
+  }
+
+  async function confirmClose() {
     if (!projectId) return;
+    const trimmed = resolution.trim();
+    if (!trimmed) {
+      setResolutionError("Please enter a resolution note.");
+      return;
+    }
     setBusy(true);
     try {
+      await addProjectComment(projectId, `Resolution: ${trimmed}`);
       const res: any = await closeProject(projectId);
       if (!res?.ok) throw new Error(res?.error || "Failed to close project");
+      setShowCloseModal(false);
       await load();
     } catch (e: any) {
+      setError(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  } catch (e: any) {
       alert(e?.message || "Failed to close project");
     } finally {
       setBusy(false);
@@ -150,14 +171,10 @@ export default function ProjectDetail() {
   }
 
   return (
-    <div className="container">
-      <div className="detailHeader">
-        <Link className="btnGhost" to="/projects">← Back</Link>
-        <div className="detailActions">
-          <button className="btnPrimary" onClick={handleClose} disabled={busy}>
-            Close
-          </button>
-        </div>
+    <div className="page">
+      <div className="row between detail-actions">
+        <Link className="btn" to="/projects">← Back</Link>
+        <button className="btn" onClick={handleClose} disabled={busy}>Close project</button>
       </div>
 
       {loading && <div>Loading…</div>}
@@ -165,23 +182,32 @@ export default function ProjectDetail() {
 
       {!loading && project && (
         <>
-          <div className="pageTitle" style={{ marginTop: 12 }}>{project.title}</div>
-          <div className="pageSubtitle">{project.location}</div>
+          <div className="row between" style={{ marginTop: 12, alignItems: "center" }}>
+            <h1 style={{ margin: 0 }}>{project.title}</h1>
+            <div className={"pill sm " + (project.status === "open" ? "primary" : "neutral")}>
+              {project.status === "open" ? "OPEN" : "CLOSED"}
+            </div>
+          </div>
+          <div className="muted" style={{ marginTop: 10 }}>
+            {project.location}
+            {project.tag ? <span className="dot">•</span> : null}
+            {project.tag ? <span>{project.tag}</span> : null}
+          </div>
 
           <div className="card" style={{ marginTop: 16 }}>
-            <div className="sectionTitle">Update / Comment</div>
+            <h2>Update / Comment</h2>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Add an update, note, or status change…"
               rows={4}
             />
-            <div className="detailActions" style={{ marginTop: 10 }}>
-              <label className="btnSecondary" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
+            <div className="row" style={{ marginTop: 10, gap: 12 }}>
+              <label className="btn secondary">
                 Add photos
                 <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
               </label>
-              <button className="btnPrimary" disabled={busy} onClick={handleAddComment}>
+              <button className="btn primary" disabled={busy} onClick={handleAddComment}>
                 {busy ? "Saving..." : "Add comment"}
               </button>
             </div>
@@ -190,14 +216,14 @@ export default function ProjectDetail() {
 
           {photos.length > 0 && (
             <div className="card" style={{ marginTop: 16 }}>
-              <div className="sectionTitle">Photos</div>
-              <div className="photoGrid">
+              <h2>Photos</h2>
+              <div className="photos-grid">
                 {photos.map((p: any, idx: number) => {
                   const url = p?.public_url || p?.url || p;
                   if (!url) return null;
                   return (
                     <a key={idx} href={url} target="_blank" rel="noreferrer">
-                      <img src={url} style={{ width: "100%", borderRadius: 12 }} />
+                      <img src={url} />
                     </a>
                   );
                 })}
@@ -206,16 +232,16 @@ export default function ProjectDetail() {
           )}
 
           <div className="card" style={{ marginTop: 16 }}>
-            <div className="sectionHead" style={{ marginBottom: 10 }}>
-              <div className="sectionTitle" style={{ margin: 0 }}>History</div>
-              <span className="countPill">{history.length}</span>
+            <div className="row between" style={{ alignItems: "center" }}>
+              <h2 style={{ margin: 0 }}>History</h2>
+              <span className="badge">{history.length}</span>
             </div>
-            <div className="list">
+            <div className="list" style={{ marginTop: 10 }}>
               {history.length === 0 && <div className="muted">No updates yet.</div>}
               {history.map((c: any, idx: number) => (
-                <div key={idx} className="historyItem">
-                  <div style={{ fontWeight: 700 }}>{c.comment || c.text || c.message}</div>
-                  <div className="muted" style={{ marginTop: 6 }}>
+                <div key={idx} className="list-item">
+                  <div className="title">{c.comment || c.text || c.message}</div>
+                  <div className="meta">
                     {(c.employee_name || c.employees?.name || "").toString()} {c.created_at ? "• " + new Date(c.created_at).toLocaleString() : ""}
                   </div>
                 </div>
@@ -224,7 +250,38 @@ export default function ProjectDetail() {
           </div>
         </>
       )}
-      <div className="spacer" />
+
+      {showCloseModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="card modal-card">
+            <div className="modal-head">
+              <h3 className="modal-title">Close project</h3>
+            </div>
+            <div className="modal-body">
+              <div className="field-label">Resolution</div>
+              <textarea
+                className="textarea"
+                value={resolution}
+                onChange={(e) => {
+                  setResolution(e.target.value);
+                  setResolutionError(null);
+                }}
+                placeholder="What’s the outcome? Any next steps?"
+              />
+              {resolutionError && <div className="error" style={{ marginTop: 10 }}>{resolutionError}</div>}
+              <div className="btn-row" style={{ marginTop: 14 }}>
+                <button className="btn small" type="button" onClick={() => setShowCloseModal(false)} disabled={busy}>
+                  Cancel
+                </button>
+                <button className="btn primary small" type="button" onClick={confirmClose} disabled={busy}>
+                  Close project
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

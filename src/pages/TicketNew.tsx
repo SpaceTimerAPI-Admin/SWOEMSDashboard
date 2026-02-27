@@ -46,8 +46,8 @@ export default function TicketNew() {
   }
 
   return (
-    <div className="container">
-      <div className="pageTitle">Create Ticket</div>
+    <div className="page">
+      <h1>Create Ticket</h1>
 
       <form onSubmit={onSubmit} className="card" style={{ marginTop: 12 }}>
         <label>
@@ -61,12 +61,12 @@ export default function TicketNew() {
         </label>
 
         <label style={{ marginTop: 10 }}>Tag</label>
-        <div className="chipRow">
+        <div className="chip-row">
           {TAGS.map((t) => (
             <button
               key={t}
               type="button"
-              className={"chip" + (tag === t ? " chipActive" : "")}
+              className={"chip" + (tag === t ? " active" : "")}
               onClick={() => setTag(t)}
             >
               {t}
@@ -79,13 +79,9 @@ export default function TicketNew() {
           <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={5} />
         </label>
 
-        {error && (
-          <div className="error" style={{ marginTop: 10 }}>
-            {error}
-          </div>
-        )}
+        {error && <div className="error" style={{ marginTop: 10 }}>{error}</div>}
 
-        <button className="btnPrimary" style={{ marginTop: 12 }} disabled={loading}>
+        <button className="btn primary" style={{ marginTop: 12 }} disabled={loading}>
           {loading ? "Creating..." : "Create ticket"}
         </button>
 

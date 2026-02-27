@@ -44,9 +44,9 @@ export default function Enroll() {
   }
 
   return (
-    <div className="container">
-      <div className="card" style={{ maxWidth: 520, margin: "0 auto" }}>
-        <div className="pageTitle">Enroll</div>
+    <div className="page">
+      <div className="card">
+        <h1>Enroll</h1>
 
         <form onSubmit={onSubmit} className="form">
           <label>
@@ -71,12 +71,11 @@ export default function Enroll() {
 
           {error && <div className="error">{error}</div>}
 
-          <button className="btnPrimary" disabled={loading}>
+          <button className="btn primary" disabled={loading}>
             {loading ? "Enrolling..." : "Enroll"}
           </button>
         </form>
       </div>
-      <div className="spacer" />
     </div>
   );
 }

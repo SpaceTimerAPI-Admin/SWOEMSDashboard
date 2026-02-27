@@ -4,7 +4,7 @@ import { NavLink } from "react-router-dom";
 export default function BottomNav() {
   return (
     <div className="nav">
-      <div className="navInner">
+      <div className="nav-inner">
         <NavLink to="/" end className={({ isActive }) => (isActive ? "active" : "")}>Home</NavLink>
         <NavLink to="/tickets" className={({ isActive }) => (isActive ? "active" : "")}>Tickets</NavLink>
         <NavLink to="/projects" className={({ isActive }) => (isActive ? "active" : "")}>Projects</NavLink>
