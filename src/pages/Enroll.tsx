@@ -1,81 +1,60 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { enroll } from "../lib/api";
 
 export default function Enroll() {
   const nav = useNavigate();
-  const [employeeId, setEmployeeId] = useState("");
+  const [enrollment_code, setCode] = useState("");
+  const [employee_id, setEmployeeId] = useState("");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
-  const [code, setCode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-
-    const payload = {
-      employee_id: employeeId.trim(),
-      name: name.trim(),
-      pin: pin.trim(),
-      // backend expects "code"
-      code: code.trim(),
-    };
-
-    if (!payload.employee_id || !payload.name || !payload.pin || !payload.code) {
-      setError("All fields are required.");
-      return;
-    }
-
-    setLoading(true);
+    setErr(null);
+    setBusy(true);
     try {
-      const res: any = await enroll(payload);
-      if (!res?.ok) {
-        setError(res?.error || "Enrollment failed.");
-        return;
-      }
+      await enroll({ enrollment_code, employee_id, name, email, pin });
       nav("/login");
-    } catch (err: any) {
-      setError(err?.message || "Enrollment failed.");
+    } catch (e: any) {
+      setErr(e.message || "Enroll failed");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   }
 
   return (
-    <div className="page">
+    <div className="container">
       <div className="card">
-        <h1>Enroll</h1>
+        <div className="h1">Enroll</div>
+        <div className="muted">Requires your enrollment code.</div>
 
-        <form onSubmit={onSubmit} className="form">
-          <label>
-            Employee ID
-            <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
-          </label>
+        <form onSubmit={onSubmit}>
+          <label>Enrollment Code</label>
+          <input className="input" value={enrollment_code} onChange={(e)=>setCode(e.target.value)} />
+          <label>Employee ID</label>
+          <input className="input" inputMode="numeric" value={employee_id} onChange={(e)=>setEmployeeId(e.target.value)} />
+          <label>Name</label>
+          <input className="input" value={name} onChange={(e)=>setName(e.target.value)} />
+          <label>Email (for EOD report)</label>
+          <input className="input" value={email} onChange={(e)=>setEmail(e.target.value)} />
+          <label>4-digit PIN</label>
+          <input className="input" inputMode="numeric" maxLength={4} value={pin} onChange={(e)=>setPin(e.target.value)} />
 
-          <label>
-            Name
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-
-          <label>
-            PIN
-            <input type="password" value={pin} onChange={(e) => setPin(e.target.value)} />
-          </label>
-
-          <label>
-            Enrollment code
-            <input value={code} onChange={(e) => setCode(e.target.value)} />
-          </label>
-
-          {error && <div className="error">{error}</div>}
-
-          <button className="btn primary" disabled={loading}>
-            {loading ? "Enrolling..." : "Enroll"}
-          </button>
+          {err ? <div style={{marginTop:10,color:"#ff8b8b"}}>{err}</div> : null}
+          <div style={{marginTop:12}}>
+            <button className="btn" disabled={busy}>{busy ? "Enrolling..." : "Create account"}</button>
+          </div>
         </form>
+
+        <div style={{marginTop:12}} className="muted">
+          <Link to="/login">Back to login</Link>
+        </div>
       </div>
+      <div className="spacer" />
     </div>
   );
 }

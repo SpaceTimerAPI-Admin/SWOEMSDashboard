@@ -109,16 +109,7 @@ export const handler: Handler = async (event) => {
     let email_error: string | null = null;
     if (!sendRes.ok) {
       email_status = "failed";
-      const body = await sendRes.text().catch(() => "");
-      email_error = `Resend ${sendRes.status} ${sendRes.statusText}: ${body}`;
-      // Make it easy to debug without hunting in Netlify logs.
-      console.error("[send-eod] Resend error", {
-        status: sendRes.status,
-        statusText: sendRes.statusText,
-        body,
-        from,
-        to,
-      });
+      email_error = await sendRes.text();
     }
 
     // Save report snapshot

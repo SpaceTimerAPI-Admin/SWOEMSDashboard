@@ -7,70 +7,42 @@ export default function TicketNew() {
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
   const [details, setDetails] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-
-    const payload = {
-      title: title.trim(),
-      location: location.trim(),
-      // backend expects description; api helper maps details->description
-      details: details.trim(),
-    };
-
-    if (!payload.title) return setError("Title required");
-    if (!payload.location) return setError("Location required");
-    if (!payload.details) return setError("Details required");
-
-    setLoading(true);
+    setErr(null);
+    setBusy(true);
     try {
-      const res: any = await createTicket(payload);
-      if (!res?.ok) throw new Error(res?.error || "Failed to create ticket");
-      const ticket = res?.ticket || res?.data?.ticket;
-      if (ticket?.id) nav(`/tickets/${ticket.id}`);
-      else nav("/tickets");
-    } catch (err: any) {
-      setError(err?.message || "Failed to create ticket");
+      const res = await createTicket({ title, location, details, sla_minutes: 60 });
+      nav(`/tickets/${res.ticket.id}`);
+    } catch (e: any) {
+      setErr(e.message || "Failed to create ticket");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   }
 
   return (
-    <div className="page">
+    <div className="container">
+      <div className="h1">Log A Call</div>
       <div className="card">
-        <h1>Create Ticket</h1>
-
-        <form onSubmit={onSubmit} className="form">
-          <label>
-            Ticket title
-            <input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-
-          <label>
-            Location
-            <input value={location} onChange={(e) => setLocation(e.target.value)} />
-          </label>
-
-          <label>
-            Details
-            <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={8} />
-          </label>
-
-          {error && <div className="error">{error}</div>}
-
-          <button className="btn primary" disabled={loading}>
-            {loading ? "Creating..." : "Create ticket (SLA 1 hour)"}
-          </button>
-
-          <div className="muted" style={{ marginTop: 8 }}>
-            After creating, you can add photos in the ticket.
+        <form onSubmit={onSubmit}>
+          <label>Ticket title</label>
+          <input className="input" value={title} onChange={(e)=>setTitle(e.target.value)} placeholder="Short summary" />
+          <label>Location</label>
+          <input className="input" value={location} onChange={(e)=>setLocation(e.target.value)} placeholder="Area / attraction / zone" />
+          <label>Details</label>
+          <textarea className="input" style={{minHeight:140}} value={details} onChange={(e)=>setDetails(e.target.value)} placeholder="What came over the radio?" />
+          {err ? <div style={{marginTop:10,color:"#ff8b8b"}}>{err}</div> : null}
+          <div style={{marginTop:12}}>
+            <button className="btn" disabled={busy}>{busy ? "Creating..." : "Create ticket (SLA 1 hour)"}</button>
           </div>
+          <div style={{marginTop:10}} className="muted">After creating, you can add photos in the ticket.</div>
         </form>
       </div>
+      <div className="spacer" />
     </div>
   );
 }
