@@ -9,35 +9,44 @@ function isClosed(t: Ticket): boolean {
   return s === "closed" || s === "done" || !!t?.closed_at || !!t?.closedAt;
 }
 
-function fmtDate(d?: string): string {
-  if (!d) return "";
-  const ms = Date.parse(d);
-  if (!ms) return d;
-  return new Date(ms).toLocaleString([], { month: "short", day: "2-digit", hour: "numeric", minute: "2-digit" });
+function fmtWhen(iso?: string): string {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  return new Date(t).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
-function humanMs(ms: number): string {
-  const a = Math.abs(ms);
-  const mins = Math.round(a / 60000);
-  if (mins < 1) return "seconds";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.round(hrs / 24);
-  return `${days}d`;
+function minutesBetween(nowMs: number, futureMs: number): number {
+  return Math.round((futureMs - nowMs) / 60000);
 }
 
-function slaLabel(t: any): { cls: string; text: string } {
+function slaPill(t: any): { text: string; tone: "ok" | "warn" | "bad" | "closed" } {
   const status = (t?.status || "").toString().toLowerCase();
-  if (status === "closed") return { cls: "neutral", text: "Closed" };
-  if (status === "project") return { cls: "neutral", text: "Converted" };
+  if (status === "closed" || status === "done" || t?.closed_at || t?.closedAt) {
+    return { text: "Closed", tone: "closed" };
+  }
 
-  const msLeft = typeof t?.ms_left === "number" ? t.ms_left : (t?.sla_due_at ? Date.parse(t.sla_due_at) - Date.now() : NaN);
-  if (!isFinite(msLeft)) return { cls: "neutral", text: "No SLA" };
+  const dueIso = t?.sla_due_at || t?.slaDueAt || t?.due_at || t?.dueAt;
+  const dueMs = dueIso ? Date.parse(dueIso) : NaN;
+  if (!Number.isFinite(dueMs)) return { text: "SLA", tone: "ok" };
 
-  if (msLeft < 0) return { cls: "bad", text: `Overdue ${humanMs(msLeft)} ` };
-  if (msLeft <= 15 * 60 * 1000) return { cls: "warn", text: `Due ${humanMs(msLeft)}` };
-  return { cls: "good", text: `Due ${humanMs(msLeft)}` };
+  const now = Date.now();
+  const mins = minutesBetween(now, dueMs);
+
+  const abs = Math.abs(mins);
+  const d = Math.floor(abs / (60 * 24));
+  const h = Math.floor((abs % (60 * 24)) / 60);
+  const m = abs % 60;
+  const dur = d > 0 ? `${d}d` : h > 0 ? `${h}h` : `${m}m`;
+
+  if (mins < 0) return { text: `Overdue ${dur}`, tone: "bad" };
+  if (mins <= 60) return { text: `Due ${dur}`, tone: "warn" };
+  return { text: `Due ${dur}`, tone: "ok" };
 }
 
 export default function Tickets() {
@@ -51,7 +60,7 @@ export default function Tickets() {
     try {
       const res: any = await listTickets({ includeClosed: true });
       if (!res?.ok) throw new Error(res?.error || "Failed to load tickets");
-      setTickets(res?.data?.tickets || res?.tickets || []);
+      setTickets(res?.tickets || res?.data?.tickets || []);
     } catch (e: any) {
       setError(e?.message || "Failed to load tickets");
     } finally {
@@ -59,7 +68,9 @@ export default function Tickets() {
     }
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+  }, []);
 
   const { openTickets, closedTickets } = useMemo(() => {
     const open: Ticket[] = [];
@@ -67,58 +78,63 @@ export default function Tickets() {
     for (const t of tickets) (isClosed(t) ? closed : open).push(t);
 
     const sortFn = (a: any, b: any) => {
-      // prioritize overdue/due soon
-      const am = typeof a?.ms_left === "number" ? a.ms_left : 0;
-      const bm = typeof b?.ms_left === "number" ? b.ms_left : 0;
-      if (a?.is_overdue !== b?.is_overdue) return a?.is_overdue ? -1 : 1;
-      if (am !== bm) return am - bm;
       const ta = Date.parse(a?.created_at || a?.createdAt || "") || 0;
       const tb = Date.parse(b?.created_at || b?.createdAt || "") || 0;
       return tb - ta;
     };
+
     open.sort(sortFn);
     closed.sort(sortFn);
-
     return { openTickets: open, closedTickets: closed };
   }, [tickets]);
 
   return (
     <div className="page">
-      <div className="row between wrap" style={{ gap: 10 }}>
+      <div className="page-head">
         <div>
-          <h1 style={{ marginBottom: 6 }}>Tickets</h1>
+          <h1>Tickets</h1>
           <div className="muted">Track urgent issues with SLA status and history.</div>
         </div>
-        <Link className="btn inline" to="/tickets/new">Create ticket</Link>
+        <Link className="btn inline primary" to="/tickets/new">
+          Create ticket
+        </Link>
       </div>
 
-      {loading && <div className="muted" style={{ marginTop: 14 }}>Loading…</div>}
-      {error && <div className="error" style={{ marginTop: 14 }}>{error}</div>}
+      {loading && <div className="muted" style={{ marginTop: 12 }}>Loading…</div>}
+      {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
 
       {!loading && !error && (
         <>
-          <div className="section-title">
-            <h2 style={{ marginBottom: 0 }}>Open</h2>
-            <span className="badge neutral">{openTickets.length} active</span>
+          <div className="section-head">
+            <h2>Open</h2>
+            <span className="pill">{openTickets.length} active</span>
           </div>
 
           {openTickets.length === 0 ? (
             <div className="muted">No open tickets.</div>
           ) : (
-            <div className="list">
+            <div className="cards">
               {openTickets.map((t) => {
-                const sla = slaLabel(t);
+                const sla = slaPill(t);
+                const created = fmtWhen(t?.created_at || t?.createdAt);
+                const who = t?.created_by_name || t?.createdByName || t?.employee_name || t?.employeeName;
+                const tag = t?.tag;
                 return (
-                  <Link key={t.id} className="list-item" to={`/tickets/${t.id}`}>
-                    <div className="item-top">
-                      <div className="grow">
-                        <div className="title">{t.title || "Untitled ticket"}</div>
-                        <div className="meta">{t.location || "No location"} • Created {fmtDate(t.created_at)}</div>
+                  <Link key={t.id} className="cardlink" to={`/tickets/${t.id}`}>
+                    <div className="carditem">
+                      <div className="cardtop">
+                        <div className="cardtitle">{t.title || "(Untitled)"}</div>
+                        <div className="pillrow">
+                          {tag && <span className="pill tone">{tag}</span>}
+                          <span className={`pill sla ${sla.tone}`}>{sla.text}</span>
+                        </div>
                       </div>
-                      <div className="badges">
-                        <span className={"badge " + sla.cls}>{sla.text}</span>
-                        <span className="badge">{(t.created_by_name || t.created_by || "—")}</span>
+                      <div className="cardsub">
+                        {t.location ? <span>{t.location}</span> : <span className="muted">No location</span>}
+                        {created ? <span className="dot">•</span> : null}
+                        {created ? <span className="muted">Created {created}</span> : null}
                       </div>
+                      {who ? <div className="cardmeta"><span className="pill soft">{who}</span></div> : null}
                     </div>
                   </Link>
                 );
@@ -126,34 +142,44 @@ export default function Tickets() {
             </div>
           )}
 
-          <div className="section-title" style={{ marginTop: 18 }}>
-            <h2 style={{ marginBottom: 0 }}>Closed / Past</h2>
-            <span className="badge neutral">{closedTickets.length}</span>
+          <div className="section-head" style={{ marginTop: 22 }}>
+            <h2>Closed / Past</h2>
+            <span className="pill">{closedTickets.length}</span>
           </div>
 
           {closedTickets.length === 0 ? (
             <div className="muted">No closed tickets.</div>
           ) : (
-            <div className="list">
-              {closedTickets.map((t) => (
-                <Link key={t.id} className="list-item" to={`/tickets/${t.id}`}>
-                  <div className="item-top">
-                    <div className="grow">
-                      <div className="title">{t.title || "Untitled ticket"}</div>
-                      <div className="meta">{t.location || "No location"} • Created {fmtDate(t.created_at)}</div>
+            <div className="cards">
+              {closedTickets.map((t) => {
+                const sla = slaPill({ ...t, status: "closed" });
+                const created = fmtWhen(t?.created_at || t?.createdAt);
+                const who = t?.created_by_name || t?.createdByName || t?.employee_name || t?.employeeName;
+                const tag = t?.tag;
+                return (
+                  <Link key={t.id} className="cardlink" to={`/tickets/${t.id}`}>
+                    <div className="carditem">
+                      <div className="cardtop">
+                        <div className="cardtitle">{t.title || "(Untitled)"}</div>
+                        <div className="pillrow">
+                          {tag && <span className="pill tone">{tag}</span>}
+                          <span className={`pill sla ${sla.tone}`}>{sla.text}</span>
+                        </div>
+                      </div>
+                      <div className="cardsub">
+                        {t.location ? <span>{t.location}</span> : <span className="muted">No location</span>}
+                        {created ? <span className="dot">•</span> : null}
+                        {created ? <span className="muted">Created {created}</span> : null}
+                      </div>
+                      {who ? <div className="cardmeta"><span className="pill soft">{who}</span></div> : null}
                     </div>
-                    <div className="badges">
-                      <span className="badge neutral">Closed</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </>
       )}
-
-      <div className="spacer" />
     </div>
   );
 }
