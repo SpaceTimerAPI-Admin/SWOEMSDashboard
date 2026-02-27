@@ -1,8 +1,8 @@
 import React from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
-import LoginPin from "./pages/LoginPin";
 import Enroll from "./pages/Enroll";
+import ResetPin from "./pages/ResetPin";
 import Home from "./pages/Home";
 import Tickets from "./pages/Tickets";
 import TicketNew from "./pages/TicketNew";
@@ -23,14 +23,14 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const loc = useLocation();
-  const showNav = !["/login", "/login/pin", "/enroll"].includes(loc.pathname);
+  const showNav = !["/login", "/enroll", "/reset-pin"].includes(loc.pathname);
 
   return (
     <>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/login/pin" element={<LoginPin />} />
         <Route path="/enroll" element={<Enroll />} />
+        <Route path="/reset-pin" element={<ResetPin />} />
 
         <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
 

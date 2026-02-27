@@ -1,150 +1,242 @@
-export type Employee = { id: string; employee_id: string; name: string; email: string };
+// src/lib/api.ts
+// Central API client for SWOEMS Dashboard.
+// This file is intentionally defensive: it accepts both legacy and current field names
+// so UI pages can evolve without breaking deploys.
 
-const TOKEN_KEY = "md_session_token";
-const EXP_KEY = "md_session_expires_at";
+import { getToken, setToken, clearToken, isExpired } from "./auth";
 
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-export function setToken(token: string, expires_at: string) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(EXP_KEY, expires_at);
-}
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(EXP_KEY);
-}
-export function isExpired(): boolean {
-  const exp = localStorage.getItem(EXP_KEY);
-  if (!exp) return true;
-  return Date.now() > new Date(exp).getTime();
-}
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
 
-async function api(path: string, options: RequestInit = {}) {
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
   const token = getToken();
-  const headers: any = { "content-type": "application/json", ...(options.headers || {}) };
-  if (token && !isExpired()) headers["authorization"] = `Bearer ${token}`;
-  const res = await fetch(path, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `Request failed: ${res.status}`);
-  return data;
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(extra ?? {}),
+  };
 }
 
-export async function login(employee_id: string, pin: string) {
-  return api("/api/login", { method: "POST", body: JSON.stringify({ employee_id, pin }) });
+async function apiFetch<T>(
+  path: string,
+  opts?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: unknown;
+  }
+): Promise<ApiResult<T>> {
+  try {
+    const res = await fetch(path, {
+      method: opts?.method ?? "GET",
+      headers: { ...authHeaders(opts?.headers), ...(opts?.headers ?? {}) },
+      body: opts?.body === undefined ? undefined : JSON.stringify(opts.body),
+      credentials: "include",
+    });
+
+    const ct = res.headers.get("content-type") || "";
+    const payload = ct.includes("application/json") ? await res.json() : await res.text();
+
+    if (!res.ok) {
+      const msg =
+        typeof payload === "string"
+          ? payload
+          : (payload?.error as string) || (payload?.message as string) || `Request failed (${res.status})`;
+      return { ok: false, error: msg, status: res.status };
+    }
+
+    // Many of our Netlify functions return { ok: true, ... } already.
+    // Normalize to ApiResult<T> where possible.
+    if (typeof payload === "object" && payload && "ok" in payload) {
+      if ((payload as any).ok === false) return { ok: false, error: (payload as any).error ?? "Request failed", status: res.status };
+      if ("data" in (payload as any)) return { ok: true, data: (payload as any).data as T };
+      // If payload is {ok:true, ...rest}, treat rest as data.
+      const { ok, ...rest } = payload as any;
+      return { ok: true, data: rest as T };
+    }
+
+    return { ok: true, data: payload as T };
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? "Network error" };
+  }
 }
 
-export async function enroll(payload: { enrollment_code: string; employee_id: string; name: string; email: string; pin: string }) {
-  return api("/api/enroll", { method: "POST", body: JSON.stringify(payload) });
-}
+// -------------------- Auth --------------------
 
-export async function resetPin(employee_id: string) {
-  return api("/api/reset-pin", {
+export async function login(employee_id: string, pin: string): Promise<ApiResult<{ token: string }>> {
+  const r = await apiFetch<{ token: string }>("/api/login", {
     method: "POST",
-    body: JSON.stringify({ employee_id }),
+    body: { employee_id, pin },
   });
+  if (r.ok && r.data?.token) setToken(r.data.token);
+  return r;
 }
 
-export async function notifyEvent(type: string, message: string) {
-  return api("/api/notify-event", { method: "POST", body: JSON.stringify({ type, message }) });
+export async function enroll(payload: { employee_id: string; name: string; pin: string; code: string }): Promise<ApiResult<{}>> {
+  return apiFetch<{}>("/api/enroll", { method: "POST", body: payload });
 }
 
-export async function sendEod(payload: { report_date?: string; notes: string; handoff_notes: string }) {
-  return api("/api/send-eod", { method: "POST", body: JSON.stringify(payload) });
+// Backwards-compat re-exports (some pages historically imported these from lib/api)
+export { setToken, getToken, clearToken, isExpired };
+
+export async function resetPin(payload: { employee_id: string; code: string; new_pin: string }): Promise<ApiResult<{}>> {
+  return apiFetch<{}>("/api/reset-pin", { method: "POST", body: payload });
 }
 
+// -------------------- Tickets --------------------
 
 export type Ticket = {
   id: string;
   title: string;
   location: string;
   details: string;
-  status: string;
-  created_at: string;
-  sla_due_at: string;
-  sla_minutes: number;
-  created_by: string;
-  created_by_name?: string;
-  ms_left?: number;
-  is_overdue?: boolean;
+  status: "open" | "closed" | "project";
+  created_at?: string;
+  updated_at?: string;
+  photo_keys?: string[];
 };
 
-export async function listTickets(includeClosed = false) {
-  const qs = includeClosed ? "?includeClosed=1" : "";
-  return api(`/api/tickets-list${qs}`, { method: "GET" });
+export async function listTickets(opts?: { includeClosed?: boolean }): Promise<ApiResult<{ tickets: Ticket[] }>> {
+  // server-side can ignore includeClosed; UI will filter if needed
+  return apiFetch<{ tickets: Ticket[] }>("/api/tickets-list", { method: "POST", body: opts ?? {} });
 }
 
-export async function createTicket(payload: { title: string; location: string; details: string; sla_minutes?: number }) {
-  return api("/api/tickets-create", { method: "POST", body: JSON.stringify(payload) });
+export async function getTicket(id: string): Promise<ApiResult<{ ticket: Ticket; comments?: any[] }>> {
+  return apiFetch<{ ticket: Ticket; comments?: any[] }>("/api/tickets-get", { method: "POST", body: { id } });
 }
 
-export async function getTicket(id: string) {
-  return api(`/api/tickets-get?id=${encodeURIComponent(id)}`, { method: "GET" });
+export async function createTicket(input: {
+  title: string;
+  location: string;
+  details?: string;
+  description?: string; // legacy name
+}): Promise<ApiResult<{ ticket: Ticket }>> {
+  const details = (input.details ?? input.description ?? "").trim();
+  return apiFetch<{ ticket: Ticket }>("/api/tickets-create", {
+    method: "POST",
+    body: { title: input.title, location: input.location, details },
+  });
 }
 
-export async function addTicketComment(payload: { ticket_id: string; comment: string }) {
-  return api("/api/tickets-comment", { method: "POST", body: JSON.stringify(payload) });
+export async function addTicketComment(input: {
+  id?: string;
+  ticket_id?: string; // legacy
+  comment: string;
+  photo_keys?: string[];
+}): Promise<ApiResult<{}>> {
+  const id = input.id ?? input.ticket_id;
+  return apiFetch<{}>("/api/tickets-comment", { method: "POST", body: { id, comment: input.comment, photo_keys: input.photo_keys ?? [] } });
 }
 
-export async function closeTicket(payload: { id: string; comment?: string }) {
-  return api("/api/tickets-close", { method: "POST", body: JSON.stringify(payload) });
+export async function closeTicket(id: string): Promise<ApiResult<{}>> {
+  return apiFetch<{}>("/api/tickets-close", { method: "POST", body: { id } });
 }
 
-export async function convertTicket(payload: { ticket_id: string }) {
-  return api("/api/tickets-convert", { method: "POST", body: JSON.stringify(payload) });
+export async function convertTicket(id: string): Promise<ApiResult<{}>> {
+  return apiFetch<{}>("/api/tickets-convert", { method: "POST", body: { id } });
 }
 
-
-export async function getTicketPhotoUploadUrl(payload: { ticket_id: string; file_name: string; content_type: string }) {
-  return api("/api/tickets-photo-upload-url", { method: "POST", body: JSON.stringify(payload) });
+// Photo upload helpers (Supabase storage presign)
+export async function getTicketPhotoUploadUrl(input: {
+  ticket_id: string;
+  filename?: string;
+  file_name?: string; // legacy
+  content_type: string;
+}): Promise<ApiResult<{ upload_url: string; storage_key: string }>> {
+  return apiFetch<{ upload_url: string; storage_key: string }>("/api/tickets-photo-upload-url", {
+    method: "POST",
+    body: {
+      ticket_id: input.ticket_id,
+      filename: input.filename ?? input.file_name,
+      content_type: input.content_type,
+    },
+  });
 }
 
-export async function confirmTicketPhoto(payload: { ticket_id: string; storage_path: string }) {
-  return api("/api/tickets-photo-confirm", { method: "POST", body: JSON.stringify(payload) });
+export async function confirmTicketPhoto(input: { ticket_id: string; storage_key?: string; storage_path?: string }): Promise<ApiResult<{}>> {
+  return apiFetch<{}>("/api/tickets-photo-confirm", {
+    method: "POST",
+    body: { ticket_id: input.ticket_id, storage_key: input.storage_key ?? input.storage_path },
+  });
 }
 
+// -------------------- Projects --------------------
 
 export type Project = {
   id: string;
   title: string;
   location: string;
   details: string;
-  status: string;
-  created_at: string;
-  sla_due_at: string;
-  sla_days: number;
-  created_by: string;
-  created_by_name?: string;
-  source_ticket_id?: string | null;
-  ms_left?: number;
-  is_overdue?: boolean;
+  status: "open" | "closed";
+  created_at?: string;
+  updated_at?: string;
+  photo_keys?: string[];
 };
 
-export async function listProjects(includeClosed = false) {
-  const qs = includeClosed ? "?includeClosed=1" : "";
-  return api(`/api/projects-list${qs}`, { method: "GET" });
+export async function listProjects(opts?: { includeClosed?: boolean }): Promise<ApiResult<{ projects: Project[] }>> {
+  return apiFetch<{ projects: Project[] }>("/api/projects-list", { method: "POST", body: opts ?? {} });
 }
 
-export async function createProject(payload: { title: string; location: string; details: string; sla_days?: number }) {
-  return api("/api/projects-create", { method: "POST", body: JSON.stringify(payload) });
+export async function getProject(id: string): Promise<ApiResult<{ project: Project; comments?: any[] }>> {
+  return apiFetch<{ project: Project; comments?: any[] }>("/api/projects-get", { method: "POST", body: { id } });
 }
 
-export async function getProject(id: string) {
-  return api(`/api/projects-get?id=${encodeURIComponent(id)}`, { method: "GET" });
+export async function createProject(input: {
+  title: string;
+  location: string;
+  details?: string;
+  description?: string; // legacy name
+}): Promise<ApiResult<{ project: Project }>> {
+  const details = (input.details ?? input.description ?? "").trim();
+  return apiFetch<{ project: Project }>("/api/projects-create", {
+    method: "POST",
+    body: { title: input.title, location: input.location, details },
+  });
 }
 
-export async function addProjectComment(payload: { project_id: string; comment: string }) {
-  return api("/api/projects-comment", { method: "POST", body: JSON.stringify(payload) });
+export async function addProjectComment(input: {
+  id?: string;
+  project_id?: string; // legacy
+  comment: string;
+  photo_keys?: string[];
+}): Promise<ApiResult<{}>> {
+  const id = input.id ?? input.project_id;
+  return apiFetch<{}>("/api/projects-comment", { method: "POST", body: { id, comment: input.comment, photo_keys: input.photo_keys ?? [] } });
 }
 
-export async function closeProject(payload: { id: string; comment?: string }) {
-  return api("/api/projects-close", { method: "POST", body: JSON.stringify(payload) });
+export async function closeProject(id: string): Promise<ApiResult<{}>> {
+  return apiFetch<{}>("/api/projects-close", { method: "POST", body: { id } });
 }
 
-export async function getProjectPhotoUploadUrl(payload: { project_id: string; file_name: string; content_type: string }) {
-  return api("/api/projects-photo-upload-url", { method: "POST", body: JSON.stringify(payload) });
+export async function getProjectPhotoUploadUrl(input: {
+  project_id: string;
+  filename?: string;
+  file_name?: string; // legacy
+  content_type: string;
+}): Promise<ApiResult<{ upload_url: string; storage_key: string }>> {
+  return apiFetch<{ upload_url: string; storage_key: string }>("/api/projects-photo-upload-url", {
+    method: "POST",
+    body: {
+      project_id: input.project_id,
+      filename: input.filename ?? input.file_name,
+      content_type: input.content_type,
+    },
+  });
 }
 
-export async function confirmProjectPhoto(payload: { project_id: string; storage_path: string }) {
-  return api("/api/projects-photo-confirm", { method: "POST", body: JSON.stringify(payload) });
+export async function confirmProjectPhoto(input: { project_id: string; storage_key?: string; storage_path?: string }): Promise<ApiResult<{}>> {
+  return apiFetch<{}>("/api/projects-photo-confirm", {
+    method: "POST",
+    body: { project_id: input.project_id, storage_key: input.storage_key ?? input.storage_path },
+  });
+}
+
+// -------------------- EOD / Events --------------------
+
+export async function sendEod(payload: { to?: string; subject?: string; notes?: string; handoff_notes?: string }): Promise<ApiResult<{}>> {
+  // accept handoff_notes legacy; server expects notes
+  const notes = payload.notes ?? payload.handoff_notes ?? "";
+  return apiFetch<{}>("/api/send-eod", { method: "POST", body: { to: payload.to, subject: payload.subject, notes } });
+}
+
+export async function notifyEvent(payload: { type: string; message: string }): Promise<ApiResult<{}>> {
+  return apiFetch<{}>("/api/notify-event", { method: "POST", body: payload });
 }

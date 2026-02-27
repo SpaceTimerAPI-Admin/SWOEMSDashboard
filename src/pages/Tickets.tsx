@@ -1,81 +1,91 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listTickets } from "../lib/api";
 
-function badge(t: any) {
-  if (t.is_overdue) return { text: "OVERDUE", style: { color: "#ff8b8b" } };
-  const mins = Math.ceil((t.ms_left || 0) / 60000);
-  if (mins <= 15) return { text: "DUE SOON", style: { color: "#ffd27a" } };
-  return { text: "ON TRACK", style: { color: "#b7c2ff" } };
+type Ticket = any;
+
+function isClosed(t: Ticket): boolean {
+  const s = (t?.status || "").toString().toLowerCase();
+  return s === "closed" || s === "done" || !!t?.closed_at || !!t?.closedAt;
 }
 
 export default function Tickets() {
-  const [items, setItems] = useState<any[]>([]);
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    setErr(null);
-    setBusy(true);
+    setLoading(true);
+    setError(null);
     try {
-      const res = await listTickets(false);
-      setItems(res.tickets || []);
+      const res: any = await listTickets({ includeClosed: true });
+      if (!res?.ok) throw new Error(res?.error || "Failed to load tickets");
+      setTickets(res?.tickets || res?.data?.tickets || []);
     } catch (e: any) {
-      setErr(e.message || "Failed to load tickets");
+      setError(e?.message || "Failed to load tickets");
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
+
+  const { openTickets, closedTickets } = useMemo(() => {
+    const open: Ticket[] = [];
+    const closed: Ticket[] = [];
+    for (const t of tickets) (isClosed(t) ? closed : open).push(t);
+    // newest first if created_at exists
+    const sortFn = (a: any, b: any) => {
+      const ta = Date.parse(a?.created_at || a?.createdAt || "") || 0;
+      const tb = Date.parse(b?.created_at || b?.createdAt || "") || 0;
+      return tb - ta;
+    };
+    open.sort(sortFn);
+    closed.sort(sortFn);
+    return { openTickets: open, closedTickets: closed };
+  }, [tickets]);
 
   return (
-    <div className="container">
-      <div className="row" style={{alignItems:"center"}}>
-        <div className="col"><div className="h1">Tickets</div></div>
-        <div className="col" style={{textAlign:"right"}}>
-          <Link to="/tickets/new" className="btn" style={{display:"inline-block", width:"auto", padding:"12px 14px"}}>+ Log A Call</Link>
-        </div>
+    <div className="page">
+      <div className="row between">
+        <h1>Tickets</h1>
+        <Link className="btn primary" to="/tickets/new">Create ticket</Link>
       </div>
 
-      {err ? <div style={{marginTop:10,color:"#ff8b8b"}}>{err}</div> : null}
+      {loading && <div>Loading…</div>}
+      {error && <div className="error">{error}</div>}
 
-      <div style={{marginTop:12, display:"grid", gap:12}}>
-        {busy ? <div className="card"><div className="muted">Loading...</div></div> : null}
-
-        {!busy && items.length === 0 ? (
-          <div className="card">
+      {!loading && !error && (
+        <>
+          <h2>Open</h2>
+          {openTickets.length === 0 ? (
             <div className="muted">No open tickets.</div>
-          </div>
-        ) : null}
+          ) : (
+            <div className="list">
+              {openTickets.map((t) => (
+                <Link key={t.id} className="list-item" to={`/tickets/${t.id}`}>
+                  <div className="title">{t.title}</div>
+                  <div className="meta">{t.location}</div>
+                </Link>
+              ))}
+            </div>
+          )}
 
-        {items.map((t) => {
-          const b = badge(t);
-          return (
-            <Link key={t.id} to={`/tickets/${t.id}`} style={{textDecoration:"none"}}>
-              <div className="card">
-                <div style={{display:"flex", justifyContent:"space-between", gap:10}}>
-                  <div style={{fontWeight:800}}>{t.title}</div>
-                  <div style={{fontSize:12, fontWeight:800, ...b.style}}>{b.text}</div>
-                </div>
-                <div className="muted" style={{marginTop:4}}>{t.location}</div>
-                <div className="muted" style={{marginTop:6}}>
-                  Logged by {t.created_by_name} • {new Date(t.created_at).toLocaleString()}
-                </div>
-                <div className="muted" style={{marginTop:6}}>
-                  SLA Due: {new Date(t.sla_due_at).toLocaleString()}
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      <div style={{marginTop:12}}>
-        <button className="btn secondary" onClick={load} disabled={busy}>Refresh</button>
-      </div>
-
-      <div className="spacer" />
+          <h2 style={{ marginTop: 24 }}>Closed / Past</h2>
+          {closedTickets.length === 0 ? (
+            <div className="muted">No closed tickets.</div>
+          ) : (
+            <div className="list">
+              {closedTickets.map((t) => (
+                <Link key={t.id} className="list-item" to={`/tickets/${t.id}`}>
+                  <div className="title">{t.title}</div>
+                  <div className="meta">{t.location}</div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

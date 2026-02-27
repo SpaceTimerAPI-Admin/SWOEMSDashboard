@@ -1,124 +1,106 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { resetPin } from "../lib/api";
 
 export default function ResetPin() {
   const nav = useNavigate();
   const [employeeId, setEmployeeId] = useState("");
   const [code, setCode] = useState("");
-  const [pin, setPin] = useState("");
-  const [pin2, setPin2] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
 
-    const id = employeeId.trim();
-    if (!id) {
-      setError("Employee ID required");
+    const eid = employeeId.trim();
+    const c = code.trim();
+    const p1 = newPin.trim();
+    const p2 = confirmPin.trim();
+
+    if (!eid || !c || !p1 || !p2) {
+      setError("All fields are required.");
       return;
     }
-    if (!code.trim()) {
-      setError("Reset code required");
+    if (!/^\d{4}$/.test(p1)) {
+      setError("PIN must be exactly 4 digits.");
       return;
     }
-    if (!pin.trim()) {
-      setError("New PIN required");
-      return;
-    }
-    if (pin.trim() !== pin2.trim()) {
-      setError("PINs do not match");
+    if (p1 !== p2) {
+      setError("PINs do not match.");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await resetPin({ employee_id: id, code: code.trim(), pin: pin.trim() });
-      if (!res.ok) throw new Error(res.error || "Reset failed");
-      setSuccess("PIN updated. You can sign in now.");
-      setTimeout(() => nav("/login"), 600);
+      const res: any = await resetPin({ employee_id: eid, code: c, new_pin: p1 });
+      if (!res?.ok) {
+        setError(res?.error || "Could not reset PIN.");
+        return;
+      }
+      setDone(true);
+      setTimeout(() => nav("/login"), 900);
     } catch (err: any) {
-      setError(err?.message || "Reset failed");
+      setError(err?.message || "Could not reset PIN.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-slate-900/40 border border-slate-700/40 rounded-2xl shadow-xl p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold">Reset PIN</h1>
-          <p className="text-slate-300 mt-1 text-sm">
-            Enter your Employee ID and the reset code provided by a supervisor.
-          </p>
-        </div>
+    <div className="container" style={{ paddingTop: 22 }}>
+      <div className="card">
+        <div className="h1">Reset PIN</div>
+        <div className="muted">Enter your Employee ID and the enrollment code to set a new 4-digit PIN.</div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm text-slate-300">Employee ID</label>
-            <input
-              className="mt-1 w-full rounded-xl bg-slate-950/50 border border-slate-700/50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              inputMode="numeric"
-              autoComplete="username"
-            />
+        <form onSubmit={onSubmit}>
+          <label>Employee ID</label>
+          <input
+            className="input"
+            value={employeeId}
+            onChange={(e) => setEmployeeId(e.target.value)}
+            inputMode="numeric"
+            autoComplete="username"
+          />
+
+          <label>Enrollment Code</label>
+          <input className="input" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" />
+
+          <label>New PIN</label>
+          <input
+            className="input"
+            value={newPin}
+            onChange={(e) => setNewPin(e.target.value)}
+            inputMode="numeric"
+            type="password"
+            autoComplete="new-password"
+          />
+
+          <label>Confirm New PIN</label>
+          <input
+            className="input"
+            value={confirmPin}
+            onChange={(e) => setConfirmPin(e.target.value)}
+            inputMode="numeric"
+            type="password"
+            autoComplete="new-password"
+          />
+
+          {error ? <div style={{ marginTop: 10, color: "#ff8080", fontSize: 13 }}>{error}</div> : null}
+          {done ? <div style={{ marginTop: 10, color: "#9fffa8", fontSize: 13 }}>PIN reset. Returning to login…</div> : null}
+
+          <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
+            <button className="btn" disabled={loading}>
+              {loading ? "Resetting…" : "Reset PIN"}
+            </button>
+            <button type="button" className="btn secondary" onClick={() => nav("/login")} disabled={loading}>
+              Back to login
+            </button>
           </div>
-
-          <div>
-            <label className="text-sm text-slate-300">Reset code</label>
-            <input
-              className="mt-1 w-full rounded-xl bg-slate-950/50 border border-slate-700/50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              autoComplete="one-time-code"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-slate-300">New PIN</label>
-            <input
-              className="mt-1 w-full rounded-xl bg-slate-950/50 border border-slate-700/50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              inputMode="numeric"
-              autoComplete="new-password"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-slate-300">Confirm new PIN</label>
-            <input
-              className="mt-1 w-full rounded-xl bg-slate-950/50 border border-slate-700/50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={pin2}
-              onChange={(e) => setPin2(e.target.value)}
-              inputMode="numeric"
-              autoComplete="new-password"
-            />
-          </div>
-
-          {error ? <div className="text-red-400 text-sm">{error}</div> : null}
-          {success ? <div className="text-emerald-400 text-sm">{success}</div> : null}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 transition px-4 py-3 font-semibold"
-          >
-            {loading ? "Updating…" : "Update PIN"}
-          </button>
         </form>
-
-        <div className="mt-5 text-sm">
-          <Link className="text-slate-300 hover:text-white" to="/login">
-            Back to sign in
-          </Link>
-        </div>
       </div>
     </div>
   );

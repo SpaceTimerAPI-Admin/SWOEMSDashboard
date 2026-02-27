@@ -1,231 +1,212 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { addTicketComment, closeTicket, convertTicket, getTicket, getTicketPhotoUploadUrl, confirmTicketPhoto } from "../lib/api";
+import {
+  addTicketComment,
+  closeTicket,
+  confirmTicketPhoto,
+  convertTicketToProject,
+  getTicket,
+  getTicketPhotoUploadUrl,
+} from "../lib/api";
 
-function fmt(ms: number) {
-  const abs = Math.abs(ms);
-  const s = Math.floor(abs / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  const mm = m % 60;
-  const ss = s % 60;
-  if (h > 0) return `${h}h ${mm}m`;
-  return `${mm}m ${ss}s`;
-}
+type Ticket = any;
 
 export default function TicketDetail() {
   const { id } = useParams();
   const nav = useNavigate();
-  const [data, setData] = useState<any>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const ticketId = id || "";
+
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [comment, setComment] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [commentError, setCommentError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function load() {
-    setErr(null);
+    setLoading(true);
+    setError(null);
     try {
-      const res = await getTicket(String(id));
-      setData(res);
+      const res: any = await getTicket(ticketId);
+      if (!res?.ok) throw new Error(res?.error || "Failed to load ticket");
+      setTicket(res?.ticket || res?.data?.ticket || res?.data || null);
     } catch (e: any) {
-      setErr(e.message || "Failed to load ticket");
+      setError(e?.message || "Failed to load ticket");
+    } finally {
+      setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { if (ticketId) void load(); }, [ticketId]);
 
-  const dueInfo = useMemo(() => {
-    if (!data?.ticket?.sla_due_at) return null;
-    const due = new Date(data.ticket.sla_due_at).getTime();
-    const ms = due - Date.now();
-    return { ms, overdue: ms < 0 };
-  }, [data]);
+  const photos = useMemo(() => {
+    const arr = ticket?.photos || ticket?.photo_urls || ticket?.photoUrls || [];
+    return Array.isArray(arr) ? arr : [];
+  }, [ticket]);
 
-  async function onAddComment() {
-    if (!comment.trim()) return;
+  async function handleAddComment(photoKeys?: string[]) {
+    setCommentError(null);
+    const c = comment.trim();
+    if (!c && (!photoKeys || photoKeys.length === 0)) {
+      setCommentError("Comment or photo required.");
+      return;
+    }
+
     setBusy(true);
     try {
-      await addTicketComment({ ticket_id: String(id), comment: comment.trim() });
+      const res: any = await addTicketComment({
+        id: ticketId,
+        comment: c,
+        photo_keys: photoKeys || [],
+      });
+      if (!res?.ok) throw new Error(res?.error || "Failed to add comment");
       setComment("");
       await load();
     } catch (e: any) {
-      setErr(e.message || "Failed to add comment");
+      setCommentError(e?.message || "Failed to add comment");
     } finally {
       setBusy(false);
     }
   }
 
-async function onUploadPhoto(file: File) {
-  setUploadErr(null);
-  setUploading(true);
-  try {
-    const up = await getTicketPhotoUploadUrl({
-      ticket_id: String(id),
-      file_name: file.name,
-      content_type: file.type || "application/octet-stream",
-    });
-
-    // Upload directly to Supabase Storage signed URL
-    const putRes = await fetch(up.signed_url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": file.type || "application/octet-stream",
-      },
-      body: file,
-    });
-
-    const putText = await putRes.text().catch(() => "");
-    if (!putRes.ok) throw new Error(`Upload failed: ${putRes.status} ${putText}`);
-
-    await confirmTicketPhoto({ ticket_id: String(id), storage_path: up.storage_path });
-    await load();
-  } catch (e: any) {
-    setUploadErr(e.message || "Upload failed");
-  } finally {
-    setUploading(false);
-  }
-}
-
-async function onClose() {
-
+  async function handleClose() {
+    if (!ticketId) return;
     setBusy(true);
     try {
-      await closeTicket({ id: String(id) });
+      const res: any = await closeTicket(ticketId);
+      if (!res?.ok) throw new Error(res?.error || "Failed to close ticket");
       await load();
     } catch (e: any) {
-      setErr(e.message || "Failed to close");
+      alert(e?.message || "Failed to close ticket");
     } finally {
       setBusy(false);
     }
   }
 
-  async function onConvert() {
+  async function handleConvertToProject() {
+    if (!ticketId) return;
     setBusy(true);
     try {
-      const res = await convertTicket({ ticket_id: String(id) });
-      nav(`/projects`);
-      alert(`Converted to project: ${res.project_id}`);
+      const res: any = await convertTicketToProject(ticketId);
+      if (!res?.ok) throw new Error(res?.error || "Failed to convert");
+      const projectId = res?.project_id || res?.data?.project_id;
+      if (projectId) nav(`/projects/${projectId}`);
+      else nav("/projects");
     } catch (e: any) {
-      setErr(e.message || "Failed to convert");
+      alert(e?.message || "Failed to convert");
     } finally {
       setBusy(false);
     }
   }
 
-  const t = data?.ticket;
-  const comments = data?.comments || [];
+  async function uploadPhoto(file: File): Promise<string> {
+    // returns storage_key
+    const res: any = await getTicketPhotoUploadUrl({
+      ticket_id: ticketId,
+      filename: file.name,
+      content_type: file.type || "application/octet-stream",
+    });
+    if (!res?.ok) throw new Error(res?.error || "Failed to get upload URL");
+
+    const uploadUrl = res?.upload_url || res?.data?.upload_url;
+    const storageKey = res?.storage_key || res?.data?.storage_key;
+
+    if (!uploadUrl || !storageKey) throw new Error("Upload URL missing");
+
+    const put = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!put.ok) throw new Error("Upload failed");
+
+    const conf: any = await confirmTicketPhoto({
+      ticket_id: ticketId,
+      storage_key: storageKey,
+    });
+    if (!conf?.ok) throw new Error(conf?.error || "Confirm failed");
+
+    return storageKey;
+  }
+
+  async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length === 0) return;
+
+    setBusy(true);
+    try {
+      const keys: string[] = [];
+      for (const f of files) keys.push(await uploadPhoto(f));
+      // add as a comment (optional)
+      await handleAddComment(keys);
+    } catch (err: any) {
+      alert(err?.message || "Photo upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <div className="container">
-      <div className="row" style={{alignItems:"center"}}>
-        <div className="col">
-          <div className="h1">Ticket</div>
-          <div className="muted"><Link to="/tickets">Back to tickets</Link></div>
+    <div className="page">
+      <div className="row between">
+        <Link className="btn" to="/tickets">← Back</Link>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={handleConvertToProject} disabled={busy}>Move to project</button>
+          <button className="btn" onClick={handleClose} disabled={busy}>Close</button>
         </div>
       </div>
 
-      {err ? <div style={{marginTop:10,color:"#ff8b8b"}}>{err}</div> : null}
+      {loading && <div>Loading…</div>}
+      {error && <div className="error">{error}</div>}
 
-      {t ? (
+      {!loading && ticket && (
         <>
-          <div className="card" style={{marginTop:12}}>
-            <div className="h2">{t.title}</div>
-            <div className="muted">Location: {t.location}</div>
-            <div className="muted">Logged by {t.created_by_name} • {new Date(t.created_at).toLocaleString()}</div>
-            <div style={{marginTop:8}}>
-              <span className="muted">Status: </span><b>{t.status}</b>
-            </div>
-            <div style={{marginTop:6}}>
-              <span className="muted">SLA Due: </span>{new Date(t.sla_due_at).toLocaleString()}
-              {dueInfo ? (
-                <span style={{marginLeft:10, fontWeight:700, color: dueInfo.overdue ? "#ff8b8b" : "#b7c2ff"}}>
-                  {dueInfo.overdue ? `Overdue by ${fmt(dueInfo.ms)}` : `Due in ${fmt(dueInfo.ms)}`}
-                </span>
-              ) : null}
-            </div>
-            <div style={{marginTop:10}}>{t.details}</div>
+          <h1 style={{ marginTop: 12 }}>{ticket.title}</h1>
+          <div className="muted">{ticket.location}</div>
 
-            <div className="row" style={{marginTop:12}}>
-              <div className="col">
-                <button className="btn secondary" onClick={onConvert} disabled={busy}>Convert to Project</button>
-              </div>
-              <div className="col">
-                <button className="btn danger" onClick={onClose} disabled={busy || t.status === "closed"}>
-                  {t.status === "closed" ? "Closed" : "Close Ticket"}
-                </button>
-              </div>
+          <div className="card" style={{ marginTop: 16 }}>
+            <h2>Update / Comment</h2>
+            <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={4} />
+            <div className="row between" style={{ marginTop: 8 }}>
+              <label className="btn">
+                Upload photo
+                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
+              </label>
+              <button className="btn primary" disabled={busy} onClick={() => handleAddComment()}>
+                {busy ? "Saving..." : "Add comment"}
+              </button>
             </div>
+            {commentError && <div className="error" style={{ marginTop: 8 }}>{commentError}</div>}
           </div>
 
-          <div className="card" style={{marginTop:12}}>
-  <div className="h2">Photos</div>
-  {uploadErr ? <div style={{marginTop:10,color:"#ff8b8b"}}>{uploadErr}</div> : null}
-  <div className="row" style={{marginTop:10, alignItems:"center"}}>
-    <div className="col">
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onUploadPhoto(f);
-          e.currentTarget.value = "";
-        }}
-        disabled={uploading}
-      />
-    </div>
-    <div className="col" style={{textAlign:"right"}}>
-      <span className="muted">{uploading ? "Uploading..." : "Optional"}</span>
-    </div>
-  </div>
-
-  {data?.photos?.length ? (
-    <div style={{marginTop:12, display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 1fr))", gap:10}}>
-      {data.photos.map((p: any) => (
-        <a key={p.id} href={p.public_url} target="_blank" rel="noreferrer" style={{textDecoration:"none"}}>
-          <div style={{border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, overflow:"hidden"}}>
-            <img src={p.public_url} alt="ticket" style={{width:"100%", height:160, objectFit:"cover", display:"block"}} />
-            <div style={{padding:8}} className="muted">
-              {p.uploaded_by_name} • {new Date(p.created_at).toLocaleString()}
-            </div>
-          </div>
-        </a>
-      ))}
-    </div>
-  ) : (
-    <div className="muted" style={{marginTop:10}}>No photos yet.</div>
-  )}
-</div>
-
-<div className="card" style={{marginTop:12}}>
-  <div className="h2">Updates</div>
-            {comments.length ? (
-              <div style={{display:"grid", gap:10}}>
-                {comments.map((c: any) => (
-                  <div key={c.id} style={{padding:10, borderRadius:12, border:"1px solid rgba(255,255,255,0.08)"}}>
-                    <div className="muted">{c.employee_name} • {new Date(c.created_at).toLocaleString()}</div>
-                    <div style={{marginTop:6}}>{c.comment}</div>
-                  </div>
+          {photos.length > 0 && (
+            <div className="card" style={{ marginTop: 16 }}>
+              <h2>Photos</h2>
+              <div className="grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                {photos.map((p: any, idx: number) => (
+                  <a key={idx} href={p.url || p} target="_blank" rel="noreferrer">
+                    <img src={p.url || p} style={{ width: "100%", borderRadius: 12 }} />
+                  </a>
                 ))}
               </div>
-            ) : (
-              <div className="muted">No updates yet.</div>
-            )}
+            </div>
+          )}
 
-            <label style={{marginTop:12}}>Add update</label>
-            <textarea className="input" style={{minHeight:90}} value={comment} onChange={(e)=>setComment(e.target.value)} placeholder="What changed?" />
-            <div style={{marginTop:10}}>
-              <button className="btn" onClick={onAddComment} disabled={busy || !comment.trim()}>
-                {busy ? "Saving..." : "Add update"}
-              </button>
+          <div className="card" style={{ marginTop: 16 }}>
+            <h2>History</h2>
+            <div className="list">
+              {(ticket.comments || ticket.history || []).map((c: any, idx: number) => (
+                <div key={idx} className="list-item">
+                  <div className="title">{c.comment || c.text || c.message}</div>
+                  <div className="meta">{c.created_at || c.createdAt || ""}</div>
+                </div>
+              ))}
             </div>
           </div>
         </>
-      ) : (
-        <div className="card" style={{marginTop:12}}><div className="muted">Loading...</div></div>
       )}
-
-      <div className="spacer" />
     </div>
   );
 }

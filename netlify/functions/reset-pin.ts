@@ -1,71 +1,47 @@
 import type { Handler } from "@netlify/functions";
 import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "./_supabase";
-import { json, badRequest, methodNotAllowed, requireEnv } from "./_shared";
+import { badRequest, json, unauthorized } from "./_shared";
 
-// Resets a user's PIN and emails them a temporary PIN.
-// POST { employee_id: string }
-// Requires: RESEND_API_KEY, RESEND_FROM_EMAIL
+function normId(s: string) {
+  return String(s || "").trim();
+}
 
 export const handler: Handler = async (event) => {
-  if (event.httpMethod !== "POST") return methodNotAllowed();
-
   try {
-    const { employee_id } = JSON.parse(event.body || "{}") as {
-      employee_id?: string;
-    };
+    if (event.httpMethod !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
 
-    if (!employee_id) return badRequest("employee_id required");
+    const body = event.body ? JSON.parse(event.body) : {};
+    const employee_id = normId(body.employee_id);
+    const code = String(body.code || "").trim();
+    const new_pin = String(body.new_pin || body.pin || "").trim();
 
-    const resendKey = requireEnv("RESEND_API_KEY");
-    const from = requireEnv("RESEND_FROM_EMAIL");
+    if (!employee_id) return badRequest("Employee ID required");
+    if (!code) return badRequest("Enrollment code required");
+    if (!/^\d{4}$/.test(new_pin)) return badRequest("PIN must be 4 digits");
 
-    const sb = supabaseAdmin();
+    const expected = String(process.env.ENROLLMENT_CODE || "").trim();
+    if (!expected || code !== expected) return unauthorized("Invalid enrollment code");
 
-    const { data: employee, error: empErr } = await sb
+    const supabase = supabaseAdmin();
+
+    const { data: emp, error: empErr } = await supabase
       .from("employees")
-      .select("employee_id, email, name")
+      .select("id, employee_id, is_active")
       .eq("employee_id", employee_id)
+      .limit(1)
       .maybeSingle();
 
-    if (empErr) throw empErr;
-    if (!employee?.email) return badRequest("Employee not found");
+    if (empErr || !emp) return unauthorized("Employee not found");
+    if (!emp.is_active) return unauthorized("Employee is inactive");
 
-    // 4-digit temporary PIN
-    const tmpPin = String(Math.floor(1000 + Math.random() * 9000));
-    const pin_hash = await bcrypt.hash(tmpPin, 10);
+    const pin_hash = await bcrypt.hash(new_pin, 10);
 
-    const { error: updErr } = await sb
-      .from("employees")
-      .update({ pin_hash })
-      .eq("employee_id", employee_id);
+    const { error: upErr } = await supabase.from("employees").update({ pin_hash }).eq("id", emp.id);
+    if (upErr) return json({ ok: false, error: "Could not reset PIN" }, 500);
 
-    if (updErr) throw updErr;
-
-    const subject = "Your SWOEMS PIN was reset";
-    const html = `
-      <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; line-height:1.5">
-        <h2 style="margin:0 0 12px">PIN reset</h2>
-        <p style="margin:0 0 12px">Hi ${employee.name || "there"},</p>
-        <p style="margin:0 0 12px">Your temporary PIN is:</p>
-        <div style="font-size:28px; font-weight:700; letter-spacing:2px; margin:10px 0 18px">${tmpPin}</div>
-        <p style="margin:0 0 12px">Log in with this PIN. You can reset it again any time from the login screen.</p>
-      </div>
-    `;
-
-    const resp = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from, to: employee.email, subject, html }),
-    });
-
-    if (!resp.ok) {
-      const txt = await resp.text().catch(() => "");
-      throw new Error(`Resend failed: ${resp.status} ${txt}`);
-    }
+    // Optional: revoke existing sessions for this employee so they must log in again with the new PIN
+    await supabase.from("sessions").delete().eq("employee_id", emp.id);
 
     return json({ ok: true });
   } catch (e: any) {

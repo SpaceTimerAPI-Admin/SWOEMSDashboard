@@ -7,42 +7,69 @@ export default function ProjectNew() {
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
   const [details, setDetails] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(null);
-    setBusy(true);
+    setError(null);
+
+    const payload = {
+      title: title.trim(),
+      location: location.trim(),
+      details: details.trim(),
+    };
+
+    if (!payload.title) return setError("Title required");
+    if (!payload.location) return setError("Location required");
+    if (!payload.details) return setError("Details required");
+
+    setLoading(true);
     try {
-      const res = await createProject({ title, location, details, sla_days: 14 });
-      nav(`/projects/${res.project.id}`);
-    } catch (e: any) {
-      setErr(e.message || "Failed to create project");
+      const res: any = await createProject(payload);
+      if (!res?.ok) throw new Error(res?.error || "Failed to create project");
+      const project = res?.project || res?.data?.project;
+      if (project?.id) nav(`/projects/${project.id}`);
+      else nav("/projects");
+    } catch (err: any) {
+      setError(err?.message || "Failed to create project");
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   }
 
   return (
-    <div className="container">
-      <div className="h1">Create Project</div>
+    <div className="page">
       <div className="card">
-        <form onSubmit={onSubmit}>
-          <label>Project title</label>
-          <input className="input" value={title} onChange={(e)=>setTitle(e.target.value)} placeholder="Short summary" />
-          <label>Location</label>
-          <input className="input" value={location} onChange={(e)=>setLocation(e.target.value)} placeholder="Area / attraction / zone" />
-          <label>Details</label>
-          <textarea className="input" style={{minHeight:140}} value={details} onChange={(e)=>setDetails(e.target.value)} placeholder="What is the long-term issue?" />
-          {err ? <div style={{marginTop:10,color:"#ff8b8b"}}>{err}</div> : null}
-          <div style={{marginTop:12}}>
-            <button className="btn" disabled={busy}>{busy ? "Creating..." : "Create project (SLA 14 days)"}</button>
+        <h1>Create Project</h1>
+
+        <form onSubmit={onSubmit} className="form">
+          <label>
+            Project title
+            <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+
+          <label>
+            Location
+            <input value={location} onChange={(e) => setLocation(e.target.value)} />
+          </label>
+
+          <label>
+            Details
+            <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={8} />
+          </label>
+
+          {error && <div className="error">{error}</div>}
+
+          <button className="btn primary" disabled={loading}>
+            {loading ? "Creating..." : "Create project (SLA 14 days)"}
+          </button>
+
+          <div className="muted" style={{ marginTop: 8 }}>
+            You can add photos after creating.
           </div>
-          <div style={{marginTop:10}} className="muted">You can add photos after creating.</div>
         </form>
       </div>
-      <div className="spacer" />
     </div>
   );
 }
