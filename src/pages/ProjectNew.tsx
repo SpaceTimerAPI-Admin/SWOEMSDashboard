@@ -19,11 +19,13 @@ export default function ProjectNew() {
       title: title.trim(),
       location: location.trim(),
       details: details.trim(),
+      tag,
     };
 
     if (!payload.title) return setError("Title required");
     if (!payload.location) return setError("Location required");
     if (!payload.details) return setError("Details required");
+    if (!payload.tag) return setError("Category required");
 
     setLoading(true);
     try {
@@ -41,7 +43,25 @@ export default function ProjectNew() {
 
   return (
     <div className="page">
-      <div className="row between wrap" style={{ gap: 10 }}>
+      
+      <div className="field" style={{ marginTop: 10 }}>
+        <div className="label">Category</div>
+        <div className="chips" style={{ marginTop: 8 }}>
+          {(["Lighting","Sound","Video","Rides","Misc"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={`chip ${tag === t ? "active" : ""}`}
+              onClick={() => setTag(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="hint">Required. Used for reporting and end-of-day grouping.</div>
+      </div>
+
+<div className="row between wrap" style={{ gap: 10 }}>
         <Link className="btn inline ghost" to="/projects">← Back</Link>
         <span className="badge neutral">SLA 7 days</span>
       </div>

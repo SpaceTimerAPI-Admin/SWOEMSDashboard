@@ -64,7 +64,7 @@ export default function TicketDetail() {
       const d: any = res?.data ?? res;
       const t = d?.ticket ?? d?.data?.ticket ?? d?.data ?? d?.ticket;
       if (!t) throw new Error("Not found");
-      setTicket({ ...t, comments: d?.comments ?? t.comments, photos: d?.photos ?? t.photos });
+      setTicket({ ...t, comments: d?.comments ?? t.comments, history: d?.comments ?? t.history, photos: d?.photos ?? t.photos, photo_urls: d?.photos ?? t.photo_urls });
     } catch (e: any) {
       setError(e?.message || "Failed to load ticket");
     } finally {
@@ -75,8 +75,18 @@ export default function TicketDetail() {
   useEffect(() => { if (ticketId) void load(); }, [ticketId]);
 
   const photos = useMemo(() => {
-    const arr = ticket?.photos || ticket?.photo_urls || ticket?.photoUrls || [];
-    return Array.isArray(arr) ? arr : [];
+    const raw: any[] = (ticket?.photos || ticket?.photo_urls || ticket?.photoUrls || []) as any;
+    const arr = Array.isArray(raw) ? raw : [];
+    // Normalize to { url, ...rest } objects for rendering
+    return arr
+      .map((p: any) => {
+        if (!p) return null;
+        if (typeof p === "string") return { url: p };
+        const url = p.public_url || p.url || p.publicUrl || p.publicURL || null;
+        // If a public URL isn't present but storage_path exists, keep object (backend should populate public_url on confirm)
+        return { ...p, url: url || p.storage_path || p.storageKey || p.storage_key || "" };
+      })
+      .filter(Boolean);
   }, [ticket]);
 
   const isClosed = ((ticket?.status || "").toString().toLowerCase() === "closed") || !!ticket?.closed_at;
@@ -139,7 +149,7 @@ export default function TicketDetail() {
   async function uploadPhoto(file: File): Promise<string> {
     const res: any = await getTicketPhotoUploadUrl({
       ticket_id: ticketId,
-      filename: file.name,
+      filename: (file.name && file.name.trim()) ? file.name : `photo_${Date.now()}.jpg`,
       content_type: file.type || "application/octet-stream",
     });
     if (!res?.ok) throw new Error(res?.error || "Failed to get upload URL");
@@ -290,8 +300,8 @@ export default function TicketDetail() {
               </div>
               <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
                 {photos.map((p: any, idx: number) => (
-                  <a key={idx} href={p.url || p} target="_blank" rel="noreferrer">
-                    <img src={p.url || p} style={{ width: "100%", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)" }} />
+                  <a key={idx} href={p.url} target="_blank" rel="noreferrer">
+                    <img src={p.url} style={{ width: "100%", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)" }} />
                   </a>
                 ))}
               </div>
@@ -308,7 +318,7 @@ export default function TicketDetail() {
               {(ticket.comments || ticket.history || []).map((c: any, idx: number) => (
                 <div key={idx} className="list-item">
                   <div className="title" style={{ fontSize: 16 }}>{c.comment || c.text || c.message || "Update"}</div>
-                  <div className="meta">{fmtDate(c.created_at || c.createdAt)} {c.created_by_name ? `• ${c.created_by_name}` : ""}</div>
+                  <div className="meta">{fmtDate(c.created_at || c.createdAt)} {(c.created_by_name || c.employee_name) ? `• ${c.created_by_name || c.employee_name}` : ""}</div>
                 </div>
               ))}
             </div>
