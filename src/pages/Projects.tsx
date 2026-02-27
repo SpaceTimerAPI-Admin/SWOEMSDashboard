@@ -90,8 +90,8 @@ export default function Projects() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Projects</h1>
-      <div className="page-subtitle">Longer work with SLA tracking and history.</div>
+      <h1 className="pageTitle">Projects</h1>
+      <div className="pageSubtitle">Longer work with SLA tracking and history.</div>
 
       <div style={{ marginTop: 12 }}>
         <Link className="btn primary" to="/projects/new">Create project</Link>
@@ -102,9 +102,9 @@ export default function Projects() {
 
       {!loading && !error && (
         <>
-          <div className="section-head">
-            <h2 className="section-title">Open</h2>
-            <span className="count-pill">{openProjects.length} active</span>
+          <div className="sectionHead">
+            <h2 className="sectionTitle">Open</h2>
+            <span className="countPill">{openProjects.length} active</span>
           </div>
 
           {openProjects.length === 0 ? (
@@ -117,21 +117,21 @@ export default function Projects() {
                 const createdBy = p?.created_by_name || p?.createdByName || p?.employee_name || p?.employeeName || "";
                 const tag = (p?.tag || "").toString();
                 return (
-                  <Link key={p.id} className="item-card" to={`/projects/${p.id}`}>
-                    <div className="item-top">
-                      <div className="item-title">{p.title || "Untitled project"}</div>
-                      {tag ? <span className="chip neutral">{tag}</span> : null}
+                  <Link key={p.id} className="itemCard" to={`/projects/${p.id}`}>
+                    <div className="itemTop">
+                      <div className="itemTitle">{p.title || "Untitled project"}</div>
+                      {tag ? <span className="pill neutral">{tag}</span> : null}
                     </div>
 
-                    <div className="item-sub">
+                    <div className="itemSub">
                       {p.location ? <span>{p.location}</span> : <span className="muted">No location</span>}
                       {created ? <span className="dot">•</span> : null}
                       {created ? <span>Created {created}</span> : null}
                     </div>
 
-                    <div className="chip-row">
-                      {due ? <span className={`chip ${due.variant}`}>{due.label}</span> : null}
-                      {createdBy ? <span className="chip neutral">{createdBy}</span> : null}
+                    <div className="chipRow">
+                      {due ? <span className={`dueChip ${due.variant}`}>{due.label}</span> : null}
+                      {createdBy ? <span className="pill neutral">{createdBy}</span> : null}
                     </div>
                   </Link>
                 );
@@ -139,9 +139,9 @@ export default function Projects() {
             </div>
           )}
 
-          <div className="section-head" style={{ marginTop: 18 }}>
-            <h2 className="section-title">Closed / Past</h2>
-            <span className="count-pill">{closedProjects.length}</span>
+          <div className="sectionHead" style={{ marginTop: 18 }}>
+            <h2 className="sectionTitle">Closed / Past</h2>
+            <span className="countPill">{closedProjects.length}</span>
           </div>
 
           {closedProjects.length === 0 ? (
@@ -154,21 +154,21 @@ export default function Projects() {
                 const createdBy = p?.created_by_name || p?.createdByName || p?.employee_name || p?.employeeName || "";
                 const tag = (p?.tag || "").toString();
                 return (
-                  <Link key={p.id} className="item-card" to={`/projects/${p.id}`}>
-                    <div className="item-top">
-                      <div className="item-title">{p.title || "Untitled project"}</div>
-                      {tag ? <span className="chip neutral">{tag}</span> : null}
+                  <Link key={p.id} className="itemCard" to={`/projects/${p.id}`}>
+                    <div className="itemTop">
+                      <div className="itemTitle">{p.title || "Untitled project"}</div>
+                      {tag ? <span className="pill neutral">{tag}</span> : null}
                     </div>
 
-                    <div className="item-sub">
+                    <div className="itemSub">
                       {p.location ? <span>{p.location}</span> : <span className="muted">No location</span>}
                       {created ? <span className="dot">•</span> : null}
                       {created ? <span>Created {created}</span> : null}
                     </div>
 
-                    <div className="chip-row">
-                      {due ? <span className={`chip ${due.variant}`}>{due.label}</span> : <span className="chip neutral">Closed</span>}
-                      {createdBy ? <span className="chip neutral">{createdBy}</span> : null}
+                    <div className="chipRow">
+                      {due ? <span className={`dueChip ${due.variant}`}>{due.label}</span> : <span className="pill neutral">Closed</span>}
+                      {createdBy ? <span className="pill neutral">{createdBy}</span> : null}
                     </div>
                   </Link>
                 );

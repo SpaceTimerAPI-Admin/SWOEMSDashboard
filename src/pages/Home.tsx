@@ -4,9 +4,11 @@ import { Link } from "react-router-dom";
 function Tile({ to, title, desc }: { to: string; title: string; desc: string }) {
   return (
     <Link to={to} style={{ textDecoration: "none" }}>
-      <div className="card">
-        <div className="h2">{title}</div>
-        <div className="muted">{desc}</div>
+      <div className="card" style={{ cursor: "pointer" }}>
+        <div className="tileTitle">{title}</div>
+        <div className="muted" style={{ marginTop: 6 }}>
+          {desc}
+        </div>
       </div>
     </Link>
   );
@@ -15,7 +17,7 @@ function Tile({ to, title, desc }: { to: string; title: string; desc: string }) 
 export default function Home() {
   return (
     <div className="container">
-      <div className="h1">Dashboard</div>
+      <div className="pageTitle">Dashboard</div>
       <div className="grid">
         <Tile to="/tickets/new" title="Log A Call" desc="Create a work order ticket (SLA 1 hour)." />
         <Tile to="/tickets" title="Ticket Dashboard" desc="View tickets prioritized by SLA." />

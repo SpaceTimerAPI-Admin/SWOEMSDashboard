@@ -37,9 +37,9 @@ export default function Login() {
   }
 
   return (
-    <div className="page">
+    <div className="container">
       <div className="card" style={{ maxWidth: 520, margin: "0 auto" }}>
-        <h1>Login</h1>
+        <div className="pageTitle">Login</div>
         <div className="muted" style={{ marginBottom: 10 }}>
           Sign in with your Employee ID and 4‑digit PIN.
         </div>
@@ -70,11 +70,11 @@ export default function Login() {
 
           {error && <div className="error">{error}</div>}
 
-          <button className="btn" disabled={loading}>
+          <button className="btnPrimary" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </button>
 
-          <Link className="btn secondary" to="/reset-pin" style={{ textAlign: "center" }}>
+          <Link className="btnSecondary" to="/reset-pin" style={{ textAlign: "center" }}>
             Reset PIN
           </Link>
         </form>
@@ -83,6 +83,7 @@ export default function Login() {
           New here? <Link to="/enroll" style={{ textDecoration: "underline" }}>Enroll</Link>
         </div>
       </div>
+      <div className="spacer" />
     </div>
   );
 }

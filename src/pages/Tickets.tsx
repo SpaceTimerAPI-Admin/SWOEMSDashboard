@@ -90,8 +90,8 @@ export default function Tickets() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Tickets</h1>
-      <div className="page-subtitle">Track urgent issues with SLA status and history.</div>
+      <h1 className="pageTitle">Tickets</h1>
+      <div className="pageSubtitle">Track urgent issues with SLA status and history.</div>
 
       <div style={{ marginTop: 12 }}>
         <Link className="btn primary" to="/tickets/new">Create ticket</Link>
@@ -102,9 +102,9 @@ export default function Tickets() {
 
       {!loading && !error && (
         <>
-          <div className="section-head">
-            <h2 className="section-title">Open</h2>
-            <span className="count-pill">{openTickets.length} active</span>
+          <div className="sectionHead">
+            <h2 className="sectionTitle">Open</h2>
+            <span className="countPill">{openTickets.length} active</span>
           </div>
 
           {openTickets.length === 0 ? (
@@ -117,21 +117,21 @@ export default function Tickets() {
                 const createdBy = t?.created_by_name || t?.createdByName || t?.employee_name || t?.employeeName || "";
                 const tag = (t?.tag || "").toString();
                 return (
-                  <Link key={t.id} className="item-card" to={`/tickets/${t.id}`}>
-                    <div className="item-top">
-                      <div className="item-title">{t.title || "Untitled ticket"}</div>
-                      {tag ? <span className="chip neutral">{tag}</span> : null}
+                  <Link key={t.id} className="itemCard" to={`/tickets/${t.id}`}>
+                    <div className="itemTop">
+                      <div className="itemTitle">{t.title || "Untitled ticket"}</div>
+                      {tag ? <span className="pill neutral">{tag}</span> : null}
                     </div>
 
-                    <div className="item-sub">
+                    <div className="itemSub">
                       {t.location ? <span>{t.location}</span> : <span className="muted">No location</span>}
                       {created ? <span className="dot">•</span> : null}
                       {created ? <span>Created {created}</span> : null}
                     </div>
 
-                    <div className="chip-row">
-                      {due ? <span className={`chip ${due.variant}`}>{due.label}</span> : null}
-                      {createdBy ? <span className="chip neutral">{createdBy}</span> : null}
+                    <div className="chipRow">
+                      {due ? <span className={`dueChip ${due.variant}`}>{due.label}</span> : null}
+                      {createdBy ? <span className="pill neutral">{createdBy}</span> : null}
                     </div>
                   </Link>
                 );
@@ -139,9 +139,9 @@ export default function Tickets() {
             </div>
           )}
 
-          <div className="section-head" style={{ marginTop: 18 }}>
-            <h2 className="section-title">Closed / Past</h2>
-            <span className="count-pill">{closedTickets.length}</span>
+          <div className="sectionHead" style={{ marginTop: 18 }}>
+            <h2 className="sectionTitle">Closed / Past</h2>
+            <span className="countPill">{closedTickets.length}</span>
           </div>
 
           {closedTickets.length === 0 ? (
@@ -154,21 +154,21 @@ export default function Tickets() {
                 const createdBy = t?.created_by_name || t?.createdByName || t?.employee_name || t?.employeeName || "";
                 const tag = (t?.tag || "").toString();
                 return (
-                  <Link key={t.id} className="item-card" to={`/tickets/${t.id}`}>
-                    <div className="item-top">
-                      <div className="item-title">{t.title || "Untitled ticket"}</div>
-                      {tag ? <span className="chip neutral">{tag}</span> : null}
+                  <Link key={t.id} className="itemCard" to={`/tickets/${t.id}`}>
+                    <div className="itemTop">
+                      <div className="itemTitle">{t.title || "Untitled ticket"}</div>
+                      {tag ? <span className="pill neutral">{tag}</span> : null}
                     </div>
 
-                    <div className="item-sub">
+                    <div className="itemSub">
                       {t.location ? <span>{t.location}</span> : <span className="muted">No location</span>}
                       {created ? <span className="dot">•</span> : null}
                       {created ? <span>Created {created}</span> : null}
                     </div>
 
-                    <div className="chip-row">
-                      {due ? <span className={`chip ${due.variant}`}>{due.label}</span> : <span className="chip neutral">Closed</span>}
-                      {createdBy ? <span className="chip neutral">{createdBy}</span> : null}
+                    <div className="chipRow">
+                      {due ? <span className={`dueChip ${due.variant}`}>{due.label}</span> : <span className="pill neutral">Closed</span>}
+                      {createdBy ? <span className="pill neutral">{createdBy}</span> : null}
                     </div>
                   </Link>
                 );

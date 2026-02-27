@@ -51,9 +51,9 @@ export default function ResetPin() {
   }
 
   return (
-    <div className="page">
-      <div className="card">
-        <h1>Reset PIN</h1>
+    <div className="container">
+      <div className="card" style={{ maxWidth: 520, margin: "0 auto" }}>
+        <div className="pageTitle">Reset PIN</div>
         <div className="muted">Admin-only: enter the admin reset code to set a new 4-digit PIN.</div>
 
         <form onSubmit={onSubmit} className="form">
@@ -97,15 +97,16 @@ export default function ResetPin() {
           {error ? <div className="error">{error}</div> : null}
           {done ? <div className="success">PIN updated. Redirecting…</div> : null}
 
-          <button className="btn primary" type="submit" disabled={loading}>
+          <button className="btnPrimary" type="submit" disabled={loading}>
             {loading ? "Resetting…" : "Reset PIN"}
           </button>
 
-          <button className="btn" type="button" onClick={() => nav("/login")} disabled={loading} style={{ marginTop: 10 }}>
+          <button className="btnGhost" type="button" onClick={() => nav("/login")} disabled={loading} style={{ marginTop: 10 }}>
             Back to Login
           </button>
         </form>
       </div>
+      <div className="spacer" />
     </div>
   );
 }

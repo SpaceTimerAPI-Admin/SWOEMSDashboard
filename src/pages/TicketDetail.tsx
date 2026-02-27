@@ -175,12 +175,16 @@ export default function TicketDetail() {
   }, [ticket]);
 
   return (
-    <div className="page">
-      <div className="row between">
-        <Link className="btn" to="/tickets">← Back</Link>
-        <div className="row" style={{ gap: 8 }}>
-          <button className="btn" onClick={handleConvertToProject} disabled={busy}>Move to project</button>
-          <button className="btn" onClick={handleClose} disabled={busy}>Close</button>
+    <div className="container">
+      <div className="detailHeader">
+        <Link className="btnGhost" to="/tickets">← Back</Link>
+        <div className="detailActions">
+          <button className="btnSecondary" onClick={handleConvertToProject} disabled={busy}>
+            Move to project
+          </button>
+          <button className="btnPrimary" onClick={handleClose} disabled={busy}>
+            Close
+          </button>
         </div>
       </div>
 
@@ -189,23 +193,25 @@ export default function TicketDetail() {
 
       {!loading && ticket && (
         <>
-          <h1 style={{ marginTop: 12 }}>{ticket.title}</h1>
-          <div className="muted">{ticket.location}</div>
+          <div className="pageTitle" style={{ marginTop: 12 }}>
+            {ticket.title}
+          </div>
+          <div className="pageSubtitle">{ticket.location}</div>
 
           <div className="card" style={{ marginTop: 16 }}>
-            <h2>Update / Comment</h2>
+            <div className="sectionTitle">Update / Comment</div>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Add an update, note, or status change…"
               rows={4}
             />
-            <div className="row between" style={{ marginTop: 8, gap: 12 }}>
-              <label className="btn">
+            <div className="detailActions" style={{ marginTop: 10 }}>
+              <label className="btnSecondary" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
                 Add photos
                 <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
               </label>
-              <button className="btn primary" disabled={busy} onClick={handleAddComment}>
+              <button className="btnPrimary" disabled={busy} onClick={handleAddComment}>
                 {busy ? "Saving..." : "Add comment"}
               </button>
             </div>
@@ -214,8 +220,8 @@ export default function TicketDetail() {
 
           {photos.length > 0 && (
             <div className="card" style={{ marginTop: 16 }}>
-              <h2>Photos</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+              <div className="sectionTitle">Photos</div>
+              <div className="photoGrid">
                 {photos.map((p: any, idx: number) => {
                   const url = p?.public_url || p?.url || p;
                   if (!url) return null;
@@ -230,16 +236,16 @@ export default function TicketDetail() {
           )}
 
           <div className="card" style={{ marginTop: 16 }}>
-            <div className="row between" style={{ alignItems: "center" }}>
-              <h2 style={{ margin: 0 }}>History</h2>
-              <span className="badge">{history.length}</span>
+            <div className="sectionHead" style={{ marginBottom: 10 }}>
+              <div className="sectionTitle" style={{ margin: 0 }}>History</div>
+              <span className="countPill">{history.length}</span>
             </div>
-            <div className="list" style={{ marginTop: 10 }}>
+            <div className="list">
               {history.length === 0 && <div className="muted">No updates yet.</div>}
               {history.map((c: any, idx: number) => (
-                <div key={idx} className="list-item">
-                  <div className="title">{c.comment || c.text || c.message}</div>
-                  <div className="meta">
+                <div key={idx} className="historyItem">
+                  <div style={{ fontWeight: 700 }}>{c.comment || c.text || c.message}</div>
+                  <div className="muted" style={{ marginTop: 6 }}>
                     {(c.employee_name || c.employees?.name || "").toString()} {c.created_at ? "• " + new Date(c.created_at).toLocaleString() : ""}
                   </div>
                 </div>
@@ -248,6 +254,7 @@ export default function TicketDetail() {
           </div>
         </>
       )}
+      <div className="spacer" />
     </div>
   );
 }
