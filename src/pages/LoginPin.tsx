@@ -1,78 +1,92 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { login, setToken } from "../lib/api";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { login } from "../lib/api";
+import { setToken } from "../lib/auth";
 
+/**
+ * Backwards-compatible login screen used by older deployments.
+ * Uses employee_id + PIN and stores the returned session token.
+ */
 export default function LoginPin() {
   const nav = useNavigate();
+  const [employeeId, setEmployeeId] = useState("");
   const [pin, setPin] = useState("");
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const pinRef = useRef<HTMLInputElement>(null);
-
-  const employeeId = (sessionStorage.getItem("pending_employee_id") || "").trim();
-
-  useEffect(() => {
-    if (!employeeId) nav("/login", { replace: true });
-  }, [employeeId, nav]);
-
-  useEffect(() => {
-    const t = setTimeout(() => pinRef.current?.focus(), 50);
-    return () => clearTimeout(t);
-  }, []);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(null);
-    if (!employeeId) return setErr("Employee ID missing. Go back.");
-    if (!pin.trim()) return setErr("PIN required");
+    setError(null);
 
-    setBusy(true);
+    const eid = employeeId.trim();
+    const p = pin.trim();
+
+    if (!eid || !p) {
+      setError("Employee ID and PIN are required.");
+      return;
+    }
+
+    setLoading(true);
     try {
-      const res = await login(employeeId, pin);
-      if (!res.ok) return setErr(res.error);
-      setToken(res.token, res.expires_at);
-      sessionStorage.removeItem("pending_employee_id");
-      nav("/", { replace: true });
-    } catch (e: any) {
-      setErr(e.message || "Login failed");
+      const res = await login(eid, p);
+
+      if (!res.ok) {
+        setError(res.error || "Login failed.");
+        return;
+      }
+
+      setToken(res.data.token);
+      nav("/tickets");
+    } catch (err: any) {
+      setError(err?.message || "Login failed.");
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   }
 
   return (
     <div className="page">
       <div className="card">
-        <div className="h1">Enter PIN</div>
-        <div className="muted">Employee ID: <span style={{ fontWeight: 700 }}>{employeeId}</span></div>
+        <h1>Login</h1>
 
-        <form onSubmit={onSubmit}>
-          <label>PIN</label>
-          <input
-            ref={pinRef}
-            className="input"
-            inputMode="numeric"
-            maxLength={4}
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            placeholder="4 digits"
-          />
+        <form onSubmit={onSubmit} className="form">
+          <label>
+            Employee ID
+            <input
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              autoComplete="username"
+              inputMode="numeric"
+            />
+          </label>
 
-          {err ? <div style={{ marginTop: 10, color: "#ff8b8b" }}>{err}</div> : null}
+          <label>
+            PIN
+            <input
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              type="password"
+              autoComplete="current-password"
+              inputMode="numeric"
+            />
+          </label>
 
-          <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center" }}>
-            <button className="btn" disabled={busy} type="submit">
-              {busy ? "Signing in..." : "Sign in"}
-            </button>
-            <Link to="/login" className="btn" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-              Back
-            </Link>
-          </div>
+          {error && <div className="error">{error}</div>}
+
+          <button className="btn primary" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => nav("/reset-pin")}
+            disabled={loading}
+            style={{ marginTop: 10 }}
+          >
+            Reset PIN
+          </button>
         </form>
-
-        <div className="muted" style={{ marginTop: 12 }}>
-          Forgot your PIN? Go back and use <b>Reset PIN</b>.
-        </div>
       </div>
     </div>
   );

@@ -240,3 +240,7 @@ export async function sendEod(payload: { to?: string; subject?: string; notes?: 
 export async function notifyEvent(payload: { type: string; message: string }): Promise<ApiResult<{}>> {
   return apiFetch<{}>("/api/notify-event", { method: "POST", body: payload });
 }
+
+
+// Backwards-compatible alias (older UI used this name)
+export const convertTicketToProject = convertTicket;

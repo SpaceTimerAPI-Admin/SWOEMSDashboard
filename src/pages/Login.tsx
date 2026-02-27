@@ -25,14 +25,14 @@ export default function Login() {
     setLoading(true);
     try {
       // login(employee_id, pin)
-      const res: any = await login(eid, p);
+      const res = await login(eid, p);
 
-      if (!res?.ok) {
-        setError(res?.error || "Login failed.");
+      if (!res.ok) {
+        setError(res.error || "Login failed.");
         return;
       }
 
-      if (res?.token) setToken(res.token);
+      setToken(res.data.token);
       nav("/tickets");
     } catch (err: any) {
       setError(err?.message || "Login failed.");
