@@ -10,34 +10,10 @@ import {
 
 type Project = any;
 
-function fmtDate(d?: string): string {
-  if (!d) return "";
-  const ms = Date.parse(d);
-  if (!ms) return d;
-  return new Date(ms).toLocaleString([], { weekday: "short", month: "short", day: "2-digit", hour: "numeric", minute: "2-digit" });
-}
-
-function humanMs(ms: number): string {
-  const a = Math.abs(ms);
-  const mins = Math.round(a / 60000);
-  if (mins < 1) return "seconds";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.round(hrs / 24);
-  return `${days}d`;
-}
-
-function slaBadge(p: any): { cls: string; text: string } {
-  const status = (p?.status || "").toString().toLowerCase();
-  if (status === "closed") return { cls: "neutral", text: "Closed" };
-
-  const msLeft = typeof p?.ms_left === "number" ? p.ms_left : (p?.sla_due_at ? Date.parse(p.sla_due_at) - Date.now() : NaN);
-  if (!isFinite(msLeft)) return { cls: "neutral", text: "No SLA" };
-
-  if (msLeft < 0) return { cls: "bad", text: `Overdue ${humanMs(msLeft)}` };
-  if (msLeft <= 24 * 60 * 60 * 1000) return { cls: "warn", text: `Due ${humanMs(msLeft)}` };
-  return { cls: "good", text: `Due ${humanMs(msLeft)}` };
+function pickData(res: any) {
+  if (!res) return null;
+  if (res.ok && "data" in res) return res.data;
+  return res;
 }
 
 export default function ProjectDetail() {
@@ -58,7 +34,15 @@ export default function ProjectDetail() {
     try {
       const res: any = await getProject(projectId);
       if (!res?.ok) throw new Error(res?.error || "Failed to load project");
-      setProject(res?.data?.project || res?.project || res?.data || null);
+
+      const data: any = pickData(res);
+      const p = data?.project || data;
+      const merged = {
+        ...(p || {}),
+        comments: data?.comments ?? p?.comments ?? p?.history ?? [],
+        photos: data?.photos ?? p?.photos ?? p?.photo_urls ?? [],
+      };
+      setProject(merged);
     } catch (e: any) {
       setError(e?.message || "Failed to load project");
     } finally {
@@ -69,27 +53,29 @@ export default function ProjectDetail() {
   useEffect(() => { if (projectId) void load(); }, [projectId]);
 
   const photos = useMemo(() => {
-    const arr = project?.photos || project?.photo_urls || project?.photoUrls || [];
+    const arr = project?.photos || [];
     return Array.isArray(arr) ? arr : [];
   }, [project]);
 
-  const isClosed = ((project?.status || "").toString().toLowerCase() === "closed") || !!project?.closed_at;
-  const sla = project ? slaBadge(project) : { cls: "neutral", text: "—" };
+  const history = useMemo(() => {
+    const arr = project?.comments || project?.history || [];
+    return Array.isArray(arr) ? arr : [];
+  }, [project]);
 
-  async function handleAddComment(photoKeys?: string[]) {
+  async function handleAddComment() {
     setCommentError(null);
     const c = comment.trim();
-    if (!c && (!photoKeys || photoKeys.length === 0)) {
-      setCommentError("Comment or photo required.");
+    if (!c) {
+      setCommentError("Comment required.");
       return;
     }
 
     setBusy(true);
     try {
       const res: any = await addProjectComment({
+        project_id: projectId,
         id: projectId,
         comment: c,
-        photo_keys: photoKeys || [],
       });
       if (!res?.ok) throw new Error(res?.error || "Failed to add comment");
       setComment("");
@@ -115,16 +101,21 @@ export default function ProjectDetail() {
     }
   }
 
-  async function uploadPhoto(file: File): Promise<string> {
+  async function uploadPhoto(file: File): Promise<void> {
+    const safeName = (file && file.name && file.name.trim()) ? file.name : `photo_${Date.now()}.jpg`;
+
     const res: any = await getProjectPhotoUploadUrl({
       project_id: projectId,
-      filename: (file.name && file.name.trim()) ? file.name : `photo_${Date.now()}.jpg`,
+      filename: safeName,
+      file_name: safeName,
       content_type: file.type || "application/octet-stream",
     });
     if (!res?.ok) throw new Error(res?.error || "Failed to get upload URL");
 
-    const uploadUrl = res?.upload_url || res?.data?.upload_url;
-    const storageKey = res?.storage_key || res?.data?.storage_key;
+    const data: any = pickData(res);
+    const uploadUrl = data?.upload_url;
+    const storageKey = data?.storage_key || data?.storage_path;
+
     if (!uploadUrl || !storageKey) throw new Error("Upload URL missing");
 
     const put = await fetch(uploadUrl, {
@@ -137,10 +128,9 @@ export default function ProjectDetail() {
     const conf: any = await confirmProjectPhoto({
       project_id: projectId,
       storage_key: storageKey,
+      storage_path: storageKey,
     });
     if (!conf?.ok) throw new Error(conf?.error || "Confirm failed");
-
-    return storageKey;
   }
 
   async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -150,14 +140,8 @@ export default function ProjectDetail() {
 
     setBusy(true);
     try {
-      const keys: string[] = [];
-      for (const f of files) keys.push(await uploadPhoto(f));
-      // Photo uploads should not require a typed comment.
-      if (comment.trim()) {
-        await handleAddComment();
-      } else {
-        await load();
-      }
+      for (const f of files) await uploadPhoto(f);
+      await load();
     } catch (err: any) {
       alert(err?.message || "Photo upload failed");
     } finally {
@@ -167,131 +151,75 @@ export default function ProjectDetail() {
 
   return (
     <div className="page">
-      <div className="row between wrap" style={{ gap: 10 }}>
-        <Link className="btn inline ghost" to="/projects">← Back</Link>
-
-        {!isClosed && (
-          <button className="btn inline danger" onClick={handleClose} disabled={busy}>
-            Close
-          </button>
-        )}
+      <div className="row between">
+        <Link className="btn" to="/projects">← Back</Link>
+        <button className="btn" onClick={handleClose} disabled={busy}>Close</button>
       </div>
 
-      {loading && <div className="muted" style={{ marginTop: 14 }}>Loading…</div>}
-      {error && <div className="error" style={{ marginTop: 14 }}>{error}</div>}
+      {loading && <div>Loading…</div>}
+      {error && <div className="error">{error}</div>}
 
       {!loading && project && (
         <>
-          <div style={{ marginTop: 12 }}>
-            <div className="row between wrap" style={{ gap: 10, alignItems: "flex-start" }}>
-              <div className="grow">
-                <h1 style={{ marginBottom: 8 }}>{project.title || "Project"}</h1>
-                <div className="muted">{project.location || "No location"}</div>
-              </div>
-              <div className="badges">
-                <span className={"badge " + sla.cls}>{sla.text}</span>
-                <span className="badge">{(project.status || "open").toString().toUpperCase()}</span>
-              </div>
-            </div>
-          </div>
+          <h1 style={{ marginTop: 12 }}>{project.title}</h1>
+          <div className="muted">{project.location}</div>
 
-          <div className="card" style={{ marginTop: 14 }}>
-            <div className="kv">
-              <div className="cell">
-                <div className="k">Created</div>
-                <div className="v">{fmtDate(project.created_at)}</div>
-              </div>
-              <div className="cell">
-                <div className="k">SLA Due</div>
-                <div className="v">{project.sla_due_at ? fmtDate(project.sla_due_at) : "—"}</div>
-              </div>
-              <div className="cell">
-                <div className="k">Created By</div>
-                <div className="v">{project.created_by_name || project.created_by || "—"}</div>
-              </div>
-              <div className="cell">
-                <div className="k">SLA</div>
-                <div className="v">{project.sla_days ? `${project.sla_days} days` : "—"}</div>
-              </div>
-            </div>
-
-            {project.source_ticket_id && (
-              <div style={{ marginTop: 12 }}>
-                <span className="badge neutral">From ticket #{project.source_ticket_id}</span>
-              </div>
-            )}
-
-            {project.details && (
-              <div style={{ marginTop: 12 }}>
-                <div className="k" style={{ fontSize: 12, color: "rgba(230,232,239,0.70)" }}>Details</div>
-                <div style={{ marginTop: 6, whiteSpace: "pre-wrap", lineHeight: 1.35 }}>{project.details}</div>
-              </div>
-            )}
-          </div>
-
-          <div className="card" style={{ marginTop: 14 }}>
-            <div className="section-title">
-              <h2 style={{ margin: 0 }}>Update / Comment</h2>
-              <span className="badge neutral">{busy ? "Saving…" : "Ready"}</span>
-            </div>
-
+          <div className="card" style={{ marginTop: 16 }}>
+            <h2>Update / Comment</h2>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              rows={4}
               placeholder="Add an update, note, or status change…"
-              style={{ marginTop: 10 }}
+              rows={4}
             />
-
-            <div className="row between wrap" style={{ marginTop: 10, gap: 10 }}>
-              <label className="btn inline secondary" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
+            <div className="row between" style={{ marginTop: 8, gap: 12 }}>
+              <label className="btn">
                 Add photos
-                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} disabled={busy} />
+                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
               </label>
-
-              <button className="btn inline" disabled={busy} onClick={() => handleAddComment()}>
-                Add comment
+              <button className="btn primary" disabled={busy} onClick={handleAddComment}>
+                {busy ? "Saving..." : "Add comment"}
               </button>
             </div>
-
-            {commentError && <div className="error">{commentError}</div>}
+            {commentError && <div className="error" style={{ marginTop: 8 }}>{commentError}</div>}
           </div>
 
           {photos.length > 0 && (
-            <div className="card" style={{ marginTop: 14 }}>
-              <div className="section-title">
-                <h2 style={{ margin: 0 }}>Photos</h2>
-                <span className="badge neutral">{photos.length}</span>
-              </div>
-              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
-                {photos.map((p: any, idx: number) => (
-                  <a key={idx} href={p.url} target="_blank" rel="noreferrer">
-                    <img src={p.url} style={{ width: "100%", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)" }} />
-                  </a>
-                ))}
+            <div className="card" style={{ marginTop: 16 }}>
+              <h2>Photos</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+                {photos.map((p: any, idx: number) => {
+                  const url = p?.public_url || p?.url || p;
+                  if (!url) return null;
+                  return (
+                    <a key={idx} href={url} target="_blank" rel="noreferrer">
+                      <img src={url} style={{ width: "100%", borderRadius: 12 }} />
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          <div className="card" style={{ marginTop: 14 }}>
-            <div className="section-title">
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="row between" style={{ alignItems: "center" }}>
               <h2 style={{ margin: 0 }}>History</h2>
-              <span className="badge neutral">{(project.comments || project.history || []).length}</span>
+              <span className="badge">{history.length}</span>
             </div>
-
-            <div className="list" style={{ marginTop: 12 }}>
-              {(project.comments || project.history || []).map((c: any, idx: number) => (
+            <div className="list" style={{ marginTop: 10 }}>
+              {history.length === 0 && <div className="muted">No updates yet.</div>}
+              {history.map((c: any, idx: number) => (
                 <div key={idx} className="list-item">
-                  <div className="title" style={{ fontSize: 16 }}>{c.comment || c.text || c.message || "Update"}</div>
-                  <div className="meta">{fmtDate(c.created_at || c.createdAt)} {(c.created_by_name || c.employee_name) ? `• ${c.created_by_name || c.employee_name}` : ""}</div>
+                  <div className="title">{c.comment || c.text || c.message}</div>
+                  <div className="meta">
+                    {(c.employee_name || c.employees?.name || "").toString()} {c.created_at ? "• " + new Date(c.created_at).toLocaleString() : ""}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </>
       )}
-
-      <div className="spacer" />
     </div>
   );
 }

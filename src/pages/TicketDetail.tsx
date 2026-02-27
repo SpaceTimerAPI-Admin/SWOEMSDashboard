@@ -11,35 +11,11 @@ import {
 
 type Ticket = any;
 
-function fmtDate(d?: string): string {
-  if (!d) return "";
-  const ms = Date.parse(d);
-  if (!ms) return d;
-  return new Date(ms).toLocaleString([], { weekday: "short", month: "short", day: "2-digit", hour: "numeric", minute: "2-digit" });
-}
-
-function humanMs(ms: number): string {
-  const a = Math.abs(ms);
-  const mins = Math.round(a / 60000);
-  if (mins < 1) return "seconds";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  const days = Math.round(hrs / 24);
-  return `${days}d`;
-}
-
-function slaBadge(t: any): { cls: string; text: string } {
-  const status = (t?.status || "").toString().toLowerCase();
-  if (status === "closed") return { cls: "neutral", text: "Closed" };
-  if (status === "project") return { cls: "neutral", text: "Converted" };
-
-  const msLeft = typeof t?.ms_left === "number" ? t.ms_left : (t?.sla_due_at ? Date.parse(t.sla_due_at) - Date.now() : NaN);
-  if (!isFinite(msLeft)) return { cls: "neutral", text: "No SLA" };
-
-  if (msLeft < 0) return { cls: "bad", text: `Overdue ${humanMs(msLeft)}` };
-  if (msLeft <= 15 * 60 * 1000) return { cls: "warn", text: `Due ${humanMs(msLeft)}` };
-  return { cls: "good", text: `Due ${humanMs(msLeft)}` };
+function pickData(res: any) {
+  // Supports ApiResult<{...}> ({ok:true,data:{...}}) and legacy ({ok:true, ...})
+  if (!res) return null;
+  if (res.ok && "data" in res) return res.data;
+  return res;
 }
 
 export default function TicketDetail() {
@@ -61,10 +37,16 @@ export default function TicketDetail() {
     try {
       const res: any = await getTicket(ticketId);
       if (!res?.ok) throw new Error(res?.error || "Failed to load ticket");
-      const d: any = res?.data ?? res;
-      const t = d?.ticket ?? d?.data?.ticket ?? d?.data ?? d?.ticket;
-      if (!t) throw new Error("Not found");
-      setTicket({ ...t, comments: d?.comments ?? t.comments, history: d?.comments ?? t.history, photos: d?.photos ?? t.photos, photo_urls: d?.photos ?? t.photo_urls });
+
+      const data: any = pickData(res);
+      const t = data?.ticket || data; // some versions return {ticket, comments, photos}
+      const merged = {
+        ...(t || {}),
+        comments: data?.comments ?? t?.comments ?? t?.history ?? [],
+        photos: data?.photos ?? t?.photos ?? t?.photo_urls ?? [],
+      };
+
+      setTicket(merged);
     } catch (e: any) {
       setError(e?.message || "Failed to load ticket");
     } finally {
@@ -72,39 +54,30 @@ export default function TicketDetail() {
     }
   }
 
-  useEffect(() => { if (ticketId) void load(); }, [ticketId]);
+  useEffect(() => {
+    if (ticketId) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketId]);
 
   const photos = useMemo(() => {
-    const raw: any[] = (ticket?.photos || ticket?.photo_urls || ticket?.photoUrls || []) as any;
-    const arr = Array.isArray(raw) ? raw : [];
-    // Normalize to { url, ...rest } objects for rendering
-    return arr
-      .map((p: any) => {
-        if (!p) return null;
-        if (typeof p === "string") return { url: p };
-        const url = p.public_url || p.url || p.publicUrl || p.publicURL || null;
-        // If a public URL isn't present but storage_path exists, keep object (backend should populate public_url on confirm)
-        return { ...p, url: url || p.storage_path || p.storageKey || p.storage_key || "" };
-      })
-      .filter(Boolean);
+    const arr = ticket?.photos || [];
+    return Array.isArray(arr) ? arr : [];
   }, [ticket]);
 
-  const isClosed = ((ticket?.status || "").toString().toLowerCase() === "closed") || !!ticket?.closed_at;
-
-  async function handleAddComment(photoKeys?: string[]) {
+  async function handleAddComment() {
     setCommentError(null);
     const c = comment.trim();
-    if (!c && (!photoKeys || photoKeys.length === 0)) {
-      setCommentError("Comment or photo required.");
+    if (!c) {
+      setCommentError("Comment required.");
       return;
     }
 
     setBusy(true);
     try {
       const res: any = await addTicketComment({
-        id: ticketId,
+        ticket_id: ticketId,
+        id: ticketId, // support older handlers too
         comment: c,
-        photo_keys: photoKeys || [],
       });
       if (!res?.ok) throw new Error(res?.error || "Failed to add comment");
       setComment("");
@@ -136,7 +109,8 @@ export default function TicketDetail() {
     try {
       const res: any = await convertTicketToProject(ticketId);
       if (!res?.ok) throw new Error(res?.error || "Failed to convert");
-      const projectId = res?.project_id || res?.data?.project_id;
+      const data: any = pickData(res);
+      const projectId = data?.project_id || data?.project?.id;
       if (projectId) nav(`/projects/${projectId}`);
       else nav("/projects");
     } catch (e: any) {
@@ -146,16 +120,20 @@ export default function TicketDetail() {
     }
   }
 
-  async function uploadPhoto(file: File): Promise<string> {
+  async function uploadPhoto(file: File): Promise<void> {
+    const safeName = (file && file.name && file.name.trim()) ? file.name : `photo_${Date.now()}.jpg`;
+
     const res: any = await getTicketPhotoUploadUrl({
       ticket_id: ticketId,
-      filename: (file.name && file.name.trim()) ? file.name : `photo_${Date.now()}.jpg`,
+      filename: safeName,
+      file_name: safeName, // support older handlers
       content_type: file.type || "application/octet-stream",
     });
     if (!res?.ok) throw new Error(res?.error || "Failed to get upload URL");
 
-    const uploadUrl = res?.upload_url || res?.data?.upload_url;
-    const storageKey = res?.storage_key || res?.data?.storage_key;
+    const data: any = pickData(res);
+    const uploadUrl = data?.upload_url;
+    const storageKey = data?.storage_key || data?.storage_path;
 
     if (!uploadUrl || !storageKey) throw new Error("Upload URL missing");
 
@@ -169,10 +147,9 @@ export default function TicketDetail() {
     const conf: any = await confirmTicketPhoto({
       ticket_id: ticketId,
       storage_key: storageKey,
+      storage_path: storageKey,
     });
     if (!conf?.ok) throw new Error(conf?.error || "Confirm failed");
-
-    return storageKey;
   }
 
   async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -182,14 +159,9 @@ export default function TicketDetail() {
 
     setBusy(true);
     try {
-      const keys: string[] = [];
-      for (const f of files) keys.push(await uploadPhoto(f));
-      // Photo uploads should not require a typed comment.
-      if (comment.trim()) {
-        await handleAddComment();
-      } else {
-        await load();
-      }
+      for (const f of files) await uploadPhoto(f);
+      // No comment required for photos. Just reload so they appear.
+      await load();
     } catch (err: any) {
       alert(err?.message || "Photo upload failed");
     } finally {
@@ -197,136 +169,85 @@ export default function TicketDetail() {
     }
   }
 
-  const sla = ticket ? slaBadge(ticket) : { cls: "neutral", text: "—" };
+  const history = useMemo(() => {
+    const arr = ticket?.comments || ticket?.history || [];
+    return Array.isArray(arr) ? arr : [];
+  }, [ticket]);
 
   return (
     <div className="page">
-      <div className="row between wrap" style={{ gap: 10 }}>
-        <Link className="btn inline ghost" to="/tickets">← Back</Link>
-
-        <div className="row wrap" style={{ gap: 8, justifyContent: "flex-end" }}>
-          {!isClosed && (
-            <button className="btn inline" onClick={handleConvertToProject} disabled={busy}>
-              Move to project
-            </button>
-          )}
-          {!isClosed && (
-            <button className="btn inline danger" onClick={handleClose} disabled={busy}>
-              Close
-            </button>
-          )}
+      <div className="row between">
+        <Link className="btn" to="/tickets">← Back</Link>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={handleConvertToProject} disabled={busy}>Move to project</button>
+          <button className="btn" onClick={handleClose} disabled={busy}>Close</button>
         </div>
       </div>
 
-      {loading && <div className="muted" style={{ marginTop: 14 }}>Loading…</div>}
-      {error && <div className="error" style={{ marginTop: 14 }}>{error}</div>}
+      {loading && <div>Loading…</div>}
+      {error && <div className="error">{error}</div>}
 
       {!loading && ticket && (
         <>
-          <div style={{ marginTop: 12 }}>
-            <div className="row between wrap" style={{ gap: 10, alignItems: "flex-start" }}>
-              <div className="grow">
-                <h1 style={{ marginBottom: 8 }}>{ticket.title || "Ticket"}</h1>
-                <div className="muted">{ticket.location || "No location"}</div>
-              </div>
-              <div className="badges">
-                <span className={"badge " + sla.cls}>{sla.text}</span>
-                <span className="badge">{(ticket.status || "open").toString().toUpperCase()}</span>
-              </div>
-            </div>
-          </div>
+          <h1 style={{ marginTop: 12 }}>{ticket.title}</h1>
+          <div className="muted">{ticket.location}</div>
 
-          <div className="card" style={{ marginTop: 14 }}>
-            <div className="kv">
-              <div className="cell">
-                <div className="k">Created</div>
-                <div className="v">{fmtDate(ticket.created_at)}</div>
-              </div>
-              <div className="cell">
-                <div className="k">SLA Due</div>
-                <div className="v">{ticket.sla_due_at ? fmtDate(ticket.sla_due_at) : "—"}</div>
-              </div>
-              <div className="cell">
-                <div className="k">Created By</div>
-                <div className="v">{ticket.created_by_name || ticket.created_by || "—"}</div>
-              </div>
-              <div className="cell">
-                <div className="k">SLA</div>
-                <div className="v">{ticket.sla_minutes ? `${ticket.sla_minutes} min` : "—"}</div>
-              </div>
-            </div>
-
-            {ticket.details && (
-              <div style={{ marginTop: 12 }}>
-                <div className="k" style={{ fontSize: 12, color: "rgba(230,232,239,0.70)" }}>Details</div>
-                <div style={{ marginTop: 6, whiteSpace: "pre-wrap", lineHeight: 1.35 }}>{ticket.details}</div>
-              </div>
-            )}
-          </div>
-
-          <div className="card" style={{ marginTop: 14 }}>
-            <div className="section-title">
-              <h2 style={{ margin: 0 }}>Update / Comment</h2>
-              <span className="badge neutral">{busy ? "Saving…" : "Ready"}</span>
-            </div>
-
+          <div className="card" style={{ marginTop: 16 }}>
+            <h2>Update / Comment</h2>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              rows={4}
               placeholder="Add an update, note, or status change…"
-              style={{ marginTop: 10 }}
+              rows={4}
             />
-
-            <div className="row between wrap" style={{ marginTop: 10, gap: 10 }}>
-              <label className="btn inline secondary" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
+            <div className="row between" style={{ marginTop: 8, gap: 12 }}>
+              <label className="btn">
                 Add photos
-                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} disabled={busy} />
+                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
               </label>
-
-              <button className="btn inline" disabled={busy} onClick={() => handleAddComment()}>
-                Add comment
+              <button className="btn primary" disabled={busy} onClick={handleAddComment}>
+                {busy ? "Saving..." : "Add comment"}
               </button>
             </div>
-
-            {commentError && <div className="error">{commentError}</div>}
+            {commentError && <div className="error" style={{ marginTop: 8 }}>{commentError}</div>}
           </div>
 
           {photos.length > 0 && (
-            <div className="card" style={{ marginTop: 14 }}>
-              <div className="section-title">
-                <h2 style={{ margin: 0 }}>Photos</h2>
-                <span className="badge neutral">{photos.length}</span>
-              </div>
-              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
-                {photos.map((p: any, idx: number) => (
-                  <a key={idx} href={p.url} target="_blank" rel="noreferrer">
-                    <img src={p.url} style={{ width: "100%", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)" }} />
-                  </a>
-                ))}
+            <div className="card" style={{ marginTop: 16 }}>
+              <h2>Photos</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+                {photos.map((p: any, idx: number) => {
+                  const url = p?.public_url || p?.url || p;
+                  if (!url) return null;
+                  return (
+                    <a key={idx} href={url} target="_blank" rel="noreferrer">
+                      <img src={url} style={{ width: "100%", borderRadius: 12 }} />
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          <div className="card" style={{ marginTop: 14 }}>
-            <div className="section-title">
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="row between" style={{ alignItems: "center" }}>
               <h2 style={{ margin: 0 }}>History</h2>
-              <span className="badge neutral">{(ticket.comments || ticket.history || []).length}</span>
+              <span className="badge">{history.length}</span>
             </div>
-
-            <div className="list" style={{ marginTop: 12 }}>
-              {(ticket.comments || ticket.history || []).map((c: any, idx: number) => (
+            <div className="list" style={{ marginTop: 10 }}>
+              {history.length === 0 && <div className="muted">No updates yet.</div>}
+              {history.map((c: any, idx: number) => (
                 <div key={idx} className="list-item">
-                  <div className="title" style={{ fontSize: 16 }}>{c.comment || c.text || c.message || "Update"}</div>
-                  <div className="meta">{fmtDate(c.created_at || c.createdAt)} {(c.created_by_name || c.employee_name) ? `• ${c.created_by_name || c.employee_name}` : ""}</div>
+                  <div className="title">{c.comment || c.text || c.message}</div>
+                  <div className="meta">
+                    {(c.employee_name || c.employees?.name || "").toString()} {c.created_at ? "• " + new Date(c.created_at).toLocaleString() : ""}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </>
       )}
-
-      <div className="spacer" />
     </div>
   );
 }
