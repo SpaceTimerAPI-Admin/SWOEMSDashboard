@@ -13,9 +13,12 @@ export const handler: Handler = async (event) => {
     const body = event.body ? JSON.parse(event.body) : {};
     const project_id = String(body.project_id || body.projectId || body.project_ID || body.id || "").trim();
     const comment = String(body.comment || "").trim();
+    const photo_keys: string[] = Array.isArray(body.photo_keys) ? body.photo_keys.map((x: any) => String(x)).filter(Boolean) : [];
 
     if (!project_id) return badRequest("project_id required");
-    if (!comment) return badRequest("comment required");
+    if (!comment && photo_keys.length === 0) return badRequest("comment required");
+
+    const finalComment = comment || `Added ${photo_keys.length} photo${photo_keys.length === 1 ? "" : "s"}.`;
 
     const supabase = supabaseAdmin();
     const { data, error } = await supabase
@@ -23,7 +26,7 @@ export const handler: Handler = async (event) => {
       .insert({
         project_id,
         employee_id: session.employee.id,
-        comment,
+        comment: finalComment,
         status_change: null,
       })
       .select("id, created_at")

@@ -61,7 +61,10 @@ export default function TicketDetail() {
     try {
       const res: any = await getTicket(ticketId);
       if (!res?.ok) throw new Error(res?.error || "Failed to load ticket");
-      setTicket(res?.data?.ticket || res?.ticket || res?.data || null);
+      const d: any = res?.data ?? res;
+      const t = d?.ticket ?? d?.data?.ticket ?? d?.data ?? d?.ticket;
+      if (!t) throw new Error("Not found");
+      setTicket({ ...t, comments: d?.comments ?? t.comments, photos: d?.photos ?? t.photos });
     } catch (e: any) {
       setError(e?.message || "Failed to load ticket");
     } finally {
@@ -171,7 +174,12 @@ export default function TicketDetail() {
     try {
       const keys: string[] = [];
       for (const f of files) keys.push(await uploadPhoto(f));
-      await handleAddComment(keys);
+      // Photo uploads should not require a typed comment.
+      if (comment.trim()) {
+        await handleAddComment();
+      } else {
+        await load();
+      }
     } catch (err: any) {
       alert(err?.message || "Photo upload failed");
     } finally {
@@ -261,11 +269,6 @@ export default function TicketDetail() {
             />
 
             <div className="row between wrap" style={{ marginTop: 10, gap: 10 }}>
-              <label className="btn inline secondary" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
-                Take photo
-                <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={onPickFiles} disabled={busy} />
-              </label>
-
               <label className="btn inline secondary" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
                 Add photos
                 <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} disabled={busy} />

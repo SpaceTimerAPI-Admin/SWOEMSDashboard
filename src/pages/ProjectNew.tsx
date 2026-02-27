@@ -7,6 +7,7 @@ export default function ProjectNew() {
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
   const [details, setDetails] = useState("");
+  const [tag, setTag] = useState<"Lighting"|"Sound"|"Video"|"Rides"|"Misc">("Misc");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

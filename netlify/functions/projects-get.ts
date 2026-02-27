@@ -31,7 +31,7 @@ export const handler: Handler = async (event) => {
     const { data: project, error: pErr } = await supabase
       .from("projects")
       .select(`
-        id, title, location, details, status, created_at, sla_due_at, sla_days,
+        id, title, location, details, tag, status, created_at, sla_due_at, sla_days,
         created_by, source_ticket_id,
         employees!projects_created_by_fkey(name)
       `)

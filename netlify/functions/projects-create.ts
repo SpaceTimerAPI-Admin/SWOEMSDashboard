@@ -15,6 +15,7 @@ export const handler: Handler = async (event) => {
     const title = String(body.title || "").trim();
     const location = String(body.location || "").trim();
     const details = String(body.details || "").trim();
+    const tag = String(body.tag || "").trim();
     const sla_days = body.sla_days ? Number(body.sla_days) : 14;
 
     if (!title) return badRequest("Title required");

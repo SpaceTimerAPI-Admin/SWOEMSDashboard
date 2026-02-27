@@ -14,9 +14,12 @@ export const handler: Handler = async (event) => {
     const body = event.body ? JSON.parse(event.body) : {};
     const ticket_id = String(body.ticket_id || body.ticketId || body.ticket_ID || body.id || "").trim();
     const comment = String(body.comment || "").trim();
+    const photo_keys: string[] = Array.isArray(body.photo_keys) ? body.photo_keys.map((x: any) => String(x)).filter(Boolean) : [];
 
     if (!ticket_id) return badRequest("ticket_id required");
-    if (!comment) return badRequest("comment required");
+    if (!comment && photo_keys.length === 0) return badRequest("comment required");
+
+    const finalComment = comment || `Added ${photo_keys.length} photo${photo_keys.length === 1 ? "" : "s"}.`;
 
     const supabase = supabaseAdmin();
 
@@ -25,7 +28,7 @@ export const handler: Handler = async (event) => {
       .insert({
         ticket_id,
         employee_id: session.employee.id,
-        comment,
+        comment: finalComment,
         status_change: null,
       })
       .select("id, created_at")
