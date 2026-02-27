@@ -13,15 +13,16 @@ export const handler: Handler = async (event) => {
 
     const body = event.body ? JSON.parse(event.body) : {};
     const employee_id = normId(body.employee_id);
-    const code = String(body.code || "").trim();
+    const admin_code = String(body.admin_code || body.code || "").trim();
     const new_pin = String(body.new_pin || body.pin || "").trim();
 
     if (!employee_id) return badRequest("Employee ID required");
     if (!code) return badRequest("Enrollment code required");
     if (!/^\d{4}$/.test(new_pin)) return badRequest("PIN must be 4 digits");
 
-    const expected = String(process.env.ENROLLMENT_CODE || "").trim();
-    if (!expected || code !== expected) return unauthorized("Invalid enrollment code");
+    const expected = String(process.env.PIN_RESET_ADMIN_CODE || "").trim();
+    if (!expected) return unauthorized("Admin reset code not configured");
+    if (admin_code !== expected) return unauthorized("Invalid admin reset code");
 
     const supabase = supabaseAdmin();
 

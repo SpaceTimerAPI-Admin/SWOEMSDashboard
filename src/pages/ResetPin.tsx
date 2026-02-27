@@ -5,7 +5,7 @@ import { resetPin } from "../lib/api";
 export default function ResetPin() {
   const nav = useNavigate();
   const [employeeId, setEmployeeId] = useState("");
-  const [code, setCode] = useState("");
+  const [adminCode, setAdminCode] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,11 +17,11 @@ export default function ResetPin() {
     setError(null);
 
     const eid = employeeId.trim();
-    const c = code.trim();
+    const code = adminCode.trim();
     const p1 = newPin.trim();
     const p2 = confirmPin.trim();
 
-    if (!eid || !c || !p1 || !p2) {
+    if (!eid || !code || !p1 || !p2) {
       setError("All fields are required.");
       return;
     }
@@ -36,9 +36,9 @@ export default function ResetPin() {
 
     setLoading(true);
     try {
-      const res: any = await resetPin({ employee_id: eid, code: c, new_pin: p1 });
-      if (!res?.ok) {
-        setError(res?.error || "Could not reset PIN.");
+      const res = await resetPin({ employee_id: eid, admin_code: code, new_pin: p1 });
+      if (!res.ok) {
+        setError(res.error || "Could not reset PIN.");
         return;
       }
       setDone(true);
@@ -51,55 +51,59 @@ export default function ResetPin() {
   }
 
   return (
-    <div className="container" style={{ paddingTop: 22 }}>
+    <div className="page">
       <div className="card">
-        <div className="h1">Reset PIN</div>
-        <div className="muted">Enter your Employee ID and the enrollment code to set a new 4-digit PIN.</div>
+        <h1>Reset PIN</h1>
+        <div className="muted">Admin-only: enter the admin reset code to set a new 4-digit PIN.</div>
 
-        <form onSubmit={onSubmit}>
-          <label>Employee ID</label>
-          <input
-            className="input"
-            value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-            inputMode="numeric"
-            autoComplete="username"
-          />
+        <form onSubmit={onSubmit} className="form">
+          <label>
+            Employee ID
+            <input
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              inputMode="numeric"
+              autoComplete="username"
+            />
+          </label>
 
-          <label>Enrollment Code</label>
-          <input className="input" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" />
+          <label>
+            Admin Reset Code
+            <input value={adminCode} onChange={(e) => setAdminCode(e.target.value)} autoComplete="one-time-code" />
+          </label>
 
-          <label>New PIN</label>
-          <input
-            className="input"
-            value={newPin}
-            onChange={(e) => setNewPin(e.target.value)}
-            inputMode="numeric"
-            type="password"
-            autoComplete="new-password"
-          />
+          <label>
+            New 4-digit PIN
+            <input
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value)}
+              inputMode="numeric"
+              maxLength={4}
+              autoComplete="new-password"
+            />
+          </label>
 
-          <label>Confirm New PIN</label>
-          <input
-            className="input"
-            value={confirmPin}
-            onChange={(e) => setConfirmPin(e.target.value)}
-            inputMode="numeric"
-            type="password"
-            autoComplete="new-password"
-          />
+          <label>
+            Confirm PIN
+            <input
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value)}
+              inputMode="numeric"
+              maxLength={4}
+              autoComplete="new-password"
+            />
+          </label>
 
-          {error ? <div style={{ marginTop: 10, color: "#ff8080", fontSize: 13 }}>{error}</div> : null}
-          {done ? <div style={{ marginTop: 10, color: "#9fffa8", fontSize: 13 }}>PIN reset. Returning to login…</div> : null}
+          {error ? <div className="error">{error}</div> : null}
+          {done ? <div className="success">PIN updated. Redirecting…</div> : null}
 
-          <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-            <button className="btn" disabled={loading}>
-              {loading ? "Resetting…" : "Reset PIN"}
-            </button>
-            <button type="button" className="btn secondary" onClick={() => nav("/login")} disabled={loading}>
-              Back to login
-            </button>
-          </div>
+          <button className="btn primary" type="submit" disabled={loading}>
+            {loading ? "Resetting…" : "Reset PIN"}
+          </button>
+
+          <button className="btn" type="button" onClick={() => nav("/login")} disabled={loading} style={{ marginTop: 10 }}>
+            Back to Login
+          </button>
         </form>
       </div>
     </div>
