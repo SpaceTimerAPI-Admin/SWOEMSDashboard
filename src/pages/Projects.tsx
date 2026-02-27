@@ -48,7 +48,7 @@ export default function Projects() {
     <div className="page">
       <div className="row between">
         <h1>Projects</h1>
-        <Link className="btn primary" to="/projects/new">Create project</Link>
+        <Link className="btn primary inline" to="/projects/new">Create project</Link>
       </div>
 
       {loading && <div>Loading…</div>}

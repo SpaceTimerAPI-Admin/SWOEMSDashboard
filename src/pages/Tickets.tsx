@@ -49,7 +49,7 @@ export default function Tickets() {
     <div className="page">
       <div className="row between">
         <h1>Tickets</h1>
-        <Link className="btn primary" to="/tickets/new">Create ticket</Link>
+        <Link className="btn primary inline" to="/tickets/new">Create ticket</Link>
       </div>
 
       {loading && <div>Loading…</div>}
