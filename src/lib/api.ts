@@ -74,6 +74,12 @@ export async function enroll(payload: { employee_id: string; name: string; pin: 
   return apiFetch<{}>("/api/enroll", { method: "POST", body: payload });
 }
 
+
+export async function resetPin(payload: { employee_id: string; new_pin: string; admin_code: string }): Promise<ApiResult<{}>> {
+  // Admin-only PIN reset
+  return apiFetch<{}>("/api/reset-pin", { method: "POST", body: payload });
+}
+
 // Backwards-compat re-exports (some pages historically imported these from lib/api)
 export { setToken, getToken, clearToken, isExpired };
 
@@ -92,12 +98,11 @@ export type Ticket = {
 
 export async function listTickets(opts?: { includeClosed?: boolean }): Promise<ApiResult<{ tickets: Ticket[] }>> {
   // server-side can ignore includeClosed; UI will filter if needed
-  const qs = opts?.includeClosed ? "?includeClosed=1" : "";
-  return apiFetch<{ tickets: Ticket[] }>(`/api/tickets-list${qs}`);
+  return apiFetch<{ tickets: Ticket[] }>("/api/tickets-list", { method: "POST", body: opts ?? {} });
 }
 
 export async function getTicket(id: string): Promise<ApiResult<{ ticket: Ticket; comments?: any[] }>> {
-  return apiFetch<{ ticket: Ticket; comments?: any[] }>(`/api/tickets-get?id=${encodeURIComponent(id)}`);
+  return apiFetch<{ ticket: Ticket; comments?: any[] }>("/api/tickets-get", { method: "POST", body: { id } });
 }
 
 export async function createTicket(input: {
@@ -130,6 +135,10 @@ export async function closeTicket(id: string): Promise<ApiResult<{}>> {
 export async function convertTicket(id: string): Promise<ApiResult<{}>> {
   return apiFetch<{}>("/api/tickets-convert", { method: "POST", body: { id } });
 }
+
+
+// Backwards-compatible alias
+export const convertTicketToProject = convertTicket;
 
 // Photo upload helpers (Supabase storage presign)
 export async function getTicketPhotoUploadUrl(input: {
@@ -169,12 +178,11 @@ export type Project = {
 };
 
 export async function listProjects(opts?: { includeClosed?: boolean }): Promise<ApiResult<{ projects: Project[] }>> {
-  const qs = opts?.includeClosed ? "?includeClosed=1" : "";
-  return apiFetch<{ projects: Project[] }>(`/api/projects-list${qs}`);
+  return apiFetch<{ projects: Project[] }>("/api/projects-list", { method: "POST", body: opts ?? {} });
 }
 
 export async function getProject(id: string): Promise<ApiResult<{ project: Project; comments?: any[] }>> {
-  return apiFetch<{ project: Project; comments?: any[] }>(`/api/projects-get?id=${encodeURIComponent(id)}`);
+  return apiFetch<{ project: Project; comments?: any[] }>("/api/projects-get", { method: "POST", body: { id } });
 }
 
 export async function createProject(input: {
@@ -238,7 +246,3 @@ export async function sendEod(payload: { to?: string; subject?: string; notes?: 
 export async function notifyEvent(payload: { type: string; message: string }): Promise<ApiResult<{}>> {
   return apiFetch<{}>("/api/notify-event", { method: "POST", body: payload });
 }
-
-
-// Backwards compat alias
-export const convertTicketToProject = convertTicket;
