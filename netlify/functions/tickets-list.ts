@@ -5,13 +5,27 @@ import { json, unauthorized } from "./_shared";
 
 export const handler: Handler = async (event) => {
   try {
-    if (event.httpMethod !== "GET") return json({ ok: false, error: "Method not allowed" }, 405);
+    // Support both GET (preferred) and POST (backwards-compat with older clients)
+    if (event.httpMethod !== "GET" && event.httpMethod !== "POST") {
+      return json({ ok: false, error: "Method not allowed" }, 405);
+    }
 
     const session = await requireSession(event);
     if (!session) return unauthorized();
 
     const supabase = supabaseAdmin();
-    const includeClosed = (event.queryStringParameters?.includeClosed || "") === "1";
+
+    // Newer clients send ?includeClosed=1 via GET. Older clients may POST { includeClosed: true }.
+    let includeClosed = (event.queryStringParameters?.includeClosed || "") === "1";
+    if (event.httpMethod === "POST" && event.body) {
+      try {
+        const body = JSON.parse(event.body);
+        if (typeof body?.includeClosed === "boolean") includeClosed = body.includeClosed;
+        if (body?.includeClosed === 1 || body?.includeClosed === "1") includeClosed = true;
+      } catch {
+        // ignore bad JSON
+      }
+    }
 
     let q = supabase
       .from("tickets")

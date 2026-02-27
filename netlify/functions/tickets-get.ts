@@ -5,12 +5,25 @@ import { badRequest, json, unauthorized } from "./_shared";
 
 export const handler: Handler = async (event) => {
   try {
-    if (event.httpMethod !== "GET") return json({ ok: false, error: "Method not allowed" }, 405);
+    // Support both GET (preferred) and POST (backwards-compat with older clients)
+    if (event.httpMethod !== "GET" && event.httpMethod !== "POST") {
+      return json({ ok: false, error: "Method not allowed" }, 405);
+    }
 
     const session = await requireSession(event);
     if (!session) return unauthorized();
 
-    const id = event.queryStringParameters?.id;
+    // Newer clients call /tickets-get?id=... via GET
+    // Older clients may POST { id: "..." }
+    let id = event.queryStringParameters?.id;
+    if (!id && event.httpMethod === "POST" && event.body) {
+      try {
+        const body = JSON.parse(event.body);
+        if (typeof body?.id === "string") id = body.id;
+      } catch {
+        // ignore
+      }
+    }
     if (!id) return badRequest("id required");
 
     const supabase = supabaseAdmin();
@@ -38,10 +51,11 @@ export const handler: Handler = async (event) => {
 
     if (cErr) return json({ ok: false, error: cErr.message }, 500);
 
-
     const { data: photos, error: pErr } = await supabase
       .from("ticket_photos")
-      .select("id, ticket_id, storage_path, public_url, created_at, uploaded_by, employees!ticket_photos_uploaded_by_fkey(name)")
+      .select(
+        "id, ticket_id, storage_path, public_url, created_at, uploaded_by, employees!ticket_photos_uploaded_by_fkey(name)"
+      )
       .eq("ticket_id", id)
       .order("created_at", { ascending: true });
 
