@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createProject } from "../lib/api";
 
@@ -7,32 +7,30 @@ export default function ProjectNew() {
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
   const [details, setDetails] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    if (!title.trim() || !location.trim()) {
-      setError("Title and location required");
-      return;
-    }
+    const payload = {
+      title: title.trim(),
+      location: location.trim(),
+      details: details.trim(),
+    };
 
-    if (!details.trim()) {
-      setError("Details required");
-      return;
-    }
+    if (!payload.title) return setError("Title required");
+    if (!payload.location) return setError("Location required");
+    if (!payload.details) return setError("Details required");
 
     setLoading(true);
     try {
-      await createProject({
-        title: title.trim(),
-        location: location.trim(),
-        description: details.trim(), // ✅ FIX: send as description (API expects description)
-      });
-
-      nav("/projects");
+      const res: any = await createProject(payload);
+      if (!res?.ok) throw new Error(res?.error || "Failed to create project");
+      const project = res?.project || res?.data?.project;
+      if (project?.id) nav(`/projects/${project.id}`);
+      else nav("/projects");
     } catch (err: any) {
       setError(err?.message || "Failed to create project");
     } finally {
@@ -46,43 +44,30 @@ export default function ProjectNew() {
         <h1>Create Project</h1>
 
         <form onSubmit={onSubmit} className="form">
-          <label className="label">
+          <label>
             Project title
-            <input
-              className="input"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
 
-          <label className="label">
+          <label>
             Location
-            <input
-              className="input"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              required
-            />
+            <input value={location} onChange={(e) => setLocation(e.target.value)} />
           </label>
 
-          <label className="label">
+          <label>
             Details
-            <textarea
-              className="textarea"
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              required
-            />
+            <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={8} />
           </label>
 
           {error && <div className="error">{error}</div>}
 
-          <button className="btn" type="submit" disabled={loading}>
+          <button className="btn primary" disabled={loading}>
             {loading ? "Creating..." : "Create project (SLA 14 days)"}
           </button>
 
-          <div className="hint">You can add photos after creating.</div>
+          <div className="muted" style={{ marginTop: 8 }}>
+            You can add photos after creating.
+          </div>
         </form>
       </div>
     </div>

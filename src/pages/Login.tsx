@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../lib/api";
 import { setToken } from "../lib/auth";
@@ -13,16 +13,29 @@ export default function Login() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const eid = employeeId.trim();
+    const p = pin.trim();
+
+    if (!eid || !p) {
+      setError("Employee ID and PIN are required.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await login({ employee_id: employeeId.trim(), pin: pin.trim() });
-      // Expected response shape: { ok: true, token: string } OR { token: string }
-      const token = (res as any)?.token;
-      if (!token) throw new Error("Login did not return a token");
-      setToken(token);
-      nav("/");
+      // login(employee_id, pin)
+      const res: any = await login(eid, p);
+
+      if (!res?.ok) {
+        setError(res?.error || "Login failed.");
+        return;
+      }
+
+      if (res?.token) setToken(res.token);
+      nav("/tickets");
     } catch (err: any) {
-      setError(err?.message || "Login failed");
+      setError(err?.message || "Login failed.");
     } finally {
       setLoading(false);
     }
@@ -32,37 +45,33 @@ export default function Login() {
     <div className="page">
       <div className="card">
         <h1>Login</h1>
-        <p className="muted">Enter your Employee ID and 4-digit PIN.</p>
 
         <form onSubmit={onSubmit} className="form">
-          <label className="label">
+          <label>
             Employee ID
             <input
-              className="input"
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
-              inputMode="numeric"
               autoComplete="username"
-              required
+              inputMode="numeric"
             />
           </label>
 
-          <label className="label">
+          <label>
             PIN
             <input
-              className="input"
               value={pin}
               onChange={(e) => setPin(e.target.value)}
-              inputMode="numeric"
+              type="password"
               autoComplete="current-password"
-              required
+              inputMode="numeric"
             />
           </label>
 
-          {error ? <div className="error">{error}</div> : null}
+          {error && <div className="error">{error}</div>}
 
-          <button className="btn" type="submit" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
+          <button className="btn primary" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
       </div>
