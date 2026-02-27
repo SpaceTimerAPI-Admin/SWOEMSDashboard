@@ -12,7 +12,7 @@ export const handler: Handler = async (event) => {
     if (!session) return unauthorized();
 
     const body = event.body ? JSON.parse(event.body) : {};
-    const id = String(body.id || "").trim();
+    const id = String(body.id || body.ticket_id || "").trim();
     const note = String(body.comment || "").trim();
 
     if (!id) return badRequest("id required");
@@ -20,11 +20,17 @@ export const handler: Handler = async (event) => {
     const supabase = supabaseAdmin();
     const now = new Date().toISOString();
 
-    const { error } = await supabase.from("tickets").update({
-      status: "closed",
-      closed_at: now,
-      closed_by: session.employee.id,
-    }).eq("id", id);
+    // Fetch for nicer notifications (optional)
+    const { data: t } = await supabase.from("tickets").select("id, title, location").eq("id", id).maybeSingle();
+
+    const { error } = await supabase
+      .from("tickets")
+      .update({
+        status: "closed",
+        closed_at: now,
+        closed_by: session.employee.id,
+      })
+      .eq("id", id);
 
     if (error) return json({ ok: false, error: error.message }, 500);
 
@@ -37,7 +43,12 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    try { await postGroupMe(`✅ Ticket closed by ${session.employee.name} (ID: ${id})`); } catch {}
+    try {
+      const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
+      const link = base ? `${base}/tickets/${id}` : "";
+      const title = t?.title ? `${t.title}${t.location ? ` @ ${t.location}` : ""}` : `Ticket ${id}`;
+      await postGroupMe(`✅ Closed: ${title} — by ${session.employee.name}${link ? ` — ${link}` : ""}`);
+    } catch {}
 
     return json({ ok: true });
   } catch (e: any) {

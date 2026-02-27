@@ -12,7 +12,7 @@ export const handler: Handler = async (event) => {
 
     const body = event.body ? JSON.parse(event.body) : {};
     const project_id = String(body.project_id || "").trim();
-    const storage_path = String(body.storage_path || "").trim();
+    const storage_path = String(body.storage_path || body.storage_key || body.storageKey || "").trim();
 
     if (!project_id) return badRequest("project_id required");
     if (!storage_path) return badRequest("storage_path required");

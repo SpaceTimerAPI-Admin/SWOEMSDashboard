@@ -12,7 +12,7 @@ export const handler: Handler = async (event) => {
     if (!session) return unauthorized();
 
     const body = event.body ? JSON.parse(event.body) : {};
-    const ticket_id = String(body.ticket_id || "").trim();
+    const ticket_id = String(body.ticket_id || body.id || "").trim();
     if (!ticket_id) return badRequest("ticket_id required");
 
     const supabase = supabaseAdmin();
@@ -46,9 +46,9 @@ export const handler: Handler = async (event) => {
 
     if (pErr) return json({ ok: false, error: pErr.message }, 500);
 
+    // Mark ticket as converted so it no longer appears in the Tickets list
+    await supabase.from("tickets").update({ status: "converted" }).eq("id", ticket.id);
 
-// Mark ticket as converted so it no longer appears in the Tickets list
-await supabase.from("tickets").update({ status: "converted" }).eq("id", ticket.id);
     await supabase.from("ticket_comments").insert({
       ticket_id: ticket.id,
       employee_id: session.employee.id,
@@ -57,7 +57,11 @@ await supabase.from("tickets").update({ status: "converted" }).eq("id", ticket.i
     });
 
     try {
-      await postGroupMe(`📁 Ticket converted to Project by ${session.employee.name} — ${ticket.title} @ ${ticket.location}`);
+      const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
+      const tLink = base ? `${base}/tickets/${ticket.id}` : "";
+      const pLink = base ? `${base}/projects/${project.id}` : "";
+      const links = [tLink && `Ticket: ${tLink}`, pLink && `Project: ${pLink}`].filter(Boolean).join(" — ");
+      await postGroupMe(`📁 Converted: ${ticket.title} @ ${ticket.location} — by ${session.employee.name}${links ? ` — ${links}` : ""}`);
     } catch {}
 
     return json({ ok: true, project_id: project.id });

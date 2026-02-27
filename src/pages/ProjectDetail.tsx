@@ -240,7 +240,12 @@ export default function ProjectDetail() {
 
             <div className="row between wrap" style={{ marginTop: 10, gap: 10 }}>
               <label className="btn inline secondary" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
-                Upload photo
+                Take photo
+                <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={onPickFiles} disabled={busy} />
+              </label>
+
+              <label className="btn inline secondary" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
+                Add photos
                 <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} disabled={busy} />
               </label>
 

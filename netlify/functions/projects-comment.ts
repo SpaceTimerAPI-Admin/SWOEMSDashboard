@@ -11,7 +11,7 @@ export const handler: Handler = async (event) => {
     if (!session) return unauthorized();
 
     const body = event.body ? JSON.parse(event.body) : {};
-    const project_id = String(body.project_id || "").trim();
+    const project_id = String(body.project_id || body.projectId || body.project_ID || body.id || "").trim();
     const comment = String(body.comment || "").trim();
 
     if (!project_id) return badRequest("project_id required");

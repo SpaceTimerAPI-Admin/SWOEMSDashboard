@@ -12,7 +12,7 @@ export const handler: Handler = async (event) => {
     if (!session) return unauthorized();
 
     const body = event.body ? JSON.parse(event.body) : {};
-    const ticket_id = String(body.ticket_id || "").trim();
+    const ticket_id = String(body.ticket_id || body.ticketId || body.ticket_ID || body.id || "").trim();
     const comment = String(body.comment || "").trim();
 
     if (!ticket_id) return badRequest("ticket_id required");

@@ -18,7 +18,7 @@ export const handler: Handler = async (event) => {
 
     const body = event.body ? JSON.parse(event.body) : {};
     const ticket_id = String(body.ticket_id || "").trim();
-    const storage_path = String(body.storage_path || "").trim();
+    const storage_path = String(body.storage_path || body.storage_key || body.storageKey || "").trim();
 
     if (!ticket_id) return badRequest("ticket_id required");
     if (!storage_path) return badRequest("storage_path required");
