@@ -212,7 +212,7 @@ function buildEmailHtml(opts: {
         <tr><td style="background:linear-gradient(135deg,#1A1A2E 0%,#16213E 60%,#0F3460 100%);border-radius:14px 14px 0 0;padding:28px 28px 24px">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
             <div>
-              <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px">SWOEMS Operations</div>
+              <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px">SeaWorld Entertainment Maintenance</div>
               <div style="font-size:24px;font-weight:700;color:#FFFFFF;letter-spacing:-.02em">End of Day Report</div>
               <div style="font-size:14px;color:rgba(255,255,255,.65);margin-top:4px">${dateDisplay}</div>
             </div>
@@ -272,7 +272,7 @@ function buildEmailHtml(opts: {
 
         <!-- Footer -->
         <tr><td style="padding:16px 0;text-align:center">
-          <div style="font-size:11px;color:#AAA">SWOEMS Dashboard · Auto-generated EOD Report</div>
+          <div style="font-size:11px;color:#AAA">SeaWorld Entertainment Maintenance · Auto-generated EOD Report</div>
         </td></tr>
 
       </table>
