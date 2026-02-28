@@ -4,6 +4,7 @@
  */
 
 const TOKEN_KEY = "md_session_token";
+const PROFILE_KEY = "md_employee_profile";
 
 export function getToken(): string | null {
   try {
@@ -68,6 +69,24 @@ export function isAuthed(): boolean {
 /** Clears auth and returns user to login screen */
 export function logout(): void {
   clearToken();
+  clearProfile();
   // Hard redirect keeps things simple for SPA + Netlify
   window.location.href = "/login";
+}
+
+export type EmployeeProfile = { id: string; employee_id: string; name: string; email: string };
+
+export function getProfile(): EmployeeProfile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+export function setProfile(profile: EmployeeProfile): void {
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch {}
+}
+
+export function clearProfile(): void {
+  try { localStorage.removeItem(PROFILE_KEY); } catch {}
 }

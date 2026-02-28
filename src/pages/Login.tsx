@@ -28,7 +28,7 @@ export default function Login() {
         setError(res.error || "Login failed.");
         return;
       }
-      nav("/tickets");
+      nav("/");
     } catch (err: any) {
       setError(err?.message || "Login failed.");
     } finally {
@@ -40,9 +40,10 @@ export default function Login() {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 16px" }}>
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>⚡</div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--text)" }}>SWOEMS</div>
-          <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 3 }}>Sign in to your account</div>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>🔧</div>
+          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)", lineHeight: 1.2 }}>SeaWorld Entertainment</div>
+          <div style={{ fontSize: 15, fontWeight: 500, color: "var(--muted)", marginTop: 2 }}>Maintenance</div>
+          <div style={{ fontSize: 13, color: "var(--muted2)", marginTop: 6 }}>Sign in to your account</div>
         </div>
 
         <div className="card" style={{ padding: "20px" }}>

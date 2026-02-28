@@ -3,7 +3,7 @@
 // This file is intentionally defensive: it accepts both legacy and current field names
 // so UI pages can evolve without breaking deploys.
 
-import { getToken, setToken, clearToken, isExpired } from "./auth";
+import { getToken, setToken, clearToken, isExpired, setProfile } from "./auth";
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
 
@@ -62,11 +62,14 @@ async function apiFetch<T>(
 // -------------------- Auth --------------------
 
 export async function login(employee_id: string, pin: string): Promise<ApiResult<{ token: string }>> {
-  const r = await apiFetch<{ token: string }>("/api/login", {
+  const r = await apiFetch<{ token: string; employee?: any }>("/api/login", {
     method: "POST",
     body: { employee_id, pin },
   });
-  if (r.ok && r.data?.token) setToken(r.data.token);
+  if (r.ok && r.data?.token) {
+    setToken(r.data.token);
+    if (r.data?.employee) setProfile(r.data.employee);
+  }
   return r;
 }
 
@@ -78,6 +81,10 @@ export async function enroll(payload: { employee_id: string; name: string; pin: 
 export async function resetPin(payload: { employee_id: string; new_pin: string; admin_code: string }): Promise<ApiResult<{}>> {
   // Admin-only PIN reset
   return apiFetch<{}>("/api/reset-pin", { method: "POST", body: payload });
+}
+
+export async function updateEmail(email: string): Promise<ApiResult<{ email: string }>> {
+  return apiFetch<{ email: string }>("/api/update-email", { method: "POST", body: { email } });
 }
 
 // Backwards-compat re-exports (some pages historically imported these from lib/api)

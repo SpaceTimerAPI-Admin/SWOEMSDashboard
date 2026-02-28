@@ -27,7 +27,7 @@ export default function Home() {
     <div className="page fade-up">
       <div style={{ marginBottom: 4 }}>
         <div className="page-title">Dashboard</div>
-        <div className="page-subtitle">SWOEMS Operations Center</div>
+        <div className="page-subtitle">SeaWorld Entertainment Maintenance</div>
       </div>
 
       <div className="home-grid">
@@ -35,7 +35,7 @@ export default function Home() {
           to="/tickets/new"
           icon="🎫"
           title="Log a Call"
-          desc="Create a work order (SLA 1h)"
+          desc="Create a new work order ticket"
           accent="rgba(92,107,255,0.18)"
         />
         <Tile
@@ -49,7 +49,7 @@ export default function Home() {
           to="/projects"
           icon="📐"
           title="Projects"
-          desc="Track longer-term items (SLA 14d)"
+          desc="Track longer-term work items"
           accent="rgba(255,182,39,0.12)"
         />
         <Tile

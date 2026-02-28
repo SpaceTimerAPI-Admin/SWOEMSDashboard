@@ -26,18 +26,31 @@ function empName(employees: any[], empId: string) {
   return e ? e.name : "Unknown";
 }
 
+const TZ = "America/New_York";
+
 function fmtTime(iso: string) {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return new Date(iso).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit", hour12: true });
   } catch { return iso; }
 }
 
 function fmtDateTime(iso: string) {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+    return new Date(iso).toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
   } catch { return iso; }
+}
+
+function resolutionTime(createdAt: string, closedAt: string): string {
+  if (!createdAt || !closedAt) return "";
+  const diffMs = new Date(closedAt).getTime() - new Date(createdAt).getTime();
+  if (diffMs < 0) return "";
+  const totalMins = Math.round(diffMs / 60000);
+  if (totalMins < 60) return `${totalMins}m`;
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 function tagColor(tag: string): { bg: string; text: string; border: string } {
@@ -70,10 +83,11 @@ function buildEmailHtml(opts: {
   projects: any[];
   projectComments: any[];
   employees: any[];
+  siteBaseUrl: string;
 }): string {
-  const { day, generatedBy, generatedAt, notes, handoffNotes, tickets, ticketComments, projects, projectComments, employees } = opts;
+  const { day, generatedBy, generatedAt, notes, handoffNotes, tickets, ticketComments, projects, projectComments, employees, siteBaseUrl } = opts;
 
-  const dateDisplay = new Date(day + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const dateDisplay = new Date(day + "T12:00:00").toLocaleDateString("en-US", { timeZone: TZ, weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   // Build per-tag sections
   const tagSections = TAGS.map(tag => {
@@ -87,18 +101,22 @@ function buildEmailHtml(opts: {
       const who = empName(employees, t.created_by);
       const comments = ticketComments.filter(c => c.ticket_id === t.id);
       const isClosed = t.status === "closed" || t.status === "done" || t.closed_at;
+      const ticketUrl = siteBaseUrl ? `${siteBaseUrl}/tickets/${t.id}` : null;
+      const resTime = isClosed && t.closed_at ? resolutionTime(t.created_at, t.closed_at) : null;
+      const titleHtml = ticketUrl
+        ? `<a href="${ticketUrl}" style="font-weight:600;font-size:14px;color:#1A1A2E;text-decoration:none;border-bottom:1px solid #CBD5E1">${escapeHtml(t.title)}</a>`
+        : `<span style="font-weight:600;font-size:14px;color:#1A1A2E">${escapeHtml(t.title)}</span>`;
       return `
         <tr>
           <td style="padding:14px 16px;border-bottom:1px solid #F0F0F0;vertical-align:top">
             <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
               <div style="flex:1;min-width:200px">
-                <div style="font-weight:600;font-size:14px;color:#1A1A2E;margin-bottom:4px">${escapeHtml(t.title)}</div>
+                <div style="margin-bottom:4px">${titleHtml}</div>
                 <div style="font-size:12px;color:#666;margin-bottom:6px">
                   📍 ${escapeHtml(t.location)}
                   &nbsp;·&nbsp;
                   Logged by ${escapeHtml(who)} at ${fmtTime(t.created_at)}
-                  &nbsp;·&nbsp;
-                  SLA due ${fmtTime(t.sla_due_at)}
+                  ${resTime ? `&nbsp;·&nbsp; ✓ Resolved in <strong>${resTime}</strong>` : ""}
                 </div>
                 ${t.details ? `<div style="font-size:13px;color:#444;background:#FAFAFA;padding:8px 10px;border-radius:6px;border-left:3px solid ${colors.border};margin-bottom:8px">${escapeHtml(t.details)}</div>` : ""}
                 ${comments.length > 0 ? `
@@ -124,6 +142,11 @@ function buildEmailHtml(opts: {
       const who = empName(employees, p.created_by);
       const comments = projectComments.filter(c => c.project_id === p.id);
       const isClosed = p.status === "closed" || p.status === "done" || p.closed_at;
+      const projectUrl = siteBaseUrl ? `${siteBaseUrl}/projects/${p.id}` : null;
+      const resTime = isClosed && p.closed_at ? resolutionTime(p.created_at, p.closed_at) : null;
+      const titleHtml = projectUrl
+        ? `<a href="${projectUrl}" style="font-weight:600;font-size:14px;color:#1A1A2E;text-decoration:none;border-bottom:1px solid #CBD5E1">${escapeHtml(p.title)}</a>`
+        : `<span style="font-weight:600;font-size:14px;color:#1A1A2E">${escapeHtml(p.title)}</span>`;
       return `
         <tr>
           <td style="padding:14px 16px;border-bottom:1px solid #F0F0F0;vertical-align:top">
@@ -131,14 +154,13 @@ function buildEmailHtml(opts: {
               <div style="flex:1;min-width:200px">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                   <span style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:.05em">Project</span>
-                  <div style="font-weight:600;font-size:14px;color:#1A1A2E">${escapeHtml(p.title)}</div>
+                  ${titleHtml}
                 </div>
                 <div style="font-size:12px;color:#666;margin-bottom:6px">
                   📍 ${escapeHtml(p.location)}
                   &nbsp;·&nbsp;
                   Created by ${escapeHtml(who)} at ${fmtTime(p.created_at)}
-                  &nbsp;·&nbsp;
-                  SLA due ${fmtDateTime(p.sla_due_at)}
+                  ${resTime ? `&nbsp;·&nbsp; ✓ Resolved in <strong>${resTime}</strong>` : ""}
                 </div>
                 ${p.details ? `<div style="font-size:13px;color:#444;background:#FAFAFA;padding:8px 10px;border-radius:6px;border-left:3px solid ${colors.border};margin-bottom:8px">${escapeHtml(p.details)}</div>` : ""}
                 ${comments.length > 0 ? `
@@ -321,7 +343,8 @@ export const handler: Handler = async (event) => {
     );
 
     const allEmployees = employees.data || [];
-    const generatedAt = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+    const generatedAt = new Date().toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+    const siteBaseUrl = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
 
     const html = buildEmailHtml({
       day,
@@ -334,6 +357,7 @@ export const handler: Handler = async (event) => {
       projects: allProjects,
       projectComments: projectsCommented.data || [],
       employees: allEmployees,
+      siteBaseUrl,
     });
 
     const subject = `EOD Report — ${day} — SWOEMS Maintenance`;
