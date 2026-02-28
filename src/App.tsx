@@ -17,7 +17,8 @@ import { isAuthed } from "./lib/auth";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const loc = useLocation();
-  if (!isAuthed()) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
+  if (!isAuthed())
+    return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
   return <>{children}</>;
 }
 
@@ -32,18 +33,81 @@ export default function App() {
         <Route path="/enroll" element={<Enroll />} />
         <Route path="/reset-pin" element={<ResetPin />} />
 
-        <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
+        <Route
+          path="/"
+          element={
+            <RequireAuth>
+              <Home />
+            </RequireAuth>
+          }
+        />
 
-        <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
-        <Route path="/tickets/new" element={<RequireAuth><TicketNew /></RequireAuth>} />
-        <Route path="/tickets/:id" element={<RequireAuth><TicketDetail /></RequireAuth>} />
+        <Route
+          path="/tickets"
+          element={
+            <RequireAuth>
+              <Tickets />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/tickets/new"
+          element={
+            <RequireAuth>
+              <TicketNew />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/tickets/:id"
+          element={
+            <RequireAuth>
+              <TicketDetail />
+            </RequireAuth>
+          }
+        />
 
-        <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
-        <Route path="/projects/new" element={<RequireAuth><ProjectNew /></RequireAuth>} />
-        <Route path="/projects/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
+        <Route
+          path="/projects"
+          element={
+            <RequireAuth>
+              <Projects />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/projects/new"
+          element={
+            <RequireAuth>
+              <ProjectNew />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/projects/:id"
+          element={
+            <RequireAuth>
+              <ProjectDetail />
+            </RequireAuth>
+          }
+        />
 
-        <Route path="/eod" element={<RequireAuth><EOD /></RequireAuth>} />
-        <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+        <Route
+          path="/eod"
+          element={
+            <RequireAuth>
+              <EOD />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <RequireAuth>
+              <Settings />
+            </RequireAuth>
+          }
+        />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

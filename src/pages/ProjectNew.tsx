@@ -57,7 +57,10 @@ export default function ProjectNew() {
 
         <label>
           Location
-          <input value={location} onChange={(e) => setLocation(e.target.value)} />
+          <input
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
         </label>
 
         <label style={{ marginTop: 10 }}>Tag</label>
@@ -76,12 +79,24 @@ export default function ProjectNew() {
 
         <label style={{ marginTop: 12 }}>
           Details
-          <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={5} />
+          <textarea
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            rows={5}
+          />
         </label>
 
-        {error && <div className="error" style={{ marginTop: 10 }}>{error}</div>}
+        {error && (
+          <div className="error" style={{ marginTop: 10 }}>
+            {error}
+          </div>
+        )}
 
-        <button className="btn primary" style={{ marginTop: 12 }} disabled={loading}>
+        <button
+          className="btn primary"
+          style={{ marginTop: 12 }}
+          disabled={loading}
+        >
           {loading ? "Creating..." : "Create project"}
         </button>
       </form>

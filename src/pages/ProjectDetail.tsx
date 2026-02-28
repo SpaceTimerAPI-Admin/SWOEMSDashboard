@@ -53,7 +53,9 @@ export default function ProjectDetail() {
     }
   }
 
-  useEffect(() => { if (projectId) void load(); }, [projectId]);
+  useEffect(() => {
+    if (projectId) void load();
+  }, [projectId]);
 
   const photos = useMemo(() => {
     const arr = project?.photos || [];
@@ -105,7 +107,10 @@ export default function ProjectDetail() {
     }
     setBusy(true);
     try {
-      await addProjectComment({ id: projectId, comment: `Resolution: ${trimmed}` });
+      await addProjectComment({
+        id: projectId,
+        comment: `Resolution: ${trimmed}`,
+      });
       const res: any = await closeProject(projectId);
       if (!res?.ok) throw new Error(res?.error || "Failed to close project");
       setShowCloseModal(false);
@@ -115,11 +120,13 @@ export default function ProjectDetail() {
     } finally {
       setBusy(false);
     }
-
   }
 
   async function uploadPhoto(file: File): Promise<void> {
-    const safeName = (file && file.name && file.name.trim()) ? file.name : `photo_${Date.now()}.jpg`;
+    const safeName =
+      file && file.name && file.name.trim()
+        ? file.name
+        : `photo_${Date.now()}.jpg`;
 
     const res: any = await getProjectPhotoUploadUrl({
       project_id: projectId,
@@ -169,8 +176,12 @@ export default function ProjectDetail() {
   return (
     <div className="page">
       <div className="row between detail-actions">
-        <Link className="btn" to="/projects">← Back</Link>
-        <button className="btn" onClick={handleClose} disabled={busy}>Close project</button>
+        <Link className="btn" to="/projects">
+          ← Back
+        </Link>
+        <button className="btn" onClick={handleClose} disabled={busy}>
+          Close project
+        </button>
       </div>
 
       {loading && <div>Loading…</div>}
@@ -178,9 +189,16 @@ export default function ProjectDetail() {
 
       {!loading && project && (
         <>
-          <div className="row between" style={{ marginTop: 12, alignItems: "center" }}>
+          <div
+            className="row between"
+            style={{ marginTop: 12, alignItems: "center" }}
+          >
             <h1 style={{ margin: 0 }}>{project.title}</h1>
-            <div className={"pill sm " + (project.status === "open" ? "primary" : "neutral")}>
+            <div
+              className={
+                "pill sm " + (project.status === "open" ? "primary" : "neutral")
+              }
+            >
               {project.status === "open" ? "OPEN" : "CLOSED"}
             </div>
           </div>
@@ -208,13 +226,27 @@ export default function ProjectDetail() {
             <div className="row" style={{ marginTop: 10, gap: 12 }}>
               <label className="btn secondary">
                 Add photos
-                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={onPickFiles}
+                />
               </label>
-              <button className="btn primary" disabled={busy} onClick={handleAddComment}>
+              <button
+                className="btn primary"
+                disabled={busy}
+                onClick={handleAddComment}
+              >
                 {busy ? "Saving..." : "Add comment"}
               </button>
             </div>
-            {commentError && <div className="error" style={{ marginTop: 8 }}>{commentError}</div>}
+            {commentError && (
+              <div className="error" style={{ marginTop: 8 }}>
+                {commentError}
+              </div>
+            )}
           </div>
 
           {photos.length > 0 && (
@@ -240,12 +272,19 @@ export default function ProjectDetail() {
               <span className="badge">{history.length}</span>
             </div>
             <div className="list" style={{ marginTop: 10 }}>
-              {history.length === 0 && <div className="muted">No updates yet.</div>}
+              {history.length === 0 && (
+                <div className="muted">No updates yet.</div>
+              )}
               {history.map((c: any, idx: number) => (
                 <div key={idx} className="list-item">
-                  <div className="title">{c.comment || c.text || c.message}</div>
+                  <div className="title">
+                    {c.comment || c.text || c.message}
+                  </div>
                   <div className="meta">
-                    {(c.employee_name || c.employees?.name || "").toString()} {c.created_at ? "• " + new Date(c.created_at).toLocaleString() : ""}
+                    {(c.employee_name || c.employees?.name || "").toString()}{" "}
+                    {c.created_at
+                      ? "• " + new Date(c.created_at).toLocaleString()
+                      : ""}
                   </div>
                 </div>
               ))}
@@ -271,12 +310,26 @@ export default function ProjectDetail() {
                 }}
                 placeholder="What’s the outcome? Any next steps?"
               />
-              {resolutionError && <div className="error" style={{ marginTop: 10 }}>{resolutionError}</div>}
+              {resolutionError && (
+                <div className="error" style={{ marginTop: 10 }}>
+                  {resolutionError}
+                </div>
+              )}
               <div className="btn-row" style={{ marginTop: 14 }}>
-                <button className="btn small" type="button" onClick={() => setShowCloseModal(false)} disabled={busy}>
+                <button
+                  className="btn small"
+                  type="button"
+                  onClick={() => setShowCloseModal(false)}
+                  disabled={busy}
+                >
                   Cancel
                 </button>
-                <button className="btn primary small" type="button" onClick={confirmClose} disabled={busy}>
+                <button
+                  className="btn primary small"
+                  type="button"
+                  onClick={confirmClose}
+                  disabled={busy}
+                >
                   Close project
                 </button>
               </div>
@@ -284,7 +337,6 @@ export default function ProjectDetail() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

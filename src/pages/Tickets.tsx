@@ -30,9 +30,14 @@ function fmtDateTime(v: any): string {
   }
 }
 
-function dueInfo(t: Ticket): { label: string; variant: "danger" | "warn" | "success" | "neutral" } | null {
+function dueInfo(t: Ticket): {
+  label: string;
+  variant: "danger" | "warn" | "success" | "neutral";
+} | null {
   if (isClosed(t)) return { label: "Closed", variant: "neutral" };
-  const due = parseDate(t?.sla_due_at || t?.slaDueAt || t?.sla_due || t?.slaDue);
+  const due = parseDate(
+    t?.sla_due_at || t?.slaDueAt || t?.sla_due || t?.slaDue,
+  );
   if (!due) return null;
   const diff = due - Date.now();
   const abs = Math.abs(diff);
@@ -88,7 +93,6 @@ export default function Tickets() {
     return { openAll: open, closedAll: closed };
   }, [tickets]);
 
-  
   const perPage = 10;
 
   const [openPage, setOpenPage] = useState(1);
@@ -103,10 +107,20 @@ export default function Tickets() {
   const openTotalPages = Math.max(1, Math.ceil(openAll.length / perPage));
   const closedTotalPages = Math.max(1, Math.ceil(closedAll.length / perPage));
 
-  const openTickets = openAll.slice((openPage - 1) * perPage, openPage * perPage);
-  const closedTickets = closedAll.slice((closedPage - 1) * perPage, closedPage * perPage);
+  const openTickets = openAll.slice(
+    (openPage - 1) * perPage,
+    openPage * perPage,
+  );
+  const closedTickets = closedAll.slice(
+    (closedPage - 1) * perPage,
+    closedPage * perPage,
+  );
 
-  const renderPagination = (total: number, page: number, setPage: (n: number) => void) => {
+  const renderPagination = (
+    total: number,
+    page: number,
+    setPage: (n: number) => void,
+  ) => {
     if (total <= 1) return null;
     return (
       <div className="pagination" aria-label="Pagination">
@@ -123,17 +137,29 @@ export default function Tickets() {
       </div>
     );
   };
-return (
+  return (
     <div className="page">
       <h1 className="page-title">Tickets</h1>
-      <div className="page-subtitle">Track urgent issues with SLA status and history.</div>
-
-      <div style={{ marginTop: 12 }}>
-        <Link className="btn primary" to="/tickets/new">Create ticket</Link>
+      <div className="page-subtitle">
+        Track urgent issues with SLA status and history.
       </div>
 
-      {loading && <div className="muted" style={{ marginTop: 12 }}>Loading…</div>}
-      {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
+      <div style={{ marginTop: 12 }}>
+        <Link className="btn primary" to="/tickets/new">
+          Create ticket
+        </Link>
+      </div>
+
+      {loading && (
+        <div className="muted" style={{ marginTop: 12 }}>
+          Loading…
+        </div>
+      )}
+      {error && (
+        <div className="error" style={{ marginTop: 12 }}>
+          {error}
+        </div>
+      )}
 
       {!loading && !error && (
         <>
@@ -149,24 +175,45 @@ return (
               {openTickets.map((t) => {
                 const due = dueInfo(t);
                 const created = fmtDateTime(t?.created_at || t?.createdAt);
-                const createdBy = t?.created_by_name || t?.createdByName || t?.employee_name || t?.employeeName || "";
+                const createdBy =
+                  t?.created_by_name ||
+                  t?.createdByName ||
+                  t?.employee_name ||
+                  t?.employeeName ||
+                  "";
                 const tag = (t?.tag || "").toString();
                 return (
-                  <Link key={t.id} className="item-card" to={`/tickets/${t.id}`}>
+                  <Link
+                    key={t.id}
+                    className="item-card"
+                    to={`/tickets/${t.id}`}
+                  >
                     <div className="item-top">
-                      <div className="item-title">{t.title || "Untitled ticket"}</div>
+                      <div className="item-title">
+                        {t.title || "Untitled ticket"}
+                      </div>
                       {tag ? <span className="chip neutral">{tag}</span> : null}
                     </div>
 
                     <div className="item-sub">
-                      {t.location ? <span>{t.location}</span> : <span className="muted">No location</span>}
+                      {t.location ? (
+                        <span>{t.location}</span>
+                      ) : (
+                        <span className="muted">No location</span>
+                      )}
                       {created ? <span className="dot">•</span> : null}
                       {created ? <span>Created {created}</span> : null}
                     </div>
 
                     <div className="chip-row">
-                      {due ? <span className={`chip ${due.variant}`}>{due.label}</span> : null}
-                      {createdBy ? <span className="chip neutral">{createdBy}</span> : null}
+                      {due ? (
+                        <span className={`chip ${due.variant}`}>
+                          {due.label}
+                        </span>
+                      ) : null}
+                      {createdBy ? (
+                        <span className="chip neutral">{createdBy}</span>
+                      ) : null}
                     </div>
                   </Link>
                 );
@@ -188,24 +235,47 @@ return (
               {closedTickets.map((t) => {
                 const due = dueInfo(t);
                 const created = fmtDateTime(t?.created_at || t?.createdAt);
-                const createdBy = t?.created_by_name || t?.createdByName || t?.employee_name || t?.employeeName || "";
+                const createdBy =
+                  t?.created_by_name ||
+                  t?.createdByName ||
+                  t?.employee_name ||
+                  t?.employeeName ||
+                  "";
                 const tag = (t?.tag || "").toString();
                 return (
-                  <Link key={t.id} className="item-card" to={`/tickets/${t.id}`}>
+                  <Link
+                    key={t.id}
+                    className="item-card"
+                    to={`/tickets/${t.id}`}
+                  >
                     <div className="item-top">
-                      <div className="item-title">{t.title || "Untitled ticket"}</div>
+                      <div className="item-title">
+                        {t.title || "Untitled ticket"}
+                      </div>
                       {tag ? <span className="chip neutral">{tag}</span> : null}
                     </div>
 
                     <div className="item-sub">
-                      {t.location ? <span>{t.location}</span> : <span className="muted">No location</span>}
+                      {t.location ? (
+                        <span>{t.location}</span>
+                      ) : (
+                        <span className="muted">No location</span>
+                      )}
                       {created ? <span className="dot">•</span> : null}
                       {created ? <span>Created {created}</span> : null}
                     </div>
 
                     <div className="chip-row">
-                      {due ? <span className={`chip ${due.variant}`}>{due.label}</span> : <span className="chip neutral">Closed</span>}
-                      {createdBy ? <span className="chip neutral">{createdBy}</span> : null}
+                      {due ? (
+                        <span className={`chip ${due.variant}`}>
+                          {due.label}
+                        </span>
+                      ) : (
+                        <span className="chip neutral">Closed</span>
+                      )}
+                      {createdBy ? (
+                        <span className="chip neutral">{createdBy}</span>
+                      ) : null}
                     </div>
                   </Link>
                 );

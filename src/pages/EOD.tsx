@@ -24,15 +24,30 @@ export default function EOD() {
     <div className="container">
       <div className="h1">End of Day Report</div>
       <div className="card">
-        <div className="muted">Generates a full-detail team recap for today and emails it to you (no photos).</div>
-        <label>Notes</label>
-        <textarea className="input" style={{minHeight:110}} value={notes} onChange={(e)=>setNotes(e.target.value)} />
-        <label>Handoff Notes</label>
-        <textarea className="input" style={{minHeight:110}} value={handoff_notes} onChange={(e)=>setHandoff(e.target.value)} />
-        <div style={{marginTop:12}}>
-          <button className="btn" onClick={onSend} disabled={busy}>{busy ? "Sending..." : "Send EOD to myself"}</button>
+        <div className="muted">
+          Generates a full-detail team recap for today and emails it to you (no
+          photos).
         </div>
-        {status ? <div style={{marginTop:10}}>{status}</div> : null}
+        <label>Notes</label>
+        <textarea
+          className="input"
+          style={{ minHeight: 110 }}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+        <label>Handoff Notes</label>
+        <textarea
+          className="input"
+          style={{ minHeight: 110 }}
+          value={handoff_notes}
+          onChange={(e) => setHandoff(e.target.value)}
+        />
+        <div style={{ marginTop: 12 }}>
+          <button className="btn" onClick={onSend} disabled={busy}>
+            {busy ? "Sending..." : "Send EOD to myself"}
+          </button>
+        </div>
+        {status ? <div style={{ marginTop: 10 }}>{status}</div> : null}
       </div>
       <div className="spacer" />
     </div>
