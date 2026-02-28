@@ -109,7 +109,10 @@ export default function TicketDetail() {
     setBusy(true);
     try {
       // add resolution into history before closing
-      await addTicketComment({ id: ticketId, comment: `Resolution: ${trimmed}` });
+      await addTicketComment({
+        id: ticketId,
+        comment: `Resolution: ${trimmed}`,
+      });
       const res: any = await closeTicket(ticketId);
       if (!res?.ok) throw new Error(res?.error || "Failed to close ticket");
       setShowCloseModal(false);
@@ -119,7 +122,6 @@ export default function TicketDetail() {
     } finally {
       setBusy(false);
     }
-
   }
 
   async function handleConvertToProject() {
@@ -140,7 +142,10 @@ export default function TicketDetail() {
   }
 
   async function uploadPhoto(file: File): Promise<void> {
-    const safeName = (file && file.name && file.name.trim()) ? file.name : `photo_${Date.now()}.jpg`;
+    const safeName =
+      file && file.name && file.name.trim()
+        ? file.name
+        : `photo_${Date.now()}.jpg`;
 
     const res: any = await getTicketPhotoUploadUrl({
       ticket_id: ticketId,
@@ -196,10 +201,20 @@ export default function TicketDetail() {
   return (
     <div className="page">
       <div className="row between">
-        <Link className="btn" to="/tickets">← Back</Link>
+        <Link className="btn" to="/tickets">
+          ← Back
+        </Link>
         <div className="row" style={{ gap: 8 }}>
-          <button className="btn" onClick={handleConvertToProject} disabled={busy}>Move to project</button>
-          <button className="btn" onClick={handleClose} disabled={busy}>Close ticket</button>
+          <button
+            className="btn"
+            onClick={handleConvertToProject}
+            disabled={busy}
+          >
+            Move to project
+          </button>
+          <button className="btn" onClick={handleClose} disabled={busy}>
+            Close ticket
+          </button>
         </div>
       </div>
 
@@ -208,9 +223,16 @@ export default function TicketDetail() {
 
       {!loading && ticket && (
         <>
-          <div className="row between" style={{ marginTop: 12, alignItems: "center" }}>
+          <div
+            className="row between"
+            style={{ marginTop: 12, alignItems: "center" }}
+          >
             <h1 style={{ margin: 0 }}>{ticket.title}</h1>
-            <div className={"pill sm " + (ticket.status === "open" ? "primary" : "neutral")}>
+            <div
+              className={
+                "pill sm " + (ticket.status === "open" ? "primary" : "neutral")
+              }
+            >
               {ticket.status === "open" ? "OPEN" : "CLOSED"}
             </div>
           </div>
@@ -238,13 +260,27 @@ export default function TicketDetail() {
             <div className="row between" style={{ marginTop: 8, gap: 12 }}>
               <label className="btn">
                 Add photos
-                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={onPickFiles}
+                />
               </label>
-              <button className="btn primary" disabled={busy} onClick={handleAddComment}>
+              <button
+                className="btn primary"
+                disabled={busy}
+                onClick={handleAddComment}
+              >
                 {busy ? "Saving..." : "Add comment"}
               </button>
             </div>
-            {commentError && <div className="error" style={{ marginTop: 8 }}>{commentError}</div>}
+            {commentError && (
+              <div className="error" style={{ marginTop: 8 }}>
+                {commentError}
+              </div>
+            )}
           </div>
 
           {photos.length > 0 && (
@@ -270,12 +306,19 @@ export default function TicketDetail() {
               <span className="badge">{history.length}</span>
             </div>
             <div className="list" style={{ marginTop: 10 }}>
-              {history.length === 0 && <div className="muted">No updates yet.</div>}
+              {history.length === 0 && (
+                <div className="muted">No updates yet.</div>
+              )}
               {history.map((c: any, idx: number) => (
                 <div key={idx} className="list-item">
-                  <div className="title">{c.comment || c.text || c.message}</div>
+                  <div className="title">
+                    {c.comment || c.text || c.message}
+                  </div>
                   <div className="meta">
-                    {(c.employee_name || c.employees?.name || "").toString()} {c.created_at ? "• " + new Date(c.created_at).toLocaleString() : ""}
+                    {(c.employee_name || c.employees?.name || "").toString()}{" "}
+                    {c.created_at
+                      ? "• " + new Date(c.created_at).toLocaleString()
+                      : ""}
                   </div>
                 </div>
               ))}
@@ -301,12 +344,26 @@ export default function TicketDetail() {
                 }}
                 placeholder="What fixed it? What was done? Any follow-up?"
               />
-              {resolutionError && <div className="error" style={{ marginTop: 10 }}>{resolutionError}</div>}
+              {resolutionError && (
+                <div className="error" style={{ marginTop: 10 }}>
+                  {resolutionError}
+                </div>
+              )}
               <div className="btn-row" style={{ marginTop: 14 }}>
-                <button className="btn small" type="button" onClick={() => setShowCloseModal(false)} disabled={busy}>
+                <button
+                  className="btn small"
+                  type="button"
+                  onClick={() => setShowCloseModal(false)}
+                  disabled={busy}
+                >
                   Cancel
                 </button>
-                <button className="btn primary small" type="button" onClick={confirmClose} disabled={busy}>
+                <button
+                  className="btn primary small"
+                  type="button"
+                  onClick={confirmClose}
+                  disabled={busy}
+                >
                   Close ticket
                 </button>
               </div>
@@ -314,7 +371,6 @@ export default function TicketDetail() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

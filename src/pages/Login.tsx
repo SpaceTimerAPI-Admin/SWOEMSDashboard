@@ -74,13 +74,20 @@ export default function Login() {
             {loading ? "Signing in..." : "Sign in"}
           </button>
 
-          <Link className="btn secondary" to="/reset-pin" style={{ textAlign: "center" }}>
+          <Link
+            className="btn secondary"
+            to="/reset-pin"
+            style={{ textAlign: "center" }}
+          >
             Reset PIN
           </Link>
         </form>
 
         <div className="muted" style={{ marginTop: 10 }}>
-          New here? <Link to="/enroll" style={{ textDecoration: "underline" }}>Enroll</Link>
+          New here?{" "}
+          <Link to="/enroll" style={{ textDecoration: "underline" }}>
+            Enroll
+          </Link>
         </div>
       </div>
     </div>

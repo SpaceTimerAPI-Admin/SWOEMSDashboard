@@ -30,9 +30,14 @@ function fmtDateTime(v: any): string {
   }
 }
 
-function dueInfo(p: Project): { label: string; variant: "danger" | "warn" | "success" | "neutral" } | null {
+function dueInfo(p: Project): {
+  label: string;
+  variant: "danger" | "warn" | "success" | "neutral";
+} | null {
   if (isClosed(p)) return { label: "Closed", variant: "neutral" };
-  const due = parseDate(p?.sla_due_at || p?.slaDueAt || p?.sla_due || p?.slaDue);
+  const due = parseDate(
+    p?.sla_due_at || p?.slaDueAt || p?.sla_due || p?.slaDue,
+  );
   if (!due) return null;
   const diff = due - Date.now();
   const abs = Math.abs(diff);
@@ -47,7 +52,8 @@ function dueInfo(p: Project): { label: string; variant: "danger" | "warn" | "suc
   };
 
   if (diff < 0) return { label: `Overdue ${fmt()}`, variant: "danger" };
-  if (diff < 6 * 60 * 60 * 1000) return { label: `Due ${fmt()}`, variant: "warn" };
+  if (diff < 6 * 60 * 60 * 1000)
+    return { label: `Due ${fmt()}`, variant: "warn" };
   return { label: `Due ${fmt()}`, variant: "success" };
 }
 
@@ -88,7 +94,6 @@ export default function Projects() {
     return { openAll: open, closedAll: closed };
   }, [projects]);
 
-  
   const perPage = 10;
 
   const [openPage, setOpenPage] = useState(1);
@@ -102,10 +107,20 @@ export default function Projects() {
   const openTotalPages = Math.max(1, Math.ceil(openAll.length / perPage));
   const closedTotalPages = Math.max(1, Math.ceil(closedAll.length / perPage));
 
-  const openProjects = openAll.slice((openPage - 1) * perPage, openPage * perPage);
-  const closedProjects = closedAll.slice((closedPage - 1) * perPage, closedPage * perPage);
+  const openProjects = openAll.slice(
+    (openPage - 1) * perPage,
+    openPage * perPage,
+  );
+  const closedProjects = closedAll.slice(
+    (closedPage - 1) * perPage,
+    closedPage * perPage,
+  );
 
-  const renderPagination = (total: number, page: number, setPage: (n: number) => void) => {
+  const renderPagination = (
+    total: number,
+    page: number,
+    setPage: (n: number) => void,
+  ) => {
     if (total <= 1) return null;
     return (
       <div className="pagination" aria-label="Pagination">
@@ -122,17 +137,29 @@ export default function Projects() {
       </div>
     );
   };
-return (
+  return (
     <div className="page">
       <h1 className="page-title">Projects</h1>
-      <div className="page-subtitle">Longer work with SLA tracking and history.</div>
-
-      <div style={{ marginTop: 12 }}>
-        <Link className="btn primary" to="/projects/new">Create project</Link>
+      <div className="page-subtitle">
+        Longer work with SLA tracking and history.
       </div>
 
-      {loading && <div className="muted" style={{ marginTop: 12 }}>Loading…</div>}
-      {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
+      <div style={{ marginTop: 12 }}>
+        <Link className="btn primary" to="/projects/new">
+          Create project
+        </Link>
+      </div>
+
+      {loading && (
+        <div className="muted" style={{ marginTop: 12 }}>
+          Loading…
+        </div>
+      )}
+      {error && (
+        <div className="error" style={{ marginTop: 12 }}>
+          {error}
+        </div>
+      )}
 
       {!loading && !error && (
         <>
@@ -148,24 +175,45 @@ return (
               {openProjects.map((p) => {
                 const due = dueInfo(p);
                 const created = fmtDateTime(p?.created_at || p?.createdAt);
-                const createdBy = p?.created_by_name || p?.createdByName || p?.employee_name || p?.employeeName || "";
+                const createdBy =
+                  p?.created_by_name ||
+                  p?.createdByName ||
+                  p?.employee_name ||
+                  p?.employeeName ||
+                  "";
                 const tag = (p?.tag || "").toString();
                 return (
-                  <Link key={p.id} className="item-card" to={`/projects/${p.id}`}>
+                  <Link
+                    key={p.id}
+                    className="item-card"
+                    to={`/projects/${p.id}`}
+                  >
                     <div className="item-top">
-                      <div className="item-title">{p.title || "Untitled project"}</div>
+                      <div className="item-title">
+                        {p.title || "Untitled project"}
+                      </div>
                       {tag ? <span className="chip neutral">{tag}</span> : null}
                     </div>
 
                     <div className="item-sub">
-                      {p.location ? <span>{p.location}</span> : <span className="muted">No location</span>}
+                      {p.location ? (
+                        <span>{p.location}</span>
+                      ) : (
+                        <span className="muted">No location</span>
+                      )}
                       {created ? <span className="dot">•</span> : null}
                       {created ? <span>Created {created}</span> : null}
                     </div>
 
                     <div className="chip-row">
-                      {due ? <span className={`chip ${due.variant}`}>{due.label}</span> : null}
-                      {createdBy ? <span className="chip neutral">{createdBy}</span> : null}
+                      {due ? (
+                        <span className={`chip ${due.variant}`}>
+                          {due.label}
+                        </span>
+                      ) : null}
+                      {createdBy ? (
+                        <span className="chip neutral">{createdBy}</span>
+                      ) : null}
                     </div>
                   </Link>
                 );
@@ -187,24 +235,47 @@ return (
               {closedProjects.map((p) => {
                 const due = dueInfo(p);
                 const created = fmtDateTime(p?.created_at || p?.createdAt);
-                const createdBy = p?.created_by_name || p?.createdByName || p?.employee_name || p?.employeeName || "";
+                const createdBy =
+                  p?.created_by_name ||
+                  p?.createdByName ||
+                  p?.employee_name ||
+                  p?.employeeName ||
+                  "";
                 const tag = (p?.tag || "").toString();
                 return (
-                  <Link key={p.id} className="item-card" to={`/projects/${p.id}`}>
+                  <Link
+                    key={p.id}
+                    className="item-card"
+                    to={`/projects/${p.id}`}
+                  >
                     <div className="item-top">
-                      <div className="item-title">{p.title || "Untitled project"}</div>
+                      <div className="item-title">
+                        {p.title || "Untitled project"}
+                      </div>
                       {tag ? <span className="chip neutral">{tag}</span> : null}
                     </div>
 
                     <div className="item-sub">
-                      {p.location ? <span>{p.location}</span> : <span className="muted">No location</span>}
+                      {p.location ? (
+                        <span>{p.location}</span>
+                      ) : (
+                        <span className="muted">No location</span>
+                      )}
                       {created ? <span className="dot">•</span> : null}
                       {created ? <span>Created {created}</span> : null}
                     </div>
 
                     <div className="chip-row">
-                      {due ? <span className={`chip ${due.variant}`}>{due.label}</span> : <span className="chip neutral">Closed</span>}
-                      {createdBy ? <span className="chip neutral">{createdBy}</span> : null}
+                      {due ? (
+                        <span className={`chip ${due.variant}`}>
+                          {due.label}
+                        </span>
+                      ) : (
+                        <span className="chip neutral">Closed</span>
+                      )}
+                      {createdBy ? (
+                        <span className="chip neutral">{createdBy}</span>
+                      ) : null}
                     </div>
                   </Link>
                 );

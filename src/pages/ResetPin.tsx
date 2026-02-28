@@ -36,7 +36,11 @@ export default function ResetPin() {
 
     setLoading(true);
     try {
-      const res = await resetPin({ employee_id: eid, admin_code: code, new_pin: p1 });
+      const res = await resetPin({
+        employee_id: eid,
+        admin_code: code,
+        new_pin: p1,
+      });
       if (!res.ok) {
         setError(res.error || "Could not reset PIN.");
         return;
@@ -54,7 +58,9 @@ export default function ResetPin() {
     <div className="page">
       <div className="card">
         <h1>Reset PIN</h1>
-        <div className="muted">Admin-only: enter the admin reset code to set a new 4-digit PIN.</div>
+        <div className="muted">
+          Admin-only: enter the admin reset code to set a new 4-digit PIN.
+        </div>
 
         <form onSubmit={onSubmit} className="form">
           <label>
@@ -69,7 +75,11 @@ export default function ResetPin() {
 
           <label>
             Admin Reset Code
-            <input value={adminCode} onChange={(e) => setAdminCode(e.target.value)} autoComplete="one-time-code" />
+            <input
+              value={adminCode}
+              onChange={(e) => setAdminCode(e.target.value)}
+              autoComplete="one-time-code"
+            />
           </label>
 
           <label>
@@ -95,13 +105,21 @@ export default function ResetPin() {
           </label>
 
           {error ? <div className="error">{error}</div> : null}
-          {done ? <div className="success">PIN updated. Redirecting…</div> : null}
+          {done ? (
+            <div className="success">PIN updated. Redirecting…</div>
+          ) : null}
 
           <button className="btn primary" type="submit" disabled={loading}>
             {loading ? "Resetting…" : "Reset PIN"}
           </button>
 
-          <button className="btn" type="button" onClick={() => nav("/login")} disabled={loading} style={{ marginTop: 10 }}>
+          <button
+            className="btn"
+            type="button"
+            onClick={() => nav("/login")}
+            disabled={loading}
+            style={{ marginTop: 10 }}
+          >
             Back to Login
           </button>
         </form>

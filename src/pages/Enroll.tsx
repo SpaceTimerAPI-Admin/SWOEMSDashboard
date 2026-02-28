@@ -23,7 +23,12 @@ export default function Enroll() {
       code: code.trim(),
     };
 
-    if (!payload.employee_id || !payload.name || !payload.pin || !payload.code) {
+    if (
+      !payload.employee_id ||
+      !payload.name ||
+      !payload.pin ||
+      !payload.code
+    ) {
       setError("All fields are required.");
       return;
     }
@@ -51,7 +56,10 @@ export default function Enroll() {
         <form onSubmit={onSubmit} className="form">
           <label>
             Employee ID
-            <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
+            <input
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+            />
           </label>
 
           <label>
@@ -61,7 +69,11 @@ export default function Enroll() {
 
           <label>
             PIN
-            <input type="password" value={pin} onChange={(e) => setPin(e.target.value)} />
+            <input
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+            />
           </label>
 
           <label>
