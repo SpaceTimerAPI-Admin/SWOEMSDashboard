@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { enroll } from "../lib/api";
 
 export default function Enroll() {
@@ -7,6 +7,7 @@ export default function Enroll() {
   const [employeeId, setEmployeeId] = useState("");
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,12 +20,19 @@ export default function Enroll() {
       employee_id: employeeId.trim(),
       name: name.trim(),
       pin: pin.trim(),
-      // backend expects "code"
       code: code.trim(),
     };
 
     if (!payload.employee_id || !payload.name || !payload.pin || !payload.code) {
       setError("All fields are required.");
+      return;
+    }
+    if (!/^\d{4}$/.test(payload.pin)) {
+      setError("PIN must be exactly 4 digits.");
+      return;
+    }
+    if (payload.pin !== confirmPin.trim()) {
+      setError("PINs do not match.");
       return;
     }
 
@@ -44,37 +52,120 @@ export default function Enroll() {
   }
 
   return (
-    <div className="page">
-      <div className="card">
-        <h1>Enroll</h1>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 16px" }}>
+      <div style={{ width: "100%", maxWidth: 380 }}>
 
-        <form onSubmit={onSubmit} className="form">
-          <label>
-            Employee ID
-            <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
-          </label>
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>👋</div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--text)" }}>Create Account</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4, lineHeight: 1.5 }}>
+            You'll need an enrollment code from your admin to get started.
+          </div>
+        </div>
 
-          <label>
-            Name
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
+        <div className="card" style={{ padding: "20px" }}>
+          <form onSubmit={onSubmit}>
 
-          <label>
-            PIN
-            <input type="password" value={pin} onChange={(e) => setPin(e.target.value)} />
-          </label>
+            {/* Identity section */}
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 10 }}>
+              Your Info
+            </div>
 
-          <label>
-            Enrollment code
-            <input value={code} onChange={(e) => setCode(e.target.value)} />
-          </label>
+            <label>
+              <div className="field-label">Full Name</div>
+              <input
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+                placeholder="e.g. Alex Johnson"
+              />
+            </label>
 
-          {error && <div className="error">{error}</div>}
+            <label style={{ marginTop: 2 }}>
+              <div className="field-label">Employee ID</div>
+              <input
+                className="input"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                inputMode="numeric"
+                autoComplete="username"
+                placeholder="e.g. 12345"
+              />
+            </label>
 
-          <button className="btn primary" disabled={loading}>
-            {loading ? "Enrolling..." : "Enroll"}
-          </button>
-        </form>
+            {/* PIN section */}
+            <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0 14px" }} />
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 10 }}>
+              Set Your PIN
+            </div>
+
+            <label>
+              <div className="field-label">4‑digit PIN</div>
+              <input
+                className="input"
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                inputMode="numeric"
+                maxLength={4}
+                autoComplete="new-password"
+                placeholder="••••"
+              />
+            </label>
+
+            <label style={{ marginTop: 2 }}>
+              <div className="field-label">Confirm PIN</div>
+              <input
+                className="input"
+                type="password"
+                value={confirmPin}
+                onChange={(e) => setConfirmPin(e.target.value)}
+                inputMode="numeric"
+                maxLength={4}
+                autoComplete="new-password"
+                placeholder="••••"
+              />
+            </label>
+
+            {/* Admin code section */}
+            <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0 14px" }} />
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 10 }}>
+              Authorization
+            </div>
+
+            <label>
+              <div className="field-label">Enrollment Code</div>
+              <input
+                className="input"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                autoComplete="one-time-code"
+                placeholder="Code from your admin"
+              />
+            </label>
+
+            {error && (
+              <div style={{
+                marginTop: 12, padding: "9px 13px", borderRadius: 10, fontSize: 13,
+                background: "var(--danger-bg)", color: "#FFB0B0",
+                border: "1px solid rgba(255,84,84,0.25)",
+              }}>
+                {error}
+              </div>
+            )}
+
+            <button className="btn primary full" style={{ marginTop: 16 }} type="submit" disabled={loading}>
+              {loading ? <><span className="spinner" /> Creating account…</> : "Create account"}
+            </button>
+          </form>
+
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)", textAlign: "center" }}>
+            <Link to="/login" style={{ fontSize: 13, color: "var(--muted)" }}>Already have an account? Sign in</Link>
+          </div>
+        </div>
+
       </div>
     </div>
   );
