@@ -37,50 +37,52 @@ export default function Login() {
   }
 
   return (
-    <div className="page">
-      <div className="card" style={{ maxWidth: 520, margin: "0 auto" }}>
-        <h1>Login</h1>
-        <div className="muted" style={{ marginBottom: 10 }}>
-          Sign in with your Employee ID and 4‑digit PIN.
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 16px" }}>
+      <div style={{ width: "100%", maxWidth: 380 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>⚡</div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.025em", color: "var(--text)" }}>SWOEMS</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 3 }}>Sign in to your account</div>
         </div>
 
-        <form onSubmit={onSubmit} className="form">
-          <label>
-            Employee ID
-            <input
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              autoComplete="username"
-              inputMode="numeric"
-              placeholder="e.g. 12345"
-            />
-          </label>
+        <div className="card" style={{ padding: "20px" }}>
+          <form onSubmit={onSubmit}>
+            <label>
+              <div className="field-label">Employee ID</div>
+              <input
+                className="input"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                autoComplete="username"
+                inputMode="numeric"
+                placeholder="e.g. 12345"
+              />
+            </label>
 
-          <label>
-            PIN
-            <input
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              type="password"
-              autoComplete="current-password"
-              inputMode="numeric"
-              placeholder="••••"
-            />
-          </label>
+            <label style={{ marginTop: 2 }}>
+              <div className="field-label">PIN</div>
+              <input
+                className="input"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                type="password"
+                autoComplete="current-password"
+                inputMode="numeric"
+                placeholder="••••"
+              />
+            </label>
 
-          {error && <div className="error">{error}</div>}
+            {error && <div className="error" style={{ marginTop: 10 }}>{error}</div>}
 
-          <button className="btn" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
+            <button className="btn primary full" style={{ marginTop: 16 }} disabled={loading}>
+              {loading ? <><span className="spinner" /> Signing in…</> : "Sign in"}
+            </button>
+          </form>
 
-          <Link className="btn secondary" to="/reset-pin" style={{ textAlign: "center" }}>
-            Reset PIN
-          </Link>
-        </form>
-
-        <div className="muted" style={{ marginTop: 10 }}>
-          New here? <Link to="/enroll" style={{ textDecoration: "underline" }}>Enroll</Link>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+            <Link to="/reset-pin" style={{ fontSize: 13, color: "var(--muted)" }}>Reset PIN</Link>
+            <Link to="/enroll" style={{ fontSize: 13, color: "var(--muted)" }}>Enroll →</Link>
+          </div>
         </div>
       </div>
     </div>

@@ -1,29 +1,72 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-function Tile({ to, title, desc }: { to: string; title: string; desc: string }) {
+type TileProps = {
+  to: string;
+  icon: string;
+  title: string;
+  desc: string;
+  accent?: string;
+  wide?: boolean;
+};
+
+function Tile({ to, icon, title, desc, accent = "rgba(92,107,255,0.15)", wide }: TileProps) {
   return (
-    <Link to={to} style={{ textDecoration: "none" }}>
-      <div className="card">
-        <div className="h2">{title}</div>
-        <div className="muted">{desc}</div>
+    <Link to={to} className={`home-tile${wide ? " wide" : ""}`}>
+      <div className="tile-icon" style={{ background: accent }}>
+        {icon}
       </div>
+      <div className="tile-title">{title}</div>
+      <div className="tile-desc">{desc}</div>
     </Link>
   );
 }
 
 export default function Home() {
   return (
-    <div className="container">
-      <div className="h1">Dashboard</div>
-      <div className="grid">
-        <Tile to="/tickets/new" title="Log A Call" desc="Create a work order ticket (SLA 1 hour)." />
-        <Tile to="/tickets" title="Ticket Dashboard" desc="View tickets prioritized by SLA." />
-        <Tile to="/projects" title="Projects" desc="Track longer-term items (SLA 14 days)." />
-        <Tile to="/eod" title="End of Day Report" desc="Generate and email the team recap for today." />
-        <Tile to="/settings" title="Open / Close Park" desc="Step-by-step opening and closing procedures." />
+    <div className="page fade-up">
+      <div style={{ marginBottom: 4 }}>
+        <div className="page-title">Dashboard</div>
+        <div className="page-subtitle">SWOEMS Operations Center</div>
       </div>
-      <div className="spacer" />
+
+      <div className="home-grid">
+        <Tile
+          to="/tickets/new"
+          icon="🎫"
+          title="Log a Call"
+          desc="Create a work order (SLA 1h)"
+          accent="rgba(92,107,255,0.18)"
+        />
+        <Tile
+          to="/tickets"
+          icon="📋"
+          title="Tickets"
+          desc="View & manage all tickets"
+          accent="rgba(46,232,160,0.12)"
+        />
+        <Tile
+          to="/projects"
+          icon="📐"
+          title="Projects"
+          desc="Track longer-term items (SLA 14d)"
+          accent="rgba(255,182,39,0.12)"
+        />
+        <Tile
+          to="/eod"
+          icon="📝"
+          title="EOD Report"
+          desc="Generate & email today's recap"
+          accent="rgba(255,84,84,0.12)"
+        />
+        <Tile
+          to="/settings"
+          icon="⚙️"
+          title="Settings"
+          desc="Account & preferences"
+          accent="rgba(255,255,255,0.06)"
+        />
+      </div>
     </div>
   );
 }
