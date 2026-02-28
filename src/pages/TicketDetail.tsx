@@ -109,7 +109,7 @@ export default function TicketDetail() {
     setBusy(true);
     try {
       // add resolution into history before closing
-      await addTicketComment(ticketId, `Resolution: ${trimmed}`);
+      await addTicketComment({ id: ticketId, comment: `Resolution: ${trimmed}` });
       const res: any = await closeTicket(ticketId);
       if (!res?.ok) throw new Error(res?.error || "Failed to close ticket");
       setShowCloseModal(false);
@@ -219,6 +219,13 @@ export default function TicketDetail() {
             {ticket.tag ? <span className="dot">•</span> : null}
             {ticket.tag ? <span>{ticket.tag}</span> : null}
           </div>
+
+          {ticket.details ? (
+            <div className="card" style={{ marginTop: 12 }}>
+              <h2>Details</h2>
+              <div className="prewrap">{ticket.details}</div>
+            </div>
+          ) : null}
 
           <div className="card" style={{ marginTop: 16 }}>
             <h2>Update / Comment</h2>

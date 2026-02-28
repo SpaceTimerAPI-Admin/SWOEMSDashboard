@@ -209,6 +209,11 @@ button,input,textarea{font:inherit;}
   display:block;
 }
 
+.prewrap{
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .pagination{
   display:flex;
   gap: 10px;

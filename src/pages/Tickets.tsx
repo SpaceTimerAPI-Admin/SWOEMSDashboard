@@ -74,7 +74,7 @@ export default function Tickets() {
     void load();
   }, []);
 
-  const { openTickets, closedTickets } = useMemo(() => {
+  const { openAll, closedAll } = useMemo(() => {
     const open: Ticket[] = [];
     const closed: Ticket[] = [];
     for (const t of tickets) (isClosed(t) ? closed : open).push(t);
@@ -85,14 +85,11 @@ export default function Tickets() {
     };
     open.sort(sortFn);
     closed.sort(sortFn);
-    return { openTickets: open, closedTickets: closed };
+    return { openAll: open, closedAll: closed };
   }, [tickets]);
 
   
   const perPage = 10;
-
-  const openAll = tickets.filter((t) => t.status === "open");
-  const closedAll = tickets.filter((t) => t.status !== "open");
 
   const [openPage, setOpenPage] = useState(1);
   const [closedPage, setClosedPage] = useState(1);
@@ -215,10 +212,10 @@ return (
               })}
             </div>
           )}
+
+          {renderPagination(closedTotalPages, closedPage, setClosedPage)}
         </>
       )}
     </div>
   );
-}          {renderPagination(closedTotalPages, closedPage, setClosedPage)}
-
-
+}

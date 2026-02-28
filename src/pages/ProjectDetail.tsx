@@ -105,7 +105,7 @@ export default function ProjectDetail() {
     }
     setBusy(true);
     try {
-      await addProjectComment(projectId, `Resolution: ${trimmed}`);
+      await addProjectComment({ id: projectId, comment: `Resolution: ${trimmed}` });
       const res: any = await closeProject(projectId);
       if (!res?.ok) throw new Error(res?.error || "Failed to close project");
       setShowCloseModal(false);
@@ -115,11 +115,7 @@ export default function ProjectDetail() {
     } finally {
       setBusy(false);
     }
-  } catch (e: any) {
-      alert(e?.message || "Failed to close project");
-    } finally {
-      setBusy(false);
-    }
+
   }
 
   async function uploadPhoto(file: File): Promise<void> {
@@ -193,6 +189,13 @@ export default function ProjectDetail() {
             {project.tag ? <span className="dot">•</span> : null}
             {project.tag ? <span>{project.tag}</span> : null}
           </div>
+
+          {project.details ? (
+            <div className="card" style={{ marginTop: 12 }}>
+              <h2>Details</h2>
+              <div className="prewrap">{project.details}</div>
+            </div>
+          ) : null}
 
           <div className="card" style={{ marginTop: 16 }}>
             <h2>Update / Comment</h2>

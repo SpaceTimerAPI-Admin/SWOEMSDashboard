@@ -74,7 +74,7 @@ export default function Projects() {
     void load();
   }, []);
 
-  const { openProjects, closedProjects } = useMemo(() => {
+  const { openAll, closedAll } = useMemo(() => {
     const open: Project[] = [];
     const closed: Project[] = [];
     for (const p of projects) (isClosed(p) ? closed : open).push(p);
@@ -85,14 +85,11 @@ export default function Projects() {
     };
     open.sort(sortFn);
     closed.sort(sortFn);
-    return { openProjects: open, closedProjects: closed };
+    return { openAll: open, closedAll: closed };
   }, [projects]);
 
   
   const perPage = 10;
-
-  const openAll = projects.filter((p) => p.status === "open");
-  const closedAll = projects.filter((p) => p.status !== "open");
 
   const [openPage, setOpenPage] = useState(1);
   const [closedPage, setClosedPage] = useState(1);
@@ -214,10 +211,10 @@ return (
               })}
             </div>
           )}
+
+          {renderPagination(closedTotalPages, closedPage, setClosedPage)}
         </>
       )}
     </div>
   );
-}          {renderPagination(closedTotalPages, closedPage, setClosedPage)}
-
-
+}
