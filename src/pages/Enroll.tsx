@@ -6,9 +6,10 @@ export default function Enroll() {
   const nav = useNavigate();
   const [employeeId, setEmployeeId] = useState("");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
-  const [code, setCode] = useState("");
+  const [enrollmentCode, setEnrollmentCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,12 +20,17 @@ export default function Enroll() {
     const payload = {
       employee_id: employeeId.trim(),
       name: name.trim(),
+      email: email.trim().toLowerCase(),
       pin: pin.trim(),
-      code: code.trim(),
+      enrollment_code: enrollmentCode.trim(),
     };
 
-    if (!payload.employee_id || !payload.name || !payload.pin || !payload.code) {
+    if (!payload.employee_id || !payload.name || !payload.email || !payload.pin || !payload.enrollment_code) {
       setError("All fields are required.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+      setError("Please enter a valid email address.");
       return;
     }
     if (!/^\d{4}$/.test(payload.pin)) {
@@ -95,6 +101,19 @@ export default function Enroll() {
               />
             </label>
 
+            <label style={{ marginTop: 2 }}>
+              <div className="field-label">SeaWorld Email</div>
+              <input
+                className="input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                inputMode="email"
+                placeholder="yourname@seaworld.com"
+              />
+            </label>
+
             {/* PIN section */}
             <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0 14px" }} />
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 10 }}>
@@ -139,8 +158,8 @@ export default function Enroll() {
               <div className="field-label">Enrollment Code</div>
               <input
                 className="input"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
+                value={enrollmentCode}
+                onChange={(e) => setEnrollmentCode(e.target.value)}
                 autoComplete="one-time-code"
                 placeholder="Code from your admin"
               />

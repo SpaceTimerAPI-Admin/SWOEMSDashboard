@@ -73,7 +73,7 @@ export async function login(employee_id: string, pin: string): Promise<ApiResult
   return r;
 }
 
-export async function enroll(payload: { employee_id: string; name: string; pin: string; code: string }): Promise<ApiResult<{}>> {
+export async function enroll(payload: { employee_id: string; name: string; email: string; pin: string; enrollment_code: string }): Promise<ApiResult<{}>> {
   return apiFetch<{}>("/api/enroll", { method: "POST", body: payload });
 }
 
