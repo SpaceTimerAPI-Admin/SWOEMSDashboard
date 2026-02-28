@@ -49,7 +49,7 @@ export const handler: Handler = async (event) => {
     try {
       const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
       const link = base ? `${base}/projects/${data.id}` : "";
-      const msg = `📁 Project: ${title} @ ${location} — created by ${session.employee.name} — SLA ${sla_days}d${link ? ` — ${link}` : ""}`;
+      const msg = `📁 Project: ${title} @ ${location} — created by ${session.employee.name}${link ? ` — ${link}` : ""}`;
       await postGroupMe(msg);
     } catch {}
 

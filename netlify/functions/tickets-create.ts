@@ -50,7 +50,7 @@ export const handler: Handler = async (event) => {
     try {
       const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
       const link = base ? `${base}/tickets/${data.id}` : "";
-      const msg = `🆕 Ticket: ${title} @ ${location} — logged by ${session.employee.name} — SLA ${sla_minutes}m${link ? ` — ${link}` : ""}`;
+      const msg = `🆕 Ticket: ${title} @ ${location} — logged by ${session.employee.name}${link ? ` — ${link}` : ""}`;
       await postGroupMe(msg);
     } catch {}
 
