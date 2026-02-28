@@ -110,11 +110,12 @@ export async function createTicket(input: {
   location: string;
   details?: string;
   description?: string; // legacy name
+  tag?: string;
 }): Promise<ApiResult<{ ticket: Ticket }>> {
   const details = (input.details ?? input.description ?? "").trim();
   return apiFetch<{ ticket: Ticket }>("/api/tickets-create", {
     method: "POST",
-    body: { title: input.title, location: input.location, details },
+    body: { title: input.title, location: input.location, details, tag: input.tag ?? "" },
   });
 }
 
@@ -190,11 +191,12 @@ export async function createProject(input: {
   location: string;
   details?: string;
   description?: string; // legacy name
+  tag?: string;
 }): Promise<ApiResult<{ project: Project }>> {
   const details = (input.details ?? input.description ?? "").trim();
   return apiFetch<{ project: Project }>("/api/projects-create", {
     method: "POST",
-    body: { title: input.title, location: input.location, details },
+    body: { title: input.title, location: input.location, details, tag: input.tag ?? "" },
   });
 }
 
@@ -237,10 +239,16 @@ export async function confirmProjectPhoto(input: { project_id: string; storage_k
 
 // -------------------- EOD / Events --------------------
 
-export async function sendEod(payload: { to?: string; subject?: string; notes?: string; handoff_notes?: string }): Promise<ApiResult<{}>> {
-  // accept handoff_notes legacy; server expects notes
-  const notes = payload.notes ?? payload.handoff_notes ?? "";
-  return apiFetch<{}>("/api/send-eod", { method: "POST", body: { to: payload.to, subject: payload.subject, notes } });
+export async function sendEod(payload: { to?: string; subject?: string; notes?: string; handoff_notes?: string }): Promise<ApiResult<{ emailed_to: string; ticket_count: number; project_count: number }>> {
+  return apiFetch<{ emailed_to: string; ticket_count: number; project_count: number }>("/api/send-eod", {
+    method: "POST",
+    body: {
+      to: payload.to,
+      subject: payload.subject,
+      notes: payload.notes ?? "",
+      handoff_notes: payload.handoff_notes ?? "",
+    },
+  });
 }
 
 export async function notifyEvent(payload: { type: string; message: string }): Promise<ApiResult<{}>> {

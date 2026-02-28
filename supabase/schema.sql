@@ -54,6 +54,7 @@ create table if not exists public.tickets (
   title text not null,
   location text not null,
   details text not null,
+  tag text null, -- Lighting | Sound | Video | Rides | Misc
   status text not null default 'open', -- open | in_progress | closed
   created_by uuid not null references public.employees(id),
   created_at timestamptz not null default now(),
@@ -86,6 +87,7 @@ create table if not exists public.projects (
   title text not null,
   location text not null,
   details text not null,
+  tag text null, -- Lighting | Sound | Video | Rides | Misc
   status text not null default 'open', -- open | in_progress | closed
   created_by uuid not null references public.employees(id),
   created_at timestamptz not null default now(),
@@ -227,3 +229,7 @@ values
   ('open_b', 'Open Park - B Side'),
   ('close',  'Close Park')
 on conflict (key) do nothing;
+
+-- Migration: add tag column to tickets and projects (run on existing databases)
+alter table public.tickets add column if not exists tag text null;
+alter table public.projects add column if not exists tag text null;

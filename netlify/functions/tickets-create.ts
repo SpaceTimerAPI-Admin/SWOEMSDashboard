@@ -35,13 +35,14 @@ export const handler: Handler = async (event) => {
         title,
         location,
         details,
+        tag: tag || null,
         status: "open",
         created_by: session.employee.id,
         created_at,
         sla_minutes,
         sla_due_at,
       })
-      .select("id, title, location, created_at, sla_due_at")
+      .select("id, title, location, tag, created_at, sla_due_at")
       .single();
 
     if (error) return json({ ok: false, error: error.message }, 500);
