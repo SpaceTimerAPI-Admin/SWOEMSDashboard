@@ -393,9 +393,9 @@ img { display: block; max-width: 100%; }
   inset: 0;
   background: rgba(0,0,0,0.6);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 16px 14px calc(20px + var(--safe-bottom));
+  padding: 20px 16px;
   z-index: 2000;
   backdrop-filter: blur(4px);
 }
