@@ -2,7 +2,6 @@ import type { Handler } from "@netlify/functions";
 import { requireSession } from "./_auth";
 import { supabaseAdmin } from "./_supabase";
 import { badRequest, json, unauthorized } from "./_shared";
-import { postGroupMe } from "./_groupme";
 
 export const handler: Handler = async (event) => {
   try {
@@ -109,13 +108,7 @@ export const handler: Handler = async (event) => {
     await supabase.from("ticket_comments").delete().eq("ticket_id", ticket_id);
     await supabase.from("tickets").delete().eq("id", ticket_id);
 
-    // 10. GroupMe notification
-    try {
-      const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
-      const pLink = base ? `${base}/projects/${project.id}` : "";
-      await postGroupMe(`📁 Converted to Project: ${ticket.title} @ ${ticket.location} — by ${session.employee.name}${pLink ? ` — ${pLink}` : ""}`);
-    } catch {}
-
+    // 10. Return the new project id
     return json({ ok: true, project_id: project.id });
   } catch (e: any) {
     return json({ ok: false, error: e?.message || "Server error" }, 500);

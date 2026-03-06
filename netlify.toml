@@ -13,3 +13,7 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Scheduled: post EOD report link to GroupMe at 11:59 PM Eastern (04:59 UTC next day)
+[functions."eod-scheduled"]
+  schedule = "59 4 * * *"
