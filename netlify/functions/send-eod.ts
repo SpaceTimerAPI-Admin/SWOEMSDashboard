@@ -251,7 +251,7 @@ function buildEmailHtml(opts: {
           <!-- Operator Notes -->
           <div style="margin-bottom:24px">
             <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:8px">Operator Notes</div>
-            <div style="background:#F8F9FF;border:1px solid #E4E7FF;border-radius:8px;padding:14px 16px;font-size:14px;color:#333;line-height:1.6;white-space:pre-wrap">${escapeHtml(notes)}</div>
+            <div style="background:#F8F9FF;border:1px solid #E4E7FF;border-radius:8px;padding:14px 16px;font-size:14px;color:#333;line-height:1.6">${escapeHtml(notes).replace(/\n/g, "<br>")}</div>
           </div>
           ` : ""}
 
@@ -259,7 +259,7 @@ function buildEmailHtml(opts: {
           <!-- Handoff Notes -->
           <div style="margin-bottom:24px">
             <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:8px">Handoff Notes</div>
-            <div style="background:#FFFBF0;border:1px solid #F5E4A8;border-radius:8px;padding:14px 16px;font-size:14px;color:#333;line-height:1.6;white-space:pre-wrap">${escapeHtml(handoffNotes)}</div>
+            <div style="background:#FFFBF0;border:1px solid #F5E4A8;border-radius:8px;padding:14px 16px;font-size:14px;color:#333;line-height:1.6">${escapeHtml(handoffNotes).replace(/\n/g, "<br>")}</div>
           </div>
           ` : ""}
 
