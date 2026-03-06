@@ -233,3 +233,27 @@ on conflict (key) do nothing;
 -- Migration: add tag column to tickets and projects (run on existing databases)
 alter table public.tickets add column if not exists tag text null;
 alter table public.projects add column if not exists tag text null;
+
+-- Photo tables (if not already created)
+create table if not exists public.ticket_photos (
+  id uuid primary key default gen_random_uuid(),
+  ticket_id uuid not null references public.tickets(id) on delete cascade,
+  storage_path text not null,  -- path within ticket-photos bucket
+  public_url text null,
+  uploaded_by uuid not null references public.employees(id),
+  created_at timestamptz not null default now()
+);
+create index if not exists ticket_photos_ticket_id_idx on public.ticket_photos(ticket_id);
+
+create table if not exists public.project_photos (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  storage_path text not null,  -- path within ticket-photos OR project-photos bucket
+  public_url text null,        -- full public URL (may point to either bucket)
+  uploaded_by uuid not null references public.employees(id),
+  created_at timestamptz not null default now()
+);
+create index if not exists project_photos_project_id_idx on public.project_photos(project_id);
+
+alter table public.ticket_photos enable row level security;
+alter table public.project_photos enable row level security;

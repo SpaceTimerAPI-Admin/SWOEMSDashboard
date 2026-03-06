@@ -1,5 +1,5 @@
-import React from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Enroll from "./pages/Enroll";
 import ResetPin from "./pages/ResetPin";
@@ -8,15 +8,40 @@ import Tickets from "./pages/Tickets";
 import TicketNew from "./pages/TicketNew";
 import TicketDetail from "./pages/TicketDetail";
 import Projects from "./pages/Projects";
-import ProjectNew from "./pages/ProjectNew";
 import ProjectDetail from "./pages/ProjectDetail";
 import EOD from "./pages/EOD";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
-import { isAuthed } from "./lib/auth";
+import { isAuthed, clearToken, clearProfile } from "./lib/auth";
+
+// Global 401 interceptor — monkey-patch fetch once at startup
+let _interceptorInstalled = false;
+function installAuthInterceptor(onUnauthed: () => void) {
+  if (_interceptorInstalled) return;
+  _interceptorInstalled = true;
+  const orig = window.fetch.bind(window);
+  window.fetch = async (...args) => {
+    const res = await orig(...args);
+    if (res.status === 401) {
+      // Clone so the caller can still read the body if they want, but redirect
+      onUnauthed();
+    }
+    return res;
+  };
+}
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const loc = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    installAuthInterceptor(() => {
+      clearToken();
+      clearProfile();
+      navigate("/login", { replace: true });
+    });
+  }, [navigate]);
+
   if (!isAuthed()) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
   return <>{children}</>;
 }
@@ -39,7 +64,6 @@ export default function App() {
         <Route path="/tickets/:id" element={<RequireAuth><TicketDetail /></RequireAuth>} />
 
         <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
-        <Route path="/projects/new" element={<RequireAuth><ProjectNew /></RequireAuth>} />
         <Route path="/projects/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
 
         <Route path="/eod" element={<RequireAuth><EOD /></RequireAuth>} />

@@ -118,11 +118,12 @@ export async function createTicket(input: {
   details?: string;
   description?: string; // legacy name
   tag?: string;
+  sla_minutes?: number;
 }): Promise<ApiResult<{ ticket: Ticket }>> {
   const details = (input.details ?? input.description ?? "").trim();
   return apiFetch<{ ticket: Ticket }>("/api/tickets-create", {
     method: "POST",
-    body: { title: input.title, location: input.location, details, tag: input.tag ?? "" },
+    body: { title: input.title, location: input.location, details, tag: input.tag ?? "", sla_minutes: input.sla_minutes },
   });
 }
 
@@ -199,11 +200,12 @@ export async function createProject(input: {
   details?: string;
   description?: string; // legacy name
   tag?: string;
+  sla_days?: number;
 }): Promise<ApiResult<{ project: Project }>> {
   const details = (input.details ?? input.description ?? "").trim();
   return apiFetch<{ project: Project }>("/api/projects-create", {
     method: "POST",
-    body: { title: input.title, location: input.location, details, tag: input.tag ?? "" },
+    body: { title: input.title, location: input.location, details, tag: input.tag ?? "", sla_days: input.sla_days },
   });
 }
 
