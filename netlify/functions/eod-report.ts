@@ -75,15 +75,20 @@ function buildPage(opts: {
   projectComments: any[];
   employees: any[];
   siteBaseUrl: string;
+  olderOpenTickets: any[];
+  olderOpenProjects: any[];
 }): string {
-  const { day, tickets, projects, ticketComments, projectComments, employees, siteBaseUrl } = opts;
+  const { day, tickets, projects, ticketComments, projectComments, employees, siteBaseUrl, olderOpenTickets, olderOpenProjects } = opts;
 
   const dateDisplay = new Date(day + "T12:00:00").toLocaleDateString("en-US", {
     timeZone: TZ, weekday: "long", year: "numeric", month: "long", day: "numeric"
   });
 
-  const totalOpen = [...tickets, ...projects].filter(i => i.status !== "closed" && !i.closed_at).length;
-  const totalClosed = [...tickets, ...projects].filter(i => i.status === "closed" || i.closed_at).length;
+  const todayCount = tickets.length + projects.length;
+  const todayClosed = [...tickets, ...projects].filter(i => i.status === "closed" || i.closed_at).length;
+  // System-wide open = today's open + older open (deduplicated)
+  const todayOpenIds = new Set([...tickets, ...projects].filter(i => i.status !== "closed" && !i.closed_at).map((i: any) => i.id));
+  const systemOpenCount = todayOpenIds.size + olderOpenTickets.length + olderOpenProjects.length;
 
   const tagSections = TAGS.map(tag => {
     const tagTickets = tickets.filter(t => (t.tag || "Misc") === tag);
@@ -247,20 +252,59 @@ function buildPage(opts: {
 
   <div class="stats">
     <div class="stat">
-      <div class="stat-num" style="color:#1A1A2E">${tickets.length + projects.length}</div>
-      <div class="stat-label">Total Items</div>
+      <div class="stat-num" style="color:#1A1A2E">${todayCount}</div>
+      <div class="stat-label">Today's Items</div>
     </div>
     <div class="stat">
-      <div class="stat-num" style="color:#D97706">${totalOpen}</div>
-      <div class="stat-label">Still Open</div>
+      <div class="stat-num" style="color:#D97706">${systemOpenCount}</div>
+      <div class="stat-label">Open System-Wide</div>
     </div>
     <div class="stat">
-      <div class="stat-num" style="color:#059669">${totalClosed}</div>
-      <div class="stat-label">Closed</div>
+      <div class="stat-num" style="color:#059669">${todayClosed}</div>
+      <div class="stat-label">Closed Today</div>
     </div>
   </div>
 
   ${tagSections || '<div class="empty">🌙 No tickets or projects logged today.</div>'}
+
+  ${(olderOpenTickets.length + olderOpenProjects.length) > 0 ? `
+  <!-- Older open items -->
+  <div style="margin-top:32px;margin-bottom:8px">
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:12px">
+      ⏳ Still Open From Previous Days (${olderOpenTickets.length + olderOpenProjects.length})
+    </div>
+    <div style="background:#fff;border:1px solid #E8E8E8;border-radius:12px;overflow:hidden">
+      ${[...olderOpenTickets.map(t => {
+        const url = siteBaseUrl ? `${siteBaseUrl}/tickets/${t.id}` : null;
+        const age = Math.floor((Date.now() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
+        const tagC = tagChip(t.tag || "Misc");
+        return `<div style="padding:12px 16px;border-bottom:1px solid #F5F5F5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:600;color:#1A1A2E;margin-bottom:3px">
+              ${url ? `<a href="${url}" style="color:#1A1A2E;text-decoration:none;border-bottom:1px solid #CBD5E1">${escapeHtml(t.title)}</a>` : escapeHtml(t.title)}
+            </div>
+            <div style="font-size:12px;color:#888">📍 ${escapeHtml(t.location)} &nbsp;·&nbsp; ${age === 0 ? "Today" : age === 1 ? "1 day ago" : `${age} days ago`} &nbsp;·&nbsp; ${tagC}</div>
+          </div>
+          <span style="display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;background:#FFF8E6;color:#92600A;border:1px solid #F5C842;white-space:nowrap">Open</span>
+        </div>`;
+      }), ...olderOpenProjects.map(p => {
+        const url = siteBaseUrl ? `${siteBaseUrl}/projects/${p.id}` : null;
+        const age = Math.floor((Date.now() - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24));
+        const tagC = tagChip(p.tag || "Misc");
+        return `<div style="padding:12px 16px;border-bottom:1px solid #F5F5F5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#aaa;margin-bottom:2px">Project</div>
+            <div style="font-size:14px;font-weight:600;color:#1A1A2E;margin-bottom:3px">
+              ${url ? `<a href="${url}" style="color:#1A1A2E;text-decoration:none;border-bottom:1px solid #CBD5E1">${escapeHtml(p.title)}</a>` : escapeHtml(p.title)}
+            </div>
+            <div style="font-size:12px;color:#888">📍 ${escapeHtml(p.location)} &nbsp;·&nbsp; ${age === 0 ? "Today" : age === 1 ? "1 day ago" : `${age} days ago`} &nbsp;·&nbsp; ${tagC}</div>
+          </div>
+          <span style="display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;background:#FFF8E6;color:#92600A;border:1px solid #F5C842;white-space:nowrap">Open</span>
+        </div>`;
+      })].join("")}
+    </div>
+  </div>
+  ` : ""}
 
   <div class="footer">SeaWorld Entertainment Maintenance · EOD Report · ${escapeHtml(dateDisplay)}</div>
 </div>
@@ -284,7 +328,7 @@ export const handler: Handler = async (event) => {
     const start = new Date(day + "T00:00:00").toISOString();
     const end   = new Date(day + "T23:59:59.999").toISOString();
 
-    const [ticketsRes, ticketsClosedRes, ticketCommentsRes, projectsRes, projectsClosedRes, projectCommentsRes, employeesRes] = await Promise.all([
+    const [ticketsRes, ticketsClosedRes, ticketCommentsRes, projectsRes, projectsClosedRes, projectCommentsRes, employeesRes, allOpenTicketsRes, allOpenProjectsRes] = await Promise.all([
       supabase.from("tickets").select("*").gte("created_at", start).lte("created_at", end),
       supabase.from("tickets").select("*").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
       supabase.from("ticket_comments").select("*").gte("created_at", start).lte("created_at", end),
@@ -292,6 +336,9 @@ export const handler: Handler = async (event) => {
       supabase.from("projects").select("*").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
       supabase.from("project_comments").select("*").gte("created_at", start).lte("created_at", end),
       supabase.from("employees").select("id, name"),
+      // All open tickets/projects system-wide (not just today)
+      supabase.from("tickets").select("id, title, location, tag, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
+      supabase.from("projects").select("id, title, location, tag, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
     ]);
 
     // Deduplicate tickets (created + closed today)
@@ -320,6 +367,8 @@ export const handler: Handler = async (event) => {
       projectComments: projectCommentsRes.data || [],
       employees: employeesRes.data || [],
       siteBaseUrl: (process.env.SITE_BASE_URL || "").replace(/\/$/, ""),
+      olderOpenTickets: allOpenTicketsRes.data || [],
+      olderOpenProjects: allOpenProjectsRes.data || [],
     });
 
     return {
