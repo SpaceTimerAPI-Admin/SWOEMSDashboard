@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { login } from "../lib/api";
 
 export default function Login() {
   const nav = useNavigate();
+  const loc = useLocation();
+  const from = (loc.state as any)?.from || "/";
   const [employeeId, setEmployeeId] = useState("");
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,7 @@ export default function Login() {
         setError(res.error || "Login failed.");
         return;
       }
-      nav("/");
+      nav(from, { replace: true });
     } catch (err: any) {
       setError(err?.message || "Login failed.");
     } finally {

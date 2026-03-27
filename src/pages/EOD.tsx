@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { sendEod, listTickets, listProjects } from "../lib/api";
+import { sendEod, getEodToday } from "../lib/api";
 
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
 type Tag = typeof TAGS[number];
@@ -7,14 +7,6 @@ type Tag = typeof TAGS[number];
 function parseDate(v: any): number {
   const ms = Date.parse(v || "");
   return Number.isFinite(ms) ? ms : 0;
-}
-
-function isToday(v: any): boolean {
-  const ms = parseDate(v);
-  if (!ms) return false;
-  const d = new Date(ms);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
 
 function fmtTime(v: any): string {
@@ -77,19 +69,11 @@ export default function EOD() {
     async function load() {
       setDataLoading(true);
       try {
-        const [tr, pr] = await Promise.all([
-          listTickets({ includeClosed: true }),
-          listProjects({ includeClosed: true }),
-        ]);
-        // Filter to items active today
-        const todayTickets = (tr.ok ? (tr.data as any)?.tickets || [] : []).filter(
-          (t: any) => isToday(t.created_at) || isToday(t.closed_at) || isToday(t.updated_at)
-        );
-        const todayProjects = (pr.ok ? (pr.data as any)?.projects || [] : []).filter(
-          (p: any) => isToday(p.created_at) || isToday(p.closed_at) || isToday(p.updated_at)
-        );
-        setTickets(todayTickets);
-        setProjects(todayProjects);
+        const res = await getEodToday();
+        if (res.ok) {
+          setTickets((res.data as any).tickets || []);
+          setProjects((res.data as any).projects || []);
+        }
       } catch {}
       setDataLoading(false);
     }
@@ -126,7 +110,10 @@ export default function EOD() {
     try {
       const res: any = await sendEod({ notes, handoff_notes: handoffNotes });
       if (!res?.ok) throw new Error(res?.error || "Failed to send");
-      setStatus({ ok: true, msg: `Report emailed. Covered ${res.data?.ticket_count ?? tickets.length} tickets and ${res.data?.project_count ?? projects.length} projects.` });
+      const tc = res.data?.ticket_count ?? 0;
+      const pc = res.data?.project_count ?? 0;
+      const total = tc + pc;
+      setStatus({ ok: true, msg: `Report emailed. Covered ${total} item${total !== 1 ? "s" : ""} (${tc} ticket${tc !== 1 ? "s" : ""}, ${pc} project${pc !== 1 ? "s" : ""}).` });
     } catch (e: any) {
       setStatus({ ok: false, msg: e.message || "Failed to send EOD" });
     } finally {

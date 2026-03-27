@@ -260,6 +260,16 @@ export async function sendEod(payload: { to?: string; subject?: string; notes?: 
   });
 }
 
+export async function getEodToday(): Promise<ApiResult<{
+  day: string;
+  tickets: any[];
+  projects: any[];
+  older_open_tickets: any[];
+  older_open_projects: any[];
+}>> {
+  return apiFetch("/api/eod-today", { method: "POST", body: {} });
+}
+
 export async function notifyEvent(payload: { type: string; message: string }): Promise<ApiResult<{}>> {
   return apiFetch<{}>("/api/notify-event", { method: "POST", body: payload });
 }

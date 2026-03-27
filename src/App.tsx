@@ -38,7 +38,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     installAuthInterceptor(() => {
       clearToken();
       clearProfile();
-      navigate("/login", { replace: true });
+      const currentPath = window.location.pathname + window.location.search;
+      navigate("/login", { replace: true, state: { from: currentPath } });
     });
   }, [navigate]);
 
