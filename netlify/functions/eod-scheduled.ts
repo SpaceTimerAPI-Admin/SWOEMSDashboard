@@ -16,6 +16,24 @@ import { supabaseAdmin } from "./_supabase";
 
 const TZ = "America/New_York";
 
+function etDayRange(day: string): { start: string; end: string } {
+  const offsetMs = (d: Date): number => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    }).formatToParts(d);
+    const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
+    const etMs = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+    return d.getTime() - etMs;
+  };
+  const s = new Date(`${day}T00:00:00`);
+  const e = new Date(`${day}T23:59:59.999`);
+  return {
+    start: new Date(s.getTime() + offsetMs(s)).toISOString(),
+    end:   new Date(e.getTime() + offsetMs(e)).toISOString(),
+  };
+}
+
 export const handler: Handler = async () => {
   try {
     const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
@@ -30,8 +48,7 @@ export const handler: Handler = async () => {
     yesterday.setDate(yesterday.getDate() - 1);
     const reportDay = yesterday.toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD
 
-    const start = new Date(reportDay + "T00:00:00").toISOString();
-    const end   = new Date(reportDay + "T23:59:59.999").toISOString();
+    const { start, end } = etDayRange(reportDay);
 
     const supabase = supabaseAdmin();
 

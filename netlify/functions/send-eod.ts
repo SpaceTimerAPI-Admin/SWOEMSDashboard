@@ -6,6 +6,25 @@ import { badRequest, json, unauthorized } from "./_shared";
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
 const TZ = "America/New_York";
 
+/** Returns UTC ISO start/end for a YYYY-MM-DD date in Eastern Time (handles DST). */
+function etDayRange(day: string): { start: string; end: string } {
+  const offsetMs = (d: Date): number => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    }).formatToParts(d);
+    const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
+    const etMs = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+    return d.getTime() - etMs;
+  };
+  const s = new Date(`${day}T00:00:00`);
+  const e = new Date(`${day}T23:59:59.999`);
+  return {
+    start: new Date(s.getTime() + offsetMs(s)).toISOString(),
+    end:   new Date(e.getTime() + offsetMs(e)).toISOString(),
+  };
+}
+
 function ymd(d: Date) {
   return d.toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD in ET
 }
@@ -316,8 +335,7 @@ export const handler: Handler = async (event) => {
 
     // Always report on today in ET
     const day = ymd(new Date());
-    const start = new Date(day + "T00:00:00").toISOString();
-    const end   = new Date(day + "T23:59:59.999").toISOString();
+    const { start, end } = etDayRange(day);
 
     const supabase = supabaseAdmin();
 
