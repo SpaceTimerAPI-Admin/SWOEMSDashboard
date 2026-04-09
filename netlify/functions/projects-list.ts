@@ -29,9 +29,10 @@ export const handler: Handler = async (event) => {
     let q = supabase
       .from("projects")
       .select(`
-        id, title, location, details, status, created_at, sla_due_at, sla_days,
-        created_by, source_ticket_id,
-        employees!projects_created_by_fkey(name)
+        id, title, location, details, status, tag, created_at, sla_due_at, sla_days,
+        created_by, assigned_to, source_ticket_id,
+        employees!projects_created_by_fkey(name),
+        assignee:employees!projects_assigned_to_fkey(name)
       `)
       .order("sla_due_at", { ascending: true });
 
@@ -47,6 +48,7 @@ export const handler: Handler = async (event) => {
       return {
         ...p,
         created_by_name: p.employees?.name || "Unknown",
+        assigned_to_name: (p as any).assignee?.name || null,
         ms_left: msLeft,
         is_overdue: msLeft < 0,
       };

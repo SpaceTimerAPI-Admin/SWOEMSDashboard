@@ -9,6 +9,7 @@ import TicketNew from "./pages/TicketNew";
 import TicketDetail from "./pages/TicketDetail";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
+import ShiftLog from "./pages/ShiftLog";
 import EOD from "./pages/EOD";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
@@ -66,6 +67,8 @@ export default function App() {
 
         <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
         <Route path="/projects/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
+
+        <Route path="/shift-log" element={<RequireAuth><ShiftLog /></RequireAuth>} />
 
         <Route path="/eod" element={<RequireAuth><EOD /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />

@@ -260,16 +260,32 @@ export async function sendEod(payload: { to?: string; subject?: string; notes?: 
   });
 }
 
-export async function getEodToday(): Promise<ApiResult<{
-  day: string;
-  tickets: any[];
-  projects: any[];
-  older_open_tickets: any[];
-  older_open_projects: any[];
-}>> {
-  return apiFetch("/api/eod-today", { method: "POST", body: {} });
-}
-
 export async function notifyEvent(payload: { type: string; message: string }): Promise<ApiResult<{}>> {
   return apiFetch<{}>("/api/notify-event", { method: "POST", body: payload });
+}
+
+// -------------------- Employees --------------------
+
+export async function listEmployees(): Promise<ApiResult<{ employees: { id: string; name: string; employee_id: string }[] }>> {
+  return apiFetch("/api/employees-list", { method: "POST", body: {} });
+}
+
+// -------------------- Shift Log --------------------
+
+export async function addShiftLogEntry(note: string): Promise<ApiResult<{ entry: any }>> {
+  return apiFetch("/api/shift-log-add", { method: "POST", body: { note } });
+}
+
+export async function listShiftLogEntries(): Promise<ApiResult<{ entries: any[] }>> {
+  return apiFetch("/api/shift-log-list", { method: "POST", body: {} });
+}
+
+// -------------------- Assignment --------------------
+
+export async function assignTicket(id: string, assigned_to: string | null): Promise<ApiResult<{}>> {
+  return apiFetch("/api/tickets-assign", { method: "POST", body: { id, assigned_to } });
+}
+
+export async function assignProject(id: string, assigned_to: string | null): Promise<ApiResult<{}>> {
+  return apiFetch("/api/projects-assign", { method: "POST", body: { id, assigned_to } });
 }

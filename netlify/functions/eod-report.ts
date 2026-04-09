@@ -12,25 +12,6 @@ import { supabaseAdmin } from "./_supabase";
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
 const TZ = "America/New_York";
 
-/** Returns UTC ISO start/end for a YYYY-MM-DD date in Eastern Time (handles DST). */
-function etDayRange(day: string): { start: string; end: string } {
-  const offsetMs = (d: Date): number => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-    }).formatToParts(d);
-    const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
-    const etMs = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-    return d.getTime() - etMs;
-  };
-  const s = new Date(`${day}T00:00:00`);
-  const e = new Date(`${day}T23:59:59.999`);
-  return {
-    start: new Date(s.getTime() + offsetMs(s)).toISOString(),
-    end:   new Date(e.getTime() + offsetMs(e)).toISOString(),
-  };
-}
-
 function ymd(d: Date): string {
   // Get YYYY-MM-DD in ET
   return d.toLocaleDateString("en-CA", { timeZone: TZ }); // en-CA gives YYYY-MM-DD
@@ -94,20 +75,16 @@ function buildPage(opts: {
   projectComments: any[];
   employees: any[];
   siteBaseUrl: string;
-  olderOpenTickets: any[];
-  olderOpenProjects: any[];
+  shiftLogEntries: any[];
 }): string {
-  const { day, tickets, projects, ticketComments, projectComments, employees, siteBaseUrl, olderOpenTickets, olderOpenProjects } = opts;
+  const { day, tickets, projects, ticketComments, projectComments, employees, siteBaseUrl, shiftLogEntries } = opts;
 
   const dateDisplay = new Date(day + "T12:00:00").toLocaleDateString("en-US", {
     timeZone: TZ, weekday: "long", year: "numeric", month: "long", day: "numeric"
   });
 
-  const todayCount = tickets.length + projects.length;
-  const todayClosed = [...tickets, ...projects].filter(i => i.status === "closed" || i.closed_at).length;
-  // System-wide open = today's open + older open (deduplicated)
-  const todayOpenIds = new Set([...tickets, ...projects].filter(i => i.status !== "closed" && !i.closed_at).map((i: any) => i.id));
-  const systemOpenCount = todayOpenIds.size + olderOpenTickets.length + olderOpenProjects.length;
+  const totalOpen = [...tickets, ...projects].filter(i => i.status !== "closed" && !i.closed_at).length;
+  const totalClosed = [...tickets, ...projects].filter(i => i.status === "closed" || i.closed_at).length;
 
   const tagSections = TAGS.map(tag => {
     const tagTickets = tickets.filter(t => (t.tag || "Misc") === tag);
@@ -205,15 +182,6 @@ function buildPage(opts: {
   body { background: #F2F4F7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #333; }
   .wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
   .header { background: linear-gradient(135deg,#1A1A2E 0%,#16213E 60%,#0F3460 100%); border-radius: 14px; padding: 28px; margin-bottom: 16px; }
-  .date-bar { background: #fff; border: 1px solid #E8E8E8; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .date-bar label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #888; white-space: nowrap; }
-  .date-bar input[type=date] { flex: 1; min-width: 140px; border: 1px solid #E0E0E0; border-radius: 8px; padding: 8px 12px; font-size: 14px; font-family: inherit; color: #1A1A2E; background: #FAFAFA; outline: none; cursor: pointer; }
-  .date-bar input[type=date]:focus { border-color: #6B86E0; box-shadow: 0 0 0 3px rgba(107,134,224,0.15); }
-  .date-bar button { padding: 8px 18px; border-radius: 8px; border: none; background: #1A1A2E; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-  .date-bar button:hover { background: #0F3460; }
-  .date-nav { display: flex; gap: 6px; }
-  .date-nav button { padding: 8px 12px; border-radius: 8px; border: 1px solid #E0E0E0; background: #fff; color: #444; font-size: 13px; font-weight: 500; cursor: pointer; }
-  .date-nav button:hover { background: #F5F5F5; }
   .stats { background: #fff; border: 1px solid #E8E8E8; border-radius: 12px; display: flex; margin-bottom: 24px; overflow: hidden; }
   .stat { flex: 1; padding: 16px; text-align: center; border-right: 1px solid #F0F0F0; }
   .stat:last-child { border-right: none; }
@@ -232,95 +200,38 @@ function buildPage(opts: {
     <div style="font-size:14px;color:rgba(255,255,255,.6);margin-top:5px">${escapeHtml(dateDisplay)}</div>
   </div>
 
-  <!-- Date picker -->
-  <div class="date-bar">
-    <label>View Date</label>
-    <div class="date-nav">
-      <button onclick="shiftDay(-1)">← Prev</button>
-      <button onclick="goToday()">Today</button>
-      <button onclick="shiftDay(1)">Next →</button>
-    </div>
-    <input type="date" id="datePicker" value="${day}" max="${day <= new Date().toLocaleDateString('en-CA', {timeZone: TZ}) ? new Date().toLocaleDateString('en-CA', {timeZone: TZ}) : day}" />
-    <button onclick="goDate()">View</button>
-  </div>
-  <script>
-    const picker = document.getElementById('datePicker');
-    function goDate() {
-      const v = picker.value;
-      if (v) window.location.href = window.location.pathname + '?date=' + v;
-    }
-    function goToday() {
-      // Use local date
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth()+1).padStart(2,'0');
-      const day = String(d.getDate()).padStart(2,'0');
-      window.location.href = window.location.pathname + '?date=' + y + '-' + m + '-' + day;
-    }
-    function shiftDay(delta) {
-      const cur = picker.value || new Date().toISOString().slice(0,10);
-      const d = new Date(cur + 'T12:00:00');
-      d.setDate(d.getDate() + delta);
-      const y = d.getFullYear();
-      const m = String(d.getMonth()+1).padStart(2,'0');
-      const day = String(d.getDate()).padStart(2,'0');
-      window.location.href = window.location.pathname + '?date=' + y + '-' + m + '-' + day;
-    }
-    picker.addEventListener('keydown', function(e) { if (e.key === 'Enter') goDate(); });
-  </script>
-
   <div class="stats">
     <div class="stat">
-      <div class="stat-num" style="color:#1A1A2E">${todayCount}</div>
-      <div class="stat-label">Today's Items</div>
+      <div class="stat-num" style="color:#1A1A2E">${tickets.length + projects.length}</div>
+      <div class="stat-label">Total Items</div>
     </div>
     <div class="stat">
-      <div class="stat-num" style="color:#D97706">${systemOpenCount}</div>
-      <div class="stat-label">Open System-Wide</div>
+      <div class="stat-num" style="color:#D97706">${totalOpen}</div>
+      <div class="stat-label">Still Open</div>
     </div>
     <div class="stat">
-      <div class="stat-num" style="color:#059669">${todayClosed}</div>
-      <div class="stat-label">Closed Today</div>
+      <div class="stat-num" style="color:#059669">${totalClosed}</div>
+      <div class="stat-label">Closed</div>
     </div>
   </div>
 
   ${tagSections || '<div class="empty">🌙 No tickets or projects logged today.</div>'}
 
-  ${(olderOpenTickets.length + olderOpenProjects.length) > 0 ? `
-  <!-- Older open items -->
+  ${shiftLogEntries.length > 0 ? `
   <div style="margin-top:32px;margin-bottom:8px">
     <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:12px">
-      ⏳ Still Open From Previous Days (${olderOpenTickets.length + olderOpenProjects.length})
+      📓 Shift Log (${shiftLogEntries.length} entr${shiftLogEntries.length !== 1 ? "ies" : "y"})
     </div>
     <div style="background:#fff;border:1px solid #E8E8E8;border-radius:12px;overflow:hidden">
-      ${[...olderOpenTickets.map(t => {
-        const url = siteBaseUrl ? `${siteBaseUrl}/tickets/${t.id}` : null;
-        const age = Math.floor((Date.now() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
-        const tagC = tagChip(t.tag || "Misc");
-        return `<div style="padding:12px 16px;border-bottom:1px solid #F5F5F5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:600;color:#1A1A2E;margin-bottom:3px">
-              ${url ? `<a href="${url}" style="color:#1A1A2E;text-decoration:none;border-bottom:1px solid #CBD5E1">${escapeHtml(t.title)}</a>` : escapeHtml(t.title)}
-            </div>
-            <div style="font-size:12px;color:#888">📍 ${escapeHtml(t.location)} &nbsp;·&nbsp; ${age === 0 ? "Today" : age === 1 ? "1 day ago" : `${age} days ago`} &nbsp;·&nbsp; ${tagC}</div>
+      ${shiftLogEntries.map((e: any) => `
+        <div style="padding:12px 16px;border-bottom:1px solid #F5F5F5">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:12px;font-weight:600;color:#6B5ED6">${escapeHtml(e.employee_name || "Unknown")}</span>
+            <span style="font-size:11px;color:#AAA">${fmtTime(e.created_at)}</span>
           </div>
-          <span style="display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;background:#FFF8E6;color:#92600A;border:1px solid #F5C842;white-space:nowrap">Open</span>
-        </div>`;
-      }), ...olderOpenProjects.map(p => {
-        const url = siteBaseUrl ? `${siteBaseUrl}/projects/${p.id}` : null;
-        const age = Math.floor((Date.now() - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24));
-        const tagC = tagChip(p.tag || "Misc");
-        return `<div style="padding:12px 16px;border-bottom:1px solid #F5F5F5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#aaa;margin-bottom:2px">Project</div>
-            <div style="font-size:14px;font-weight:600;color:#1A1A2E;margin-bottom:3px">
-              ${url ? `<a href="${url}" style="color:#1A1A2E;text-decoration:none;border-bottom:1px solid #CBD5E1">${escapeHtml(p.title)}</a>` : escapeHtml(p.title)}
-            </div>
-            <div style="font-size:12px;color:#888">📍 ${escapeHtml(p.location)} &nbsp;·&nbsp; ${age === 0 ? "Today" : age === 1 ? "1 day ago" : `${age} days ago`} &nbsp;·&nbsp; ${tagC}</div>
-          </div>
-          <span style="display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;background:#FFF8E6;color:#92600A;border:1px solid #F5C842;white-space:nowrap">Open</span>
-        </div>`;
-      })].join("")}
+          <div style="font-size:14px;color:#333;line-height:1.5">${escapeHtml(e.note)}</div>
+        </div>
+      `).join("")}
     </div>
   </div>
   ` : ""}
@@ -344,9 +255,10 @@ export const handler: Handler = async (event) => {
     const rawDate = (qs.date || "").trim();
     const day = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : ymd(new Date());
 
-    const { start, end } = etDayRange(day);
+    const start = new Date(day + "T00:00:00").toISOString();
+    const end   = new Date(day + "T23:59:59.999").toISOString();
 
-    const [ticketsRes, ticketsClosedRes, ticketCommentsRes, projectsRes, projectsClosedRes, projectCommentsRes, employeesRes, allOpenTicketsRes, allOpenProjectsRes] = await Promise.all([
+    const [ticketsRes, ticketsClosedRes, ticketCommentsRes, projectsRes, projectsClosedRes, projectCommentsRes, employeesRes, shiftLogRes] = await Promise.all([
       supabase.from("tickets").select("*").gte("created_at", start).lte("created_at", end),
       supabase.from("tickets").select("*").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
       supabase.from("ticket_comments").select("*").gte("created_at", start).lte("created_at", end),
@@ -354,9 +266,10 @@ export const handler: Handler = async (event) => {
       supabase.from("projects").select("*").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
       supabase.from("project_comments").select("*").gte("created_at", start).lte("created_at", end),
       supabase.from("employees").select("id, name"),
-      // All open tickets/projects system-wide (not just today)
-      supabase.from("tickets").select("id, title, location, tag, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
-      supabase.from("projects").select("id, title, location, tag, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
+      supabase.from("shift_log_entries")
+        .select("id, note, created_at, employee_id, employees!shift_log_entries_employee_id_fkey(name)")
+        .gte("created_at", start).lte("created_at", end)
+        .order("created_at", { ascending: true }),
     ]);
 
     // Deduplicate tickets (created + closed today)
@@ -377,6 +290,11 @@ export const handler: Handler = async (event) => {
       for (const p of (extra || [])) projectMap.set(p.id, p);
     }
 
+    const shiftLogEntries = (shiftLogRes.data || []).map((e: any) => ({
+      ...e,
+      employee_name: e.employees?.name || "Unknown",
+    }));
+
     const html = buildPage({
       day,
       tickets: Array.from(ticketMap.values()),
@@ -385,8 +303,7 @@ export const handler: Handler = async (event) => {
       projectComments: projectCommentsRes.data || [],
       employees: employeesRes.data || [],
       siteBaseUrl: (process.env.SITE_BASE_URL || "").replace(/\/$/, ""),
-      olderOpenTickets: allOpenTicketsRes.data || [],
-      olderOpenProjects: allOpenProjectsRes.data || [],
+      shiftLogEntries,
     });
 
     return {

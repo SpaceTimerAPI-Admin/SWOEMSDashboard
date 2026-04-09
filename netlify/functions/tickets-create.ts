@@ -2,7 +2,6 @@ import type { Handler } from "@netlify/functions";
 import { requireSession } from "./_auth";
 import { supabaseAdmin } from "./_supabase";
 import { badRequest, json, unauthorized } from "./_shared";
-import { postGroupMe } from "./_groupme";
 
 export const handler: Handler = async (event) => {
   try {
@@ -46,20 +45,6 @@ export const handler: Handler = async (event) => {
       .single();
 
     if (error) return json({ ok: false, error: error.message }, 500);
-
-    try {
-      const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
-      const link = base ? `${base}/tickets/${data.id}` : "";
-      const tagLabel = tag ? ` [${tag}]` : "";
-      const lines = [
-        `🎫 New Ticket${tagLabel}`,
-        `📌 ${title}`,
-        `📍 ${location}`,
-        `👤 Logged by ${session.employee.name}`,
-        ...(link ? [`🔗 ${link}`] : []),
-      ];
-      await postGroupMe(lines.join("\n"));
-    } catch {}
 
     return json({ ok: true, ticket: data });
   } catch (e: any) {

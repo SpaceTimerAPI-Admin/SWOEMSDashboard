@@ -2,12 +2,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   addTicketComment,
+  assignTicket,
   closeTicket,
   confirmTicketPhoto,
   convertTicketToProject,
   getTicket,
   getTicketPhotoUploadUrl,
+  listEmployees,
 } from "../lib/api";
+import { getProfile } from "../lib/auth";
 
 type Ticket = any;
 
@@ -32,6 +35,28 @@ export default function TicketDetail() {
   const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Assignment
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [assigning, setAssigning] = useState(false);
+  const profile = getProfile();
+
+  useEffect(() => {
+    listEmployees().then((res: any) => {
+      if (res?.ok) setEmployees(res.data?.employees || []);
+    });
+  }, []);
+
+  async function handleAssign(assignedTo: string | null) {
+    setAssigning(true);
+    try {
+      const res: any = await assignTicket(ticketId, assignedTo);
+      if (!res?.ok) throw new Error(res?.error || "Failed to assign");
+      await load();
+    } catch (e: any) {
+      alert(e?.message || "Failed to assign");
+    } finally { setAssigning(false); }
+  }
 
   async function load() {
     setLoading(true);
@@ -169,6 +194,35 @@ export default function TicketDetail() {
               </button>
             </div>
           )}
+
+          {/* Assign */}
+          <div className="card" style={{ padding: "12px 15px", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div>
+                <div className="detail-label">Assigned To</div>
+                <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
+                  {ticket.assigned_to
+                    ? employees.find((e: any) => e.id === ticket.assigned_to)?.name || "Someone"
+                    : <span className="muted">Unassigned</span>}
+                  {ticket.assigned_to === profile?.id && (
+                    <span style={{ marginLeft: 6, fontSize: 11, background: "rgba(92,107,255,0.15)", color: "#B0B8FF", padding: "1px 7px", borderRadius: 99, fontWeight: 600 }}>You</span>
+                  )}
+                </div>
+              </div>
+              <select
+                className="input"
+                style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
+                value={ticket.assigned_to || ""}
+                disabled={assigning}
+                onChange={e => handleAssign(e.target.value || null)}
+              >
+                <option value="">Unassigned</option>
+                {employees.map((emp: any) => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
           {ticket.details && (
             <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>

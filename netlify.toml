@@ -14,6 +14,6 @@
   to = "/index.html"
   status = 200
 
-# Scheduled: post previous day's EOD report link to GroupMe at 2 AM Eastern (7 AM UTC)
+# Scheduled: post EOD report link to GroupMe at 11:59 PM Eastern (04:59 UTC next day)
 [functions."eod-scheduled"]
-  schedule = "0 7 * * *"
+  schedule = "59 4 * * *"

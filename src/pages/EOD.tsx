@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { sendEod, getEodToday } from "../lib/api";
+import { sendEod, listShiftLogEntries } from "../lib/api";
 
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
 type Tag = typeof TAGS[number];
@@ -52,15 +52,17 @@ function StatusDot({ closed }: { closed: boolean }) {
 }
 
 export default function EOD() {
-  const [notes, setNotes] = useState("");
   const [handoffNotes, setHandoffNotes] = useState("");
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Live data
+  // Live ticket/project data
   const [tickets, setTickets] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+
+  // Shift log entries for today
+  const [shiftEntries, setShiftEntries] = useState<any[]>([]);
 
   // Active tag filter (null = all)
   const [activeTag, setActiveTag] = useState<Tag | null>(null);
@@ -69,11 +71,27 @@ export default function EOD() {
     async function load() {
       setDataLoading(true);
       try {
-        const res = await getEodToday();
-        if (res.ok) {
-          setTickets((res.data as any).tickets || []);
-          setProjects((res.data as any).projects || []);
-        }
+        const [tr, pr, sl] = await Promise.all([
+          listTickets({ includeClosed: true }) as any,
+          listProjects({ includeClosed: true }) as any,
+          listShiftLogEntries() as any,
+        ]);
+        // Use server-side today filter via the correct timezone-aware logic
+        // tickets-list returns all; filter client-side to today ET
+        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+        const isToday = (iso: string) => {
+          if (!iso) return false;
+          return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === todayStr;
+        };
+        const todayTickets = (tr?.ok ? tr?.data?.tickets || tr?.tickets || [] : []).filter(
+          (t: any) => isToday(t.created_at) || isToday(t.closed_at)
+        );
+        const todayProjects = (pr?.ok ? pr?.data?.projects || pr?.projects || [] : []).filter(
+          (p: any) => isToday(p.created_at) || isToday(p.closed_at)
+        );
+        setTickets(todayTickets);
+        setProjects(todayProjects);
+        setShiftEntries(sl?.ok ? sl?.data?.entries || [] : []);
       } catch {}
       setDataLoading(false);
     }
@@ -108,12 +126,13 @@ export default function EOD() {
     setStatus(null);
     setBusy(true);
     try {
-      const res: any = await sendEod({ notes, handoff_notes: handoffNotes });
+      const res: any = await sendEod({ handoff_notes: handoffNotes });
       if (!res?.ok) throw new Error(res?.error || "Failed to send");
       const tc = res.data?.ticket_count ?? 0;
       const pc = res.data?.project_count ?? 0;
+      const sc = res.data?.shift_log_count ?? shiftEntries.length;
       const total = tc + pc;
-      setStatus({ ok: true, msg: `Report emailed. Covered ${total} item${total !== 1 ? "s" : ""} (${tc} ticket${tc !== 1 ? "s" : ""}, ${pc} project${pc !== 1 ? "s" : ""}).` });
+      setStatus({ ok: true, msg: `Report emailed — ${total} ticket/project item${total !== 1 ? "s" : ""}, ${sc} shift log entr${sc !== 1 ? "ies" : "y"}.` });
     } catch (e: any) {
       setStatus({ ok: false, msg: e.message || "Failed to send EOD" });
     } finally {
@@ -261,33 +280,46 @@ export default function EOD() {
         </div>
       )}
 
-      {/* Notes form */}
+      {/* Shift Log preview */}
+      {shiftEntries.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 8 }}>
+            📓 Shift Log ({shiftEntries.length} entr{shiftEntries.length !== 1 ? "ies" : "y"}) — included in report
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {shiftEntries.slice(0, 3).map((entry: any) => (
+              <div key={entry.id} className="card" style={{ padding: "10px 13px", borderLeft: "3px solid rgba(168,144,255,0.4)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(168,144,255,0.8)" }}>{entry.employee_name}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted2)" }}>
+                    {new Date(entry.created_at).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", hour12: true })}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.45 }}>{entry.note}</div>
+              </div>
+            ))}
+            {shiftEntries.length > 3 && (
+              <div style={{ fontSize: 12, color: "var(--muted2)", textAlign: "center", padding: "4px 0" }}>
+                +{shiftEntries.length - 3} more entr{shiftEntries.length - 3 !== 1 ? "ies" : "y"} in report
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Handoff Notes + Send */}
       <div className="card" style={{ padding: "16px" }}>
         <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)", marginBottom: 12 }}>
-          Add to Report
+          Handoff Notes
         </div>
 
-        <label>
-          <div className="field-label">Operator Notes</div>
-          <textarea
-            className="textarea"
-            style={{ minHeight: 80 }}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="What happened today? Notable incidents, maintenance, observations…"
-          />
-        </label>
-
-        <label style={{ marginTop: 2 }}>
-          <div className="field-label">Handoff Notes</div>
-          <textarea
-            className="textarea"
-            style={{ minHeight: 80 }}
-            value={handoffNotes}
-            onChange={(e) => setHandoffNotes(e.target.value)}
-            placeholder="What does the next shift need to know?"
-          />
-        </label>
+        <textarea
+          className="textarea"
+          style={{ minHeight: 80 }}
+          value={handoffNotes}
+          onChange={(e) => setHandoffNotes(e.target.value)}
+          placeholder="What does the next shift need to know?"
+        />
 
         {status && (
           <div style={{
