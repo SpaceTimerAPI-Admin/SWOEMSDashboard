@@ -201,6 +201,15 @@ function buildPage(opts: {
   body { background: #F2F4F7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #333; }
   .wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
   .header { background: linear-gradient(135deg,#1A1A2E 0%,#16213E 60%,#0F3460 100%); border-radius: 14px; padding: 28px; margin-bottom: 16px; }
+  .date-bar { background: #fff; border: 1px solid #E8E8E8; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .date-bar label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #888; white-space: nowrap; }
+  .date-bar input[type=date] { flex: 1; min-width: 130px; border: 1px solid #E0E0E0; border-radius: 8px; padding: 7px 10px; font-size: 14px; font-family: inherit; color: #1A1A2E; background: #FAFAFA; outline: none; cursor: pointer; }
+  .date-bar input[type=date]:focus { border-color: #6B86E0; box-shadow: 0 0 0 3px rgba(107,134,224,0.15); }
+  .date-bar .date-nav { display: flex; gap: 6px; }
+  .date-bar .date-nav button { padding: 7px 12px; border-radius: 8px; border: 1px solid #E0E0E0; background: #fff; color: #444; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .date-bar .date-nav button:hover { background: #F5F5F5; }
+  .date-bar .go-btn { padding: 7px 16px; border-radius: 8px; border: none; background: #1A1A2E; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .date-bar .go-btn:hover { background: #0F3460; }
   .stats { background: #fff; border: 1px solid #E8E8E8; border-radius: 12px; display: flex; margin-bottom: 24px; overflow: hidden; }
   .stat { flex: 1; padding: 16px; text-align: center; border-right: 1px solid #F0F0F0; }
   .stat:last-child { border-right: none; }
@@ -218,6 +227,42 @@ function buildPage(opts: {
     <div style="font-size:26px;font-weight:700;color:#fff;letter-spacing:-.02em">End of Day Report</div>
     <div style="font-size:14px;color:rgba(255,255,255,.6);margin-top:5px">${escapeHtml(dateDisplay)}</div>
   </div>
+
+  <!-- Date picker -->
+  <div class="date-bar">
+    <label>View Date</label>
+    <div class="date-nav">
+      <button onclick="shiftDay(-1)">← Prev</button>
+      <button onclick="goToday()">Today</button>
+      <button onclick="shiftDay(1)">Next →</button>
+    </div>
+    <input type="date" id="datePicker" value="${day}" />
+    <button class="go-btn" onclick="goDate()">View</button>
+  </div>
+  <script>
+    var picker = document.getElementById('datePicker');
+    function goDate() {
+      var v = picker.value;
+      if (v) window.location.href = window.location.pathname + '?date=' + v;
+    }
+    function goToday() {
+      var d = new Date();
+      var y = d.getFullYear();
+      var m = String(d.getMonth()+1).padStart(2,'0');
+      var day = String(d.getDate()).padStart(2,'0');
+      window.location.href = window.location.pathname + '?date=' + y + '-' + m + '-' + day;
+    }
+    function shiftDay(delta) {
+      var cur = picker.value || new Date().toISOString().slice(0,10);
+      var d = new Date(cur + 'T12:00:00');
+      d.setDate(d.getDate() + delta);
+      var y = d.getFullYear();
+      var m = String(d.getMonth()+1).padStart(2,'0');
+      var day = String(d.getDate()).padStart(2,'0');
+      window.location.href = window.location.pathname + '?date=' + y + '-' + m + '-' + day;
+    }
+    picker.addEventListener('keydown', function(e) { if (e.key === 'Enter') goDate(); });
+  </script>
 
   <div class="stats">
     <div class="stat">
