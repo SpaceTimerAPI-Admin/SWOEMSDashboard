@@ -8,6 +8,7 @@ import {
   getProject,
   getProjectPhotoUploadUrl,
   listEmployees,
+  reopenProject,
 } from "../lib/api";
 import { getProfile } from "../lib/auth";
 
@@ -54,6 +55,17 @@ export default function ProjectDetail() {
     } catch (e: any) {
       alert(e?.message || "Failed to assign");
     } finally { setAssigning(false); }
+  }
+
+  async function handleReopen() {
+    setBusy(true);
+    try {
+      const res: any = await reopenProject(projectId);
+      if (!res?.ok) throw new Error(res?.error || "Failed to reopen");
+      await load();
+    } catch (e: any) {
+      alert(e?.message || "Failed to reopen");
+    } finally { setBusy(false); }
   }
 
   async function load() {
@@ -213,14 +225,32 @@ export default function ProjectDetail() {
             </span>
           </div>
 
-          <div className="muted" style={{ marginBottom: 14, fontSize: 13 }}>
+          <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>
             {project.location}
             {project.tag ? <><span className="dot">•</span><span>{project.tag}</span></> : null}
           </div>
 
+          {/* Assigned person in header */}
+          {(project.assigned_to || project.assigned_to_name) && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 14,
+              padding: "3px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600,
+              background: "rgba(92,107,255,0.12)", color: "#B0B8FF",
+              border: "1px solid rgba(92,107,255,0.25)" }}>
+              📌 {project.assigned_to === profile?.id ? "Assigned to you" : `Assigned to ${project.assigned_to_name || employees.find((e: any) => e.id === project.assigned_to)?.name || "someone"}`}
+            </div>
+          )}
+
           {!isClosed && (
             <div className="btn-row" style={{ marginBottom: 16 }}>
               <button className="btn small danger" onClick={handleClose} disabled={busy}>Close project</button>
+            </div>
+          )}
+
+          {isClosed && (
+            <div className="btn-row" style={{ marginBottom: 16 }}>
+              <button className="btn small" onClick={handleReopen} disabled={busy}>
+                {busy ? <span className="spinner" /> : "↩ Reopen project"}
+              </button>
             </div>
           )}
 

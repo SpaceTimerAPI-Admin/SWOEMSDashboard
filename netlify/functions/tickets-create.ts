@@ -21,7 +21,7 @@ export const handler: Handler = async (event) => {
     if (!title) return badRequest("Title required");
     if (!location) return badRequest("Location required");
     if (!details) return badRequest("Details required");
-    if (!Number.isFinite(sla_minutes) || sla_minutes <= 0 || sla_minutes > 24 * 60) {
+    if (!Number.isFinite(sla_minutes) || sla_minutes <= 0 || sla_minutes > 48 * 60) {
       return badRequest("Invalid SLA minutes");
     }
 

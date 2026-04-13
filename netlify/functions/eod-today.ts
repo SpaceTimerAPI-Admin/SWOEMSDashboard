@@ -45,7 +45,7 @@ export const handler: Handler = async (event) => {
 
     const [ticketsCreated, ticketsClosed, ticketsCommented,
            projectsCreated, projectsClosed, projectsCommented,
-           olderOpenTickets, olderOpenProjects] = await Promise.all([
+           olderOpenTickets, olderOpenProjects, shiftLogRes] = await Promise.all([
       supabase.from("tickets").select("id, title, location, tag, status, created_at, closed_at, created_by").gte("created_at", start).lte("created_at", end),
       supabase.from("tickets").select("id, title, location, tag, status, created_at, closed_at, created_by").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
       supabase.from("ticket_comments").select("ticket_id").gte("created_at", start).lte("created_at", end),
@@ -54,6 +54,10 @@ export const handler: Handler = async (event) => {
       supabase.from("project_comments").select("project_id").gte("created_at", start).lte("created_at", end),
       supabase.from("tickets").select("id, title, location, tag, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
       supabase.from("projects").select("id, title, location, tag, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
+      supabase.from("shift_log_entries")
+        .select("id, note, created_at, employee_id, employees!shift_log_entries_employee_id_fkey(name)")
+        .gte("created_at", start).lte("created_at", end)
+        .order("created_at", { ascending: false }),
     ]);
 
     // Deduplicate today's tickets (created + closed + commented-on today)
@@ -77,6 +81,11 @@ export const handler: Handler = async (event) => {
     const tickets = Array.from(ticketMap.values()).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     const projects = Array.from(projectMap.values()).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
+    const shiftLogEntries = (shiftLogRes.data || []).map((e: any) => ({
+      id: e.id, note: e.note, created_at: e.created_at,
+      employee_id: e.employee_id, employee_name: e.employees?.name || "Unknown",
+    }));
+
     return json({
       ok: true,
       day,
@@ -84,6 +93,7 @@ export const handler: Handler = async (event) => {
       projects,
       older_open_tickets: olderOpenTickets.data || [],
       older_open_projects: olderOpenProjects.data || [],
+      shift_log_entries: shiftLogEntries,
     });
   } catch (e: any) {
     return json({ ok: false, error: e?.message || "Server error" }, 500);

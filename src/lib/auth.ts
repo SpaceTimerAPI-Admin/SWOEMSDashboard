@@ -67,10 +67,20 @@ export function isAuthed(): boolean {
 }
 
 /** Clears auth and returns user to login screen */
-export function logout(): void {
+export async function logout(): Promise<void> {
+  // Invalidate server-side session first (best effort)
+  try {
+    const token = getToken();
+    if (token) {
+      await fetch("/api/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({}),
+      });
+    }
+  } catch {}
   clearToken();
   clearProfile();
-  // Hard redirect keeps things simple for SPA + Netlify
   window.location.href = "/login";
 }
 

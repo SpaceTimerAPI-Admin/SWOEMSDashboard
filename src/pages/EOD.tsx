@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { sendEod, listTickets, listProjects, listShiftLogEntries } from "../lib/api";
+import { sendEod, getEodToday } from "../lib/api";
 
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
 type Tag = typeof TAGS[number];
@@ -71,27 +71,13 @@ export default function EOD() {
     async function load() {
       setDataLoading(true);
       try {
-        const [tr, pr, sl] = await Promise.all([
-          listTickets({ includeClosed: true }) as any,
-          listProjects({ includeClosed: true }) as any,
-          listShiftLogEntries() as any,
-        ]);
-        // Use server-side today filter via the correct timezone-aware logic
-        // tickets-list returns all; filter client-side to today ET
-        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-        const isToday = (iso: string) => {
-          if (!iso) return false;
-          return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === todayStr;
-        };
-        const todayTickets = (tr?.ok ? tr?.data?.tickets || tr?.tickets || [] : []).filter(
-          (t: any) => isToday(t.created_at) || isToday(t.closed_at)
-        );
-        const todayProjects = (pr?.ok ? pr?.data?.projects || pr?.projects || [] : []).filter(
-          (p: any) => isToday(p.created_at) || isToday(p.closed_at)
-        );
-        setTickets(todayTickets);
-        setProjects(todayProjects);
-        setShiftEntries(sl?.ok ? sl?.data?.entries || [] : []);
+        const res = await getEodToday() as any;
+        if (res?.ok) {
+          const data = res.data ?? res;
+          setTickets(data.tickets || []);
+          setProjects(data.projects || []);
+          setShiftEntries(data.shift_log_entries || []);
+        }
       } catch {}
       setDataLoading(false);
     }

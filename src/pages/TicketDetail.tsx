@@ -9,6 +9,7 @@ import {
   getTicket,
   getTicketPhotoUploadUrl,
   listEmployees,
+  reopenTicket,
 } from "../lib/api";
 import { getProfile } from "../lib/auth";
 
@@ -31,6 +32,7 @@ export default function TicketDetail() {
 
   const [comment, setComment] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
   const [resolution, setResolution] = useState("");
   const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
@@ -56,6 +58,17 @@ export default function TicketDetail() {
     } catch (e: any) {
       alert(e?.message || "Failed to assign");
     } finally { setAssigning(false); }
+  }
+
+  async function handleReopen() {
+    setBusy(true);
+    try {
+      const res: any = await reopenTicket(ticketId);
+      if (!res?.ok) throw new Error(res?.error || "Failed to reopen");
+      await load();
+    } catch (e: any) {
+      alert(e?.message || "Failed to reopen");
+    } finally { setBusy(false); }
   }
 
   async function load() {
@@ -116,7 +129,7 @@ export default function TicketDetail() {
     } finally { setBusy(false); }
   }
 
-  async function handleConvertToProject() {
+  async function confirmConvert() {
     if (!ticketId) return;
     setBusy(true);
     try {
@@ -124,6 +137,7 @@ export default function TicketDetail() {
       if (!res?.ok) throw new Error(res?.error || "Failed to convert");
       const data: any = pickData(res);
       const projectId = data?.project_id || data?.project?.id;
+      setShowConvertModal(false);
       if (projectId) nav(`/projects/${projectId}`);
       else nav("/projects");
     } catch (e: any) { alert(e?.message || "Failed to convert"); }
@@ -181,16 +195,34 @@ export default function TicketDetail() {
             </span>
           </div>
 
-          <div className="muted" style={{ marginBottom: 14, fontSize: 13 }}>
+          <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>
             {ticket.location}
             {ticket.tag ? <><span className="dot">•</span><span>{ticket.tag}</span></> : null}
           </div>
 
+          {/* Assigned person in header */}
+          {(ticket.assigned_to || ticket.assigned_to_name) && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 14,
+              padding: "3px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600,
+              background: "rgba(92,107,255,0.12)", color: "#B0B8FF",
+              border: "1px solid rgba(92,107,255,0.25)" }}>
+              📌 {ticket.assigned_to === profile?.id ? "Assigned to you" : `Assigned to ${ticket.assigned_to_name || employees.find((e: any) => e.id === ticket.assigned_to)?.name || "someone"}`}
+            </div>
+          )}
+
           {!isClosed && (
             <div className="btn-row" style={{ marginBottom: 16 }}>
-              <button className="btn small" onClick={handleConvertToProject} disabled={busy}>Move to project</button>
+              <button className="btn small" onClick={() => setShowConvertModal(true)} disabled={busy}>Move to project</button>
               <button className="btn small danger" onClick={() => { setResolutionError(null); setResolution(""); setShowCloseModal(true); }} disabled={busy}>
                 Close ticket
+              </button>
+            </div>
+          )}
+
+          {isClosed && (
+            <div className="btn-row" style={{ marginBottom: 16 }}>
+              <button className="btn small" onClick={handleReopen} disabled={busy}>
+                {busy ? <span className="spinner" /> : "↩ Reopen ticket"}
               </button>
             </div>
           )}
@@ -312,6 +344,27 @@ export default function TicketDetail() {
                 <button className="btn small" type="button" onClick={() => setShowCloseModal(false)} disabled={busy}>Cancel</button>
                 <button className="btn primary small" type="button" onClick={confirmClose} disabled={busy}>
                   {busy ? <span className="spinner" /> : "Confirm close"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConvertModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="card modal-card">
+            <div className="modal-head">
+              <h3 className="modal-title">Move to project?</h3>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.5, marginBottom: 14 }}>
+                This will convert <strong style={{ color: "var(--text)" }}>{ticket?.title}</strong> into a project and remove it from the ticket list. All comments and photos will be transferred. This cannot be undone.
+              </p>
+              <div className="btn-row">
+                <button className="btn small" type="button" onClick={() => setShowConvertModal(false)} disabled={busy}>Cancel</button>
+                <button className="btn primary small" type="button" onClick={confirmConvert} disabled={busy}>
+                  {busy ? <span className="spinner" /> : "Yes, move to project"}
                 </button>
               </div>
             </div>
