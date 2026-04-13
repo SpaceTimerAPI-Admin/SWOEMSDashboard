@@ -24,13 +24,12 @@ export const handler: Handler = async () => {
       return { statusCode: 500, body: "SITE_BASE_URL not configured" };
     }
 
-    // We're running in the early hours of "today" — report on YESTERDAY
-    const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    // Get yesterday's date string in ET
-    const reportDay = yesterday.toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD
+    // Get yesterday's date in ET — subtract 1 from today's ET date string to stay timezone-safe
+    const todayET = new Date().toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD in ET
+    const d = new Date(`${todayET}T12:00:00`); // noon ET, safe midpoint
+    d.setDate(d.getDate() - 1);
+    const reportDay = d.toLocaleDateString("en-CA", { timeZone: TZ }); // yesterday YYYY-MM-DD in ET
+    const yesterday = new Date(`${reportDay}T12:00:00`);
 
     // Build ET-correct date range for yesterday
     const offsetMs = (d: Date): number => {

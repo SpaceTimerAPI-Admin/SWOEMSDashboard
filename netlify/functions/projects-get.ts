@@ -32,8 +32,9 @@ export const handler: Handler = async (event) => {
       .from("projects")
       .select(`
         id, title, location, details, tag, status, created_at, sla_due_at, sla_days,
-        created_by, source_ticket_id,
-        employees!projects_created_by_fkey(name)
+        created_by, assigned_to, source_ticket_id,
+        employees!projects_created_by_fkey(name),
+        assignee:employees!projects_assigned_to_fkey(name)
       `)
       .eq("id", id)
       .maybeSingle();
@@ -63,7 +64,7 @@ export const handler: Handler = async (event) => {
 
     return json({
       ok: true,
-      project: { ...project, created_by_name: (project as any).employees?.name || "Unknown" },
+      project: { ...project, created_by_name: (project as any).employees?.name || "Unknown", assigned_to_name: (project as any).assignee?.name || null },
       photos: (photos || []).map((p: any) => ({ ...p, uploaded_by_name: p.employees?.name || "Unknown" })),
       comments: (comments || []).map((c: any) => ({ ...c, employee_name: c.employees?.name || "Unknown" })),
     });
