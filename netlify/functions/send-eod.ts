@@ -5,11 +5,10 @@ import { badRequest, json, unauthorized } from "./_shared";
 
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
 
+const TZ = "America/New_York";
+
 function ymd(d: Date) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return d.toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD in ET
 }
 
 function escapeHtml(s: string) {
@@ -25,8 +24,6 @@ function empName(employees: any[], empId: string) {
   const e = employees.find((x: any) => x.id === empId);
   return e ? e.name : "Unknown";
 }
-
-const TZ = "America/New_York";
 
 /** Returns correct UTC ISO start/end for a YYYY-MM-DD date in Eastern Time, DST-aware. */
 function etDayRange(day: string): { start: string; end: string } {
