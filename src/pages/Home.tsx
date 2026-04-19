@@ -88,8 +88,17 @@ export default function Home() {
         <div className="page-subtitle">SeaWorld Entertainment Maintenance</div>
       </div>
 
-      {/* Today's Shift — always visible */}
-      <div className="card" style={{ padding: "14px 16px", marginBottom: 16 }}>
+      <div className="home-grid">
+        <Tile to="/tickets/new"  icon="🎫" title="Log a Call"   desc="Create a new work order ticket"     accent="rgba(92,107,255,0.18)" />
+        <Tile to="/tickets"      icon="📋" title="Tickets"      desc="View & manage all tickets"          accent="rgba(46,232,160,0.12)" />
+        <Tile to="/projects"     icon="📐" title="Projects"     desc="Track longer-term work items"       accent="rgba(255,182,39,0.12)" />
+        <Tile to="/shift-log"    icon="📓" title="Shift Log"    desc="Log notes throughout your shift"    accent="rgba(168,144,255,0.15)" />
+        <Tile to="/eod"          icon="📝" title="EOD Report"   desc="Generate & email today's recap"     accent="rgba(255,84,84,0.12)" />
+        <Tile to="/settings"     icon="⚙️" title="Settings"    desc="Account & preferences"              accent="rgba(255,255,255,0.06)" />
+      </div>
+
+      {/* Today's Shift — bottom */}
+      <div className="card" style={{ padding: "14px 16px", marginTop: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)" }}>
             👥 On Shift Today
@@ -129,8 +138,6 @@ export default function Home() {
           </div>
         )}
       </div>
-
-      {/* My Assignments */}
       {assigned.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{
