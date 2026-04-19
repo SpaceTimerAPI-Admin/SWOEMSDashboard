@@ -17,3 +17,20 @@ alter table public.shift_log_entries enable row level security;
 -- ============================================================
 alter table public.tickets  add column if not exists assigned_to uuid null references public.employees(id);
 alter table public.projects add column if not exists assigned_to uuid null references public.employees(id);
+
+-- ============================================================
+-- NEW: Weekly Schedule
+-- ============================================================
+create table if not exists public.schedule_entries (
+  id uuid primary key default gen_random_uuid(),
+  work_date date not null,           -- the specific date this entry is for
+  employee_name text not null,       -- "First L." format
+  shift_start text null,             -- "6:00 AM"
+  shift_end text null,               -- "2:30 PM"
+  uploaded_by uuid not null references public.employees(id),
+  uploaded_at timestamptz not null default now(),
+  -- Upsert key: one entry per name per date
+  unique (work_date, employee_name)
+);
+create index if not exists schedule_entries_date_idx on public.schedule_entries(work_date);
+alter table public.schedule_entries enable row level security;

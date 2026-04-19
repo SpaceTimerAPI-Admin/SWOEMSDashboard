@@ -309,3 +309,16 @@ export async function assignTicket(id: string, assigned_to: string | null): Prom
 export async function assignProject(id: string, assigned_to: string | null): Promise<ApiResult<{}>> {
   return apiFetch("/api/projects-assign", { method: "POST", body: { id, assigned_to } });
 }
+
+// -------------------- Schedule --------------------
+
+export async function uploadSchedule(payload: {
+  image_base64: string;
+  content_type: string;
+}): Promise<ApiResult<{ count: number; dates: string[]; entries: any[] }>> {
+  return apiFetch("/api/schedule-upload", { method: "POST", body: payload });
+}
+
+export async function getTodaySchedule(): Promise<ApiResult<{ date: string; entries: { employee_name: string; shift_start: string | null; shift_end: string | null }[] }>> {
+  return apiFetch("/api/schedule-today", { method: "POST", body: {} });
+}
