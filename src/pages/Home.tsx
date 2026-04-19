@@ -35,34 +35,99 @@ export default function Home() {
   const profile = getProfile();
   const [assigned, setAssigned] = useState<any[]>([]);
 
+  // Schedule state
+  const [scheduleEntries, setScheduleEntries] = useState<any[] | null>(null);
+  const [scheduleDate, setScheduleDate] = useState<string>("");
+
   useEffect(() => {
     if (!profile?.id) return;
-    async function loadAssigned() {
+    async function loadAll() {
       try {
-        const [tr, pr] = await Promise.all([
+        const [tr, pr, sr] = await Promise.all([
           listTickets({ includeClosed: false }) as any,
           listProjects({ includeClosed: false }) as any,
+          getTodaySchedule() as any,
         ]);
+
+        // Assigned tickets/projects
         const tickets = (tr?.ok ? tr?.data?.tickets || tr?.tickets || [] : [])
           .filter((t: any) => t.assigned_to === profile!.id && !isClosed(t));
         const projects = (pr?.ok ? pr?.data?.projects || pr?.projects || [] : [])
           .filter((p: any) => p.assigned_to === profile!.id && !isClosed(p));
-        // merge and sort newest first
         const all = [
           ...tickets.map((t: any) => ({ ...t, _type: "ticket" })),
           ...projects.map((p: any) => ({ ...p, _type: "project" })),
         ].sort((a, b) => parseDate(b.created_at) - parseDate(a.created_at));
         setAssigned(all);
-      } catch {}
+
+        // Today's schedule
+        if (sr?.ok) {
+          const data = sr.data ?? sr;
+          setScheduleEntries(data.entries || []);
+          setScheduleDate(data.date || "");
+        } else {
+          setScheduleEntries([]);
+        }
+      } catch {
+        setScheduleEntries([]);
+      }
     }
-    void loadAssigned();
+    void loadAll();
   }, [profile?.id]);
+
+  const todayDisplay = scheduleDate
+    ? new Date(scheduleDate + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "long", month: "long", day: "numeric",
+      })
+    : new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   return (
     <div className="page fade-up">
       <div style={{ marginBottom: 4 }}>
         <div className="page-title">Dashboard</div>
         <div className="page-subtitle">SeaWorld Entertainment Maintenance</div>
+      </div>
+
+      {/* Today's Shift — always visible */}
+      <div className="card" style={{ padding: "14px 16px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)" }}>
+            👥 On Shift Today
+          </div>
+          <div style={{ fontSize: 11, color: "var(--muted2)" }}>{todayDisplay}</div>
+        </div>
+
+        {scheduleEntries === null ? (
+          <div style={{ fontSize: 13, color: "var(--muted2)" }}>Loading…</div>
+        ) : scheduleEntries.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--muted2)", fontStyle: "italic" }}>
+            No schedule for today.{" "}
+            <Link to="/settings" style={{ color: "var(--muted)", textDecoration: "underline" }}>
+              Upload one in Settings.
+            </Link>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {scheduleEntries.map((entry: any, i: number) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 8, padding: "8px 10px", borderRadius: 8,
+                background: "rgba(255,255,255,0.04)",
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
+                  {entry.employee_name}
+                </div>
+                {entry.shift_start && entry.shift_end ? (
+                  <div style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
+                    {entry.shift_start} – {entry.shift_end}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "var(--muted2)" }}>—</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* My Assignments */}
