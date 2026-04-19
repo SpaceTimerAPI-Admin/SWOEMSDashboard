@@ -174,7 +174,6 @@ export default function Settings() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           style={{ display: "none" }}
           onChange={onScheduleFile}
         />
