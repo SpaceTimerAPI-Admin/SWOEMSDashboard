@@ -53,7 +53,7 @@ export const handler: Handler = async (event) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",  // Faster model — better for document parsing
+        model: "claude-sonnet-4-6",  // Better accuracy for complex table layouts
         max_tokens: 4096,
         messages: [{
           role: "user",
@@ -61,28 +61,28 @@ export const handler: Handler = async (event) => {
             contentBlock,
             {
               type: "text",
-              text: `You are reading a SeaWorld weekly work schedule table.
+              text: `You are reading a SeaWorld weekly work schedule. I need you to be extremely precise.
 
-FIRST: Read the column header row carefully. It contains dates like "Thursday 5/7/2026", "Friday 5/8/2026" etc. List every date column in order from left to right. This is your date map — every shift must be anchored to its exact column header date.
+PHASE 1 — MAP THE COLUMNS:
+Read the header row. Write out each column number and its exact date, like:
+Col 1: Thursday 5/7/2026 = 2026-05-07
+Col 2: Friday 5/8/2026 = 2026-05-08
+...and so on for all columns.
 
-SECOND: For each employee, go column by column left to right using your date map. For each column:
-- If the cell contains a time range → record it under that column's exact date
-- If the cell says "Off", "OFF", "PTO", or is blank → skip it
-- Strip all location text (SWF TECH EMS, SSFF, Ad Hoc, EO, Purchasing Position, etc) — keep times only
+PHASE 2 — EXTRACT SHIFTS:
+For each employee, go through each column using your map from Phase 1. Only record a cell if it contains a time range (like "6:00 AM - 2:30 PM"). Skip "Off", "OFF", "PTO", blank cells.
 
-THIRD — SECOND SHIFTS: A row with NO employee name in the far-left column means the employee directly above has a second shift. Merge with " / " e.g. "12:30 PM - 6:00 PM / 11:30 PM - 2:00 AM"
+Strip all location text (SWF TECH EMS, SSFF, Ad Hoc, EO, etc). Keep times only.
 
-Return ONLY a JSON array, nothing else. Each object:
-{
-  "employee_name": "Firstname L.",
-  "work_date": "YYYY-MM-DD",
-  "shift_start": "6:00 AM",
-  "shift_end": "2:30 PM",
-  "all_shifts": "6:00 AM - 2:30 PM"
-}
+PHASE 3 — SECOND SHIFTS:
+A row with NO name in the far-left column = second shift for the employee above. Merge with " / ".
 
-Names are formatted as "LASTNAME, FIRSTNAME M" — convert to "Firstname L." format.
-Do not include "Off" days. Do not skip any date column. Do not shift columns.`,
+PHASE 4 — OUTPUT:
+Return ONLY a JSON array. No markdown. No explanation. Each item:
+{"employee_name":"Firstname L.","work_date":"YYYY-MM-DD","shift_start":"H:MM AM","shift_end":"H:MM PM","all_shifts":"H:MM AM - H:MM PM"}
+
+Convert names from "LASTNAME, FIRSTNAME M" to "Firstname L." format.
+Be precise — a shift on Thursday must have Thursday's date, not Sunday's.`,
             },
           ],
         }],
