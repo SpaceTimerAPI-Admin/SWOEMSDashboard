@@ -322,3 +322,11 @@ export async function uploadSchedule(payload: {
 export async function getTodaySchedule(): Promise<ApiResult<{ date: string; entries: { employee_name: string; shift_start: string | null; shift_end: string | null }[] }>> {
   return apiFetch("/api/schedule-today", { method: "POST", body: {} });
 }
+
+export async function getWeekSchedule(week_start?: string): Promise<ApiResult<{
+  week_start: string;
+  week_end: string;
+  entries: { work_date: string; employee_name: string; shift_start: string | null; shift_end: string | null; all_shifts: string | null }[];
+}>> {
+  return apiFetch("/api/schedule-week", { method: "POST", body: { week_start: week_start || "" } });
+}

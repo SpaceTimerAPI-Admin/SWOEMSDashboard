@@ -119,7 +119,7 @@ export default function Home() {
                 </div>
                 {entry.shift_start && entry.shift_end ? (
                   <div style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
-                    {entry.shift_start} – {entry.shift_end}
+                    {entry.all_shifts || `${entry.shift_start} – ${entry.shift_end}`}
                   </div>
                 ) : (
                   <div style={{ fontSize: 12, color: "var(--muted2)" }}>—</div>

@@ -173,7 +173,7 @@ export default function Settings() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           style={{ display: "none" }}
           onChange={onScheduleFile}
         />

@@ -2,10 +2,9 @@
  * POST /api/schedule-upload
  * Body: { image_base64: string, content_type: string }
  *
- * Sends the image to Claude vision to extract the schedule,
- * then upserts entries into schedule_entries (by work_date + employee_name).
- * Uploading a new photo for dates that already exist updates them (revision support).
- * Dates not present in the new image are untouched.
+ * Accepts image (jpeg/png) or PDF.
+ * Sends to Claude vision to extract the schedule.
+ * Upserts entries — uploading again only adds/updates, never deletes.
  */
 import type { Handler } from "@netlify/functions";
 import { requireSession } from "./_auth";
@@ -13,8 +12,8 @@ import { supabaseAdmin } from "./_supabase";
 import { badRequest, json, unauthorized } from "./_shared";
 
 interface ScheduleEntry {
-  employee_name: string;  // "First L." format
-  work_date: string;      // YYYY-MM-DD
+  employee_name: string;
+  work_date: string;       // YYYY-MM-DD
   shift_start: string | null;
   shift_end: string | null;
 }
@@ -35,7 +34,12 @@ export const handler: Handler = async (event) => {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return badRequest("ANTHROPIC_API_KEY not configured");
 
-    // Call Claude vision to parse the schedule
+    // Determine source type — Claude accepts images and PDFs
+    const isPdf = content_type === "application/pdf";
+    const source = isPdf
+      ? { type: "base64" as const, media_type: "application/pdf" as const, data: image_base64 }
+      : { type: "base64" as const, media_type: content_type as any, data: image_base64 };
+
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -45,36 +49,39 @@ export const handler: Handler = async (event) => {
       },
       body: JSON.stringify({
         model: "claude-opus-4-5",
-        max_tokens: 2048,
+        max_tokens: 4096,
         messages: [{
           role: "user",
           content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: content_type, data: image_base64 },
-            },
+            isPdf
+              ? { type: "document", source }
+              : { type: "image", source },
             {
               type: "text",
-              text: `You are reading a weekly work schedule. Extract every person's shift for each day they are working (not Off and not blank).
+              text: `You are reading a SeaWorld weekly work schedule table. Extract every person's shift for each day they are working.
 
-Return ONLY a JSON array with no other text, markdown, or explanation. Each object must have:
-- "employee_name": First name + last initial with a period, e.g. "Andy O." — use exactly this format
-- "work_date": The date in YYYY-MM-DD format (read the date from the column header)
-- "shift_start": Start time as shown, e.g. "6:00 AM" — null if unknown
-- "shift_end": End time as shown, e.g. "2:30 PM" — null if unknown
+CRITICAL — SECOND SHIFTS:
+The table has employee names in the FAR LEFT column. When a row has NO name in the far left column but has shift times in day columns, it belongs to the most recent named employee above it. That person has a SECOND shift on that day.
+
+For employees with two shifts on the same day, combine them with " / " separator in all_shifts, e.g. "12:30 PM - 6:00 PM / 11:30 PM - 2:00 AM". Use the start of their first shift as shift_start and end of their last shift as shift_end.
+
+Return ONLY a valid JSON array — no markdown, no explanation, no extra text. Each object must have exactly these fields:
+- "employee_name": First name + last initial with period, e.g. "Andy O." — convert from "LASTNAME, FIRSTNAME M" format
+- "work_date": YYYY-MM-DD from the column header date
+- "shift_start": Start time of first shift e.g. "6:00 AM" — null if unknown
+- "shift_end": End time of last shift e.g. "2:30 PM" — null if unknown  
+- "all_shifts": The full shift string. Single shift: "6:00 AM - 2:30 PM". Two shifts: "12:30 PM - 6:00 PM / 11:30 PM - 2:00 AM"
 
 Rules:
-- Skip any cell that says "Off", "OFF", or is blank
-- Skip any cell with no time information
-- Do NOT include any location or department codes (like SWF TECH EMS) — only name, date, and times
-- Names appear as "LASTNAME, FIRSTNAME M" — convert to "Firstname L." format
-- If a person has multiple shifts in one cell, use the first time range
+- Skip cells that say "Off", "OFF", or are blank
+- Do NOT include location codes like "SWF TECH EMS", "SSFF", "Ad Hoc" — only times
+- If a row has NO name on the far left, assign its shifts to the named employee in the row immediately above
 - Return only the JSON array, nothing else
 
 Example output:
 [
-  {"employee_name":"Andy O.","work_date":"2026-04-18","shift_start":"1:00 PM","shift_end":"9:30 PM"},
-  {"employee_name":"Lori W.","work_date":"2026-04-18","shift_start":"6:00 AM","shift_end":"2:30 PM"}
+  {"employee_name":"Andy O.","work_date":"2026-05-07","shift_start":"12:30 PM","shift_end":"2:00 AM","all_shifts":"12:30 PM - 6:00 PM / 11:30 PM - 2:00 AM"},
+  {"employee_name":"Lori W.","work_date":"2026-05-07","shift_start":"6:00 AM","shift_end":"2:30 PM","all_shifts":"6:00 AM - 2:30 PM"}
 ]`,
             },
           ],
@@ -91,7 +98,6 @@ Example output:
     const claudeData = await claudeRes.json();
     const rawText = claudeData?.content?.[0]?.text || "";
 
-    // Parse the JSON array from Claude's response
     let entries: ScheduleEntry[] = [];
     try {
       const cleaned = rawText.replace(/```json|```/g, "").trim();
@@ -99,10 +105,9 @@ Example output:
       if (!Array.isArray(entries)) throw new Error("Not an array");
     } catch {
       console.error("[schedule-upload] Failed to parse Claude response:", rawText);
-      return json({ ok: false, error: "Could not parse schedule from image. Please try a clearer photo." }, 422);
+      return json({ ok: false, error: "Could not parse schedule from image. Try a clearer photo or better lighting." }, 422);
     }
 
-    // Validate and clean entries
     const valid = entries.filter(e =>
       e.employee_name && e.work_date && /^\d{4}-\d{2}-\d{2}$/.test(e.work_date)
     );
@@ -111,13 +116,13 @@ Example output:
       return json({ ok: false, error: "No schedule entries found. Try a clearer or closer photo." }, 422);
     }
 
-    // Upsert into Supabase — existing entries for same date+name get updated (revision support)
     const supabase = supabaseAdmin();
-    const rows = valid.map(e => ({
+    const rows = valid.map((e: any) => ({
       work_date: e.work_date,
       employee_name: e.employee_name,
       shift_start: e.shift_start || null,
       shift_end: e.shift_end || null,
+      all_shifts: e.all_shifts || null,
       uploaded_by: session.employee.id,
       uploaded_at: new Date().toISOString(),
     }));
@@ -131,14 +136,8 @@ Example output:
       return json({ ok: false, error: upsertError.message }, 500);
     }
 
-    // Return the parsed entries for preview confirmation
     const dates = [...new Set(valid.map(e => e.work_date))].sort();
-    return json({
-      ok: true,
-      count: valid.length,
-      dates,
-      entries: valid,
-    });
+    return json({ ok: true, count: valid.length, dates, entries: valid });
 
   } catch (e: any) {
     console.error("[schedule-upload] Error:", e?.message);

@@ -228,6 +228,7 @@ export default function ProjectDetail() {
           <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>
             {project.location}
             {project.tag ? <><span className="dot">•</span><span>{project.tag}</span></> : null}
+            {project.created_by_name ? <><span className="dot">•</span><span>by {project.created_by_name}</span></> : null}
           </div>
 
           {/* Assigned person in header */}

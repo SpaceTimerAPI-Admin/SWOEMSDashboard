@@ -84,6 +84,7 @@ export default function Tickets() {
     const tag = t?.tag || "";
     const assignedName = t?.assigned_to_name || "";
     const isAssignedToMe = t?.assigned_to === profile?.id;
+    const submitter = t?.created_by_name || "";
     return (
       <Link key={t.id} className="item-card" to={`/tickets/${t.id}`}
         style={isAssignedToMe ? { borderLeft: "3px solid rgba(92,107,255,0.5)" } : undefined}>
@@ -94,6 +95,7 @@ export default function Tickets() {
         <div className="item-sub">
           {t.location && <span>{t.location}</span>}
           {t.created_at && <><span className="dot">•</span><span>{fmtDateTime(t.created_at)}</span></>}
+          {submitter && <><span className="dot">•</span><span>by {submitter}</span></>}
         </div>
         <div className="chip-row">
           {due && <span className={`chip ${due.variant}`}>{due.label}</span>}

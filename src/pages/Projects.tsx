@@ -84,6 +84,7 @@ export default function Projects() {
     const tag = p?.tag || "";
     const assignedName = p?.assigned_to_name || "";
     const isAssignedToMe = p?.assigned_to === profile?.id;
+    const submitter = p?.created_by_name || "";
     return (
       <Link key={p.id} className="item-card" to={`/projects/${p.id}`}
         style={isAssignedToMe ? { borderLeft: "3px solid rgba(92,107,255,0.5)" } : undefined}>
@@ -94,6 +95,7 @@ export default function Projects() {
         <div className="item-sub">
           {p.location && <span>{p.location}</span>}
           {p.created_at && <><span className="dot">•</span><span>{fmtDateTime(p.created_at)}</span></>}
+          {submitter && <><span className="dot">•</span><span>by {submitter}</span></>}
         </div>
         <div className="chip-row">
           {due && <span className={`chip ${due.variant}`}>{due.label}</span>}

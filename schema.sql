@@ -34,3 +34,6 @@ create table if not exists public.schedule_entries (
 );
 create index if not exists schedule_entries_date_idx on public.schedule_entries(work_date);
 alter table public.schedule_entries enable row level security;
+
+-- Migration: add all_shifts column for second shift support
+alter table public.schedule_entries add column if not exists all_shifts text null;

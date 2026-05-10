@@ -198,6 +198,7 @@ export default function TicketDetail() {
           <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>
             {ticket.location}
             {ticket.tag ? <><span className="dot">•</span><span>{ticket.tag}</span></> : null}
+            {ticket.created_by_name ? <><span className="dot">•</span><span>by {ticket.created_by_name}</span></> : null}
           </div>
 
           {/* Assigned person in header */}
