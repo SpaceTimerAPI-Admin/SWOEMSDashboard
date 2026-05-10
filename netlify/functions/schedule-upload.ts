@@ -53,7 +53,7 @@ export const handler: Handler = async (event) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-5",
+        model: "claude-haiku-4-5-20251001",  // Faster model — better for document parsing
         max_tokens: 4096,
         messages: [{
           role: "user",
@@ -95,7 +95,15 @@ Do not include "Off" days. Do not skip any date column. Do not shift columns.`,
       return json({ ok: false, error: `Vision API error: ${claudeRes.status}` }, 500);
     }
 
-    const claudeData = await claudeRes.json();
+    const responseText = await claudeRes.text();
+
+    // Detect gateway timeout / HTML error pages before attempting JSON parse
+    if (responseText.trim().startsWith("<") || responseText.includes("Inactivity Timeout")) {
+      console.error("[schedule-upload] Gateway timeout or HTML error returned");
+      return json({ ok: false, error: "The request timed out. Try uploading a photo of the schedule instead of a PDF, or crop the image closer to the schedule." }, 504);
+    }
+
+    const claudeData = JSON.parse(responseText);
     const rawText = claudeData?.content?.[0]?.text || "";
 
     let entries: ScheduleEntry[] = [];

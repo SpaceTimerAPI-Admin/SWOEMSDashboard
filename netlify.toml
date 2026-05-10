@@ -3,6 +3,12 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[functions]
+  node_bundler = "esbuild"
+
+[functions."schedule-upload"]
+  timeout = 60
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
