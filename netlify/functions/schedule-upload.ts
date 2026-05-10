@@ -116,8 +116,33 @@ Example output:
       return json({ ok: false, error: "No schedule entries found. Try a clearer or closer photo." }, 422);
     }
 
+    // Deduplicate — if Claude returned two entries for the same person+date
+    // (named row + second shift row separately), merge them into one
+    const mergeMap = new Map<string, any>();
+    for (const e of valid as any[]) {
+      const key = `${e.work_date}::${e.employee_name}`;
+      if (!mergeMap.has(key)) {
+        mergeMap.set(key, { ...e });
+      } else {
+        const existing = mergeMap.get(key);
+        // Combine shifts — keep earliest start, latest end, merge all_shifts
+        if (e.shift_start && (!existing.shift_start || e.shift_start < existing.shift_start)) {
+          existing.shift_start = e.shift_start;
+        }
+        if (e.shift_end && (!existing.shift_end || e.shift_end > existing.shift_end)) {
+          existing.shift_end = e.shift_end;
+        }
+        if (e.all_shifts && existing.all_shifts && e.all_shifts !== existing.all_shifts) {
+          existing.all_shifts = `${existing.all_shifts} / ${e.all_shifts}`;
+        } else if (e.all_shifts && !existing.all_shifts) {
+          existing.all_shifts = e.all_shifts;
+        }
+      }
+    }
+    const deduped = Array.from(mergeMap.values());
+
     const supabase = supabaseAdmin();
-    const rows = valid.map((e: any) => ({
+    const rows = deduped.map((e: any) => ({
       work_date: e.work_date,
       employee_name: e.employee_name,
       shift_start: e.shift_start || null,
@@ -136,8 +161,8 @@ Example output:
       return json({ ok: false, error: upsertError.message }, 500);
     }
 
-    const dates = [...new Set(valid.map(e => e.work_date))].sort();
-    return json({ ok: true, count: valid.length, dates, entries: valid });
+    const dates = [...new Set(deduped.map((e: any) => e.work_date))].sort();
+    return json({ ok: true, count: deduped.length, dates, entries: deduped });
 
   } catch (e: any) {
     console.error("[schedule-upload] Error:", e?.message);
