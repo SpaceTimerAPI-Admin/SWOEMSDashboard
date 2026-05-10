@@ -61,29 +61,28 @@ export const handler: Handler = async (event) => {
             contentBlock,
             {
               type: "text",
-              text: `You are reading a SeaWorld weekly work schedule. This is the COMPLETE authoritative schedule for the dates shown.
+              text: `You are reading a SeaWorld weekly work schedule table.
 
-Your job: Extract EVERY person's working shifts for EVERY date column shown in this schedule.
+FIRST: Read the column header row carefully. It contains dates like "Thursday 5/7/2026", "Friday 5/8/2026" etc. List every date column in order from left to right. This is your date map — every shift must be anchored to its exact column header date.
 
-STEP 1 — Read all column headers carefully. The dates are in the format M/D/YYYY. Extract the YYYY-MM-DD for each column. There may be 7 columns (e.g. Thursday through Wednesday). Read ALL of them even if some employees have no shift that day.
+SECOND: For each employee, go column by column left to right using your date map. For each column:
+- If the cell contains a time range → record it under that column's exact date
+- If the cell says "Off", "OFF", "PTO", or is blank → skip it
+- Strip all location text (SWF TECH EMS, SSFF, Ad Hoc, EO, Purchasing Position, etc) — keep times only
 
-STEP 2 — For each employee row, read left to right across all date columns:
-- If the cell has a time range like "6:00 AM - 2:30 PM" → that person is working, include it
-- If the cell says "Off", "OFF", "PTO", or is blank → skip it (person is not working)
-- Do NOT include location codes like "SWF TECH EMS", "SSFF", "Ad Hoc", "EO" — times only
+THIRD — SECOND SHIFTS: A row with NO employee name in the far-left column means the employee directly above has a second shift. Merge with " / " e.g. "12:30 PM - 6:00 PM / 11:30 PM - 2:00 AM"
 
-STEP 3 — SECOND SHIFTS: If a row has NO employee name in the far-left column but has time(s) in day columns, it belongs to the most recently named employee above it. That employee has a second shift on that day. Merge both shifts with " / " e.g. "12:30 PM - 6:00 PM / 11:30 PM - 2:00 AM"
-
-STEP 4 — Return ONLY a JSON array, no markdown, no explanation. Each object:
+Return ONLY a JSON array, nothing else. Each object:
 {
-  "employee_name": "First L.",  // Convert "LASTNAME, FIRSTNAME M" → "Firstname L."
-  "work_date": "YYYY-MM-DD",   // From the column header
-  "shift_start": "6:00 AM",    // Start of first shift, null if unknown
-  "shift_end": "2:30 PM",      // End of last shift, null if unknown
-  "all_shifts": "6:00 AM - 2:30 PM"  // Full string; use " / " for double shifts
+  "employee_name": "Firstname L.",
+  "work_date": "YYYY-MM-DD",
+  "shift_start": "6:00 AM",
+  "shift_end": "2:30 PM",
+  "all_shifts": "6:00 AM - 2:30 PM"
 }
 
-IMPORTANT: Include entries for ALL dates in the schedule, even if only a few people work that day. Do not skip any date column.`,
+Names are formatted as "LASTNAME, FIRSTNAME M" — convert to "Firstname L." format.
+Do not include "Off" days. Do not skip any date column. Do not shift columns.`,
             },
           ],
         }],
@@ -120,9 +119,31 @@ IMPORTANT: Include entries for ALL dates in the schedule, even if only a few peo
       return json({ ok: false, error: "No schedule entries found in the upload." }, 422);
     }
 
+    // Sanity check — all dates should be within a reasonable 14-day window
+    // (catches cases where Claude reads a date from a different part of the doc)
+    const dateCounts = new Map<string, number>();
+    for (const e of valid as any[]) {
+      dateCounts.set(e.work_date, (dateCounts.get(e.work_date) || 0) + 1);
+    }
+    // Find the "center of mass" date
+    const allMs = [...dateCounts.keys()].map(d => new Date(d + "T12:00:00").getTime());
+    const minMs = Math.min(...allMs);
+    const maxMs = Math.max(...allMs);
+    const spanDays = (maxMs - minMs) / 86400000;
+    // If dates span more than 14 days something is wrong — filter to the densest 7-day window
+    let filtered = valid as any[];
+    if (spanDays > 14) {
+      const medianMs = allMs.sort((a, b) => a - b)[Math.floor(allMs.length / 2)];
+      const windowMs = 7 * 86400000;
+      filtered = valid.filter((e: any) => {
+        const ms = new Date(e.work_date + "T12:00:00").getTime();
+        return Math.abs(ms - medianMs) <= windowMs;
+      });
+    }
+
     // Deduplicate — merge same person+date entries (handles second shifts returned separately)
     const mergeMap = new Map<string, any>();
-    for (const e of valid as any[]) {
+    for (const e of filtered) {
       const key = `${e.work_date}::${e.employee_name}`;
       if (!mergeMap.has(key)) {
         mergeMap.set(key, { ...e });
