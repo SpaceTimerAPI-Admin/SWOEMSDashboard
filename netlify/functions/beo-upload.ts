@@ -68,10 +68,10 @@ export const handler: Handler = async (event) => {
                 },
                 {
                   type: "text",
-                  text: `Extract the event name and date from this BEO (Banquet Event Order). Include the full name with any revision number (e.g. "Gradtastic REV 2"). Return ONLY a JSON object:
+                  text: `Extract the event name and date from this BEO (Banquet Event Order). The date is usually shown prominently near the top of the document as the event date (not the "updated" or "printed" date). Include the full name with any revision number (e.g. "Gradtastic REV 2"). Return ONLY a JSON object:
 {"event_name":"Gradtastic REV 2","event_date":"2026-05-22"}
 
-event_date must be YYYY-MM-DD. Return nothing else.`,
+event_date must be YYYY-MM-DD format for the actual event date. Return nothing else.`,
                 },
               ],
             }],
@@ -94,9 +94,28 @@ event_date must be YYYY-MM-DD. Return nothing else.`,
       }
     }
 
-    // Fallback
+    // Fallback: try to extract date from filename before defaulting to today
+    // Handles patterns like: 05.22.26, 05-22-26, 05_22_26, 2026-05-22
     if (!event_name) event_name = filename.replace(/\.pdf$/i, "").replace(/[_-]/g, " ").trim();
-    if (!event_date) event_date = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    if (!event_date) {
+      // Try MM.DD.YY or MM-DD-YY or MM_DD_YY pattern
+      const shortMatch = filename.match(/(\d{2})[.\-_](\d{2})[.\-_](\d{2})/);
+      if (shortMatch) {
+        const [, mm, dd, yy] = shortMatch;
+        const year = parseInt(yy) < 50 ? `20${yy}` : `19${yy}`;
+        const candidate = `${year}-${mm}-${dd}`;
+        // Validate it's a real date
+        const d = new Date(candidate + "T12:00:00");
+        if (!isNaN(d.getTime())) event_date = candidate;
+      }
+      // Try YYYY-MM-DD pattern
+      if (!event_date) {
+        const longMatch = filename.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (longMatch) event_date = `${longMatch[1]}-${longMatch[2]}-${longMatch[3]}`;
+      }
+      // Last resort: today
+      if (!event_date) event_date = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    }
 
     // --- Duplicate / revision detection ---
     // Check for an existing event on the same date whose base name matches

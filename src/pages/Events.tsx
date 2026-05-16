@@ -47,6 +47,7 @@ export default function Events() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [queuedFiles, setQueuedFiles] = useState<File[]>([]);
+  const [fileDateOverrides, setFileDateOverrides] = useState<string[]>([]);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
 
@@ -66,12 +67,15 @@ export default function Events() {
     if (pdfs.length === 0) return;
     setQueuedFiles(prev => {
       const names = new Set(prev.map(f => f.name));
-      return [...prev, ...pdfs.filter(f => !names.has(f.name))];
+      const newOnes = pdfs.filter(f => !names.has(f.name));
+      setFileDateOverrides(prevD => [...prevD, ...newOnes.map(() => "")]);
+      return [...prev, ...newOnes];
     });
   }
 
   function removeQueued(idx: number) {
     setQueuedFiles(prev => prev.filter((_, i) => i !== idx));
+    setFileDateOverrides(prev => prev.filter((_, i) => i !== idx));
   }
 
   function onDrop(e: React.DragEvent) {
@@ -95,7 +99,12 @@ export default function Events() {
           r.onerror = () => rej(new Error("Read failed"));
           r.readAsDataURL(file);
         });
-        const result: any = await uploadBeo({ pdf_base64: base64, filename: file.name });
+        const override = fileDateOverrides[i];
+        const result: any = await uploadBeo({
+          pdf_base64: base64,
+          filename: file.name,
+          ...(override ? { event_date: override } : {}),
+        });
         if (!result?.ok) throw new Error(result?.error || "Upload failed");
         const data = result.data ?? result;
         const ev = data.event;
@@ -115,12 +124,14 @@ export default function Events() {
     setUploadingIndex(null);
     setUploadResults(results);
     setQueuedFiles([]);
+    setFileDateOverrides([]);
     await load();
   }
 
   function closeModal() {
     setShowUploadModal(false);
     setQueuedFiles([]);
+    setFileDateOverrides([]);
     setUploadResults([]);
     setUploadingIndex(null);
     setDragOver(false);
@@ -249,25 +260,38 @@ export default function Events() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {queuedFiles.map((f, i) => (
                       <div key={i} style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
                         padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.05)",
-                        gap: 8,
                       }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                          {isUploading && uploadingIndex === i ? (
-                            <span className="spinner" />
-                          ) : (
-                            <span style={{ fontSize: 14 }}>📄</span>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                            {isUploading && uploadingIndex === i ? (
+                              <span className="spinner" />
+                            ) : (
+                              <span style={{ fontSize: 14 }}>📄</span>
+                            )}
+                            <span style={{ fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {f.name}
+                            </span>
+                          </div>
+                          {!isUploading && (
+                            <button
+                              onClick={() => removeQueued(i)}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted2)", fontSize: 16, flexShrink: 0 }}
+                            >×</button>
                           )}
-                          <span style={{ fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {f.name}
-                          </span>
                         </div>
+                        {/* Optional date override */}
                         {!isUploading && (
-                          <button
-                            onClick={() => removeQueued(i)}
-                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted2)", fontSize: 16, flexShrink: 0 }}
-                          >×</button>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <label style={{ fontSize: 11, color: "var(--muted2)", whiteSpace: "nowrap" }}>Override date:</label>
+                            <input
+                              type="date"
+                              className="input"
+                              style={{ fontSize: 12, padding: "4px 8px", flex: 1 }}
+                              value={fileDateOverrides[i] || ""}
+                              onChange={e => setFileDateOverrides(prev => { const n = [...prev]; n[i] = e.target.value; return n; })}
+                            />
+                          </div>
                         )}
                       </div>
                     ))}
