@@ -51,16 +51,17 @@ export default function Events() {
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
 
-  async function load(offset = monthOffset) {
+  async function load(offset?: number) {
+    const off = offset !== undefined ? offset : monthOffset;
     setLoading(true);
     try {
-      const res: any = await listBeoEvents(monthStr(offset));
+      const res: any = await listBeoEvents(monthStr(off));
       if (res?.ok) setEvents((res.data ?? res).events || []);
     } catch {}
     setLoading(false);
   }
 
-  useEffect(() => { void load(); }, [monthOffset]);
+  useEffect(() => { void load(monthOffset); }, [monthOffset]);
 
   function addFiles(files: FileList | File[]) {
     const pdfs = Array.from(files).filter(f => f.type === "application/pdf" || f.name.endsWith(".pdf"));
@@ -125,7 +126,7 @@ export default function Events() {
     setUploadResults(results);
     setQueuedFiles([]);
     setFileDateOverrides([]);
-    await load();
+    await load(monthOffset);
   }
 
   function closeModal() {
@@ -142,7 +143,7 @@ export default function Events() {
     try {
       const res: any = await completeBeoAction(beo_id, action_type);
       if (!res?.ok) throw new Error(res?.error || "Failed");
-      await load();
+      await load(monthOffset);
     } catch (err: any) {
       alert(err?.message || "Failed");
     } finally {
@@ -168,7 +169,7 @@ export default function Events() {
         content_type: file.type || "image/jpeg",
       });
       if (!result?.ok) throw new Error(result?.error || "Photo upload failed");
-      await load();
+      await load(monthOffset);
     } catch (err: any) {
       alert(err?.message || "Photo upload failed");
     } finally {
