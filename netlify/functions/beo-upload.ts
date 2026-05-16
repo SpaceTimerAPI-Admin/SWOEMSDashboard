@@ -1,12 +1,33 @@
 /**
  * POST /api/beo-upload
  * Body: { pdf_base64, filename, event_name?, event_date? }
- * Uploads PDF to storage, extracts event name/date via Claude, saves to DB.
+ *
+ * Duplicate/revision detection:
+ * 1. Strip "REV X" / "REV2" / revision suffixes from the new event name to get the base name
+ * 2. Check if an event exists on the same date with a matching base name
+ * 3. If found → update that event's PDF (replace file, update name to new revision)
+ *    Preserves setup/strike actions and photos.
+ * 4. If not found → create new event
  */
 import type { Handler } from "@netlify/functions";
 import { requireSession } from "./_auth";
 import { supabaseAdmin } from "./_supabase";
 import { badRequest, json, unauthorized } from "./_shared";
+
+/** Strip revision suffixes to get the base event name for matching.
+ *  "Gradtastic REV 2" → "gradtastic"
+ *  "Gradtastic_REV_2" → "gradtastic"
+ *  "Spring Fling v3"  → "spring fling"
+ */
+function baseName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[\s_]+rev[\s_]*\d+/gi, "")   // " REV 2", "_REV_2"
+    .replace(/[\s_]+v\d+$/gi, "")           // " v3", "_v3" at end
+    .replace(/[\s_]+revision[\s_]*\d+/gi, "")
+    .replace(/[_\s]+/g, " ")
+    .trim();
+}
 
 export const handler: Handler = async (event) => {
   try {
@@ -17,7 +38,6 @@ export const handler: Handler = async (event) => {
     const body = event.body ? JSON.parse(event.body) : {};
     const pdf_base64 = String(body.pdf_base64 || "").trim();
     const filename = String(body.filename || "event.pdf").trim();
-    // Allow manual override, otherwise Claude will detect
     let event_name = String(body.event_name || "").trim();
     let event_date = String(body.event_date || "").trim();
 
@@ -48,10 +68,10 @@ export const handler: Handler = async (event) => {
                 },
                 {
                   type: "text",
-                  text: `Extract the event name and date from this BEO (Banquet Event Order). Return ONLY a JSON object like:
+                  text: `Extract the event name and date from this BEO (Banquet Event Order). Include the full name with any revision number (e.g. "Gradtastic REV 2"). Return ONLY a JSON object:
 {"event_name":"Gradtastic REV 2","event_date":"2026-05-22"}
 
-The event_date must be in YYYY-MM-DD format. The event_name should be exactly as shown in the document title. Return nothing else.`,
+event_date must be YYYY-MM-DD. Return nothing else.`,
                 },
               ],
             }],
@@ -74,11 +94,21 @@ The event_date must be in YYYY-MM-DD format. The event_name should be exactly as
       }
     }
 
-    // Fallback to filename if extraction failed
-    if (!event_name) event_name = filename.replace(/\.pdf$/i, "").replace(/_/g, " ");
+    // Fallback
+    if (!event_name) event_name = filename.replace(/\.pdf$/i, "").replace(/[_-]/g, " ").trim();
     if (!event_date) event_date = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
-    // Upload PDF to Supabase storage
+    // --- Duplicate / revision detection ---
+    // Check for an existing event on the same date whose base name matches
+    const { data: existingEvents } = await supabase
+      .from("beo_events")
+      .select("id, event_name, event_date, pdf_path")
+      .eq("event_date", event_date);
+
+    const newBase = baseName(event_name);
+    const existing = (existingEvents || []).find(ev => baseName(ev.event_name) === newBase);
+
+    // Upload the new PDF to storage
     const pdfBuffer = Buffer.from(pdf_base64, "base64");
     const storagePath = `${event_date}/${Date.now()}_${filename}`;
 
@@ -91,23 +121,63 @@ The event_date must be in YYYY-MM-DD format. The event_name should be exactly as
     const { data: urlData } = supabase.storage.from("beo-pdfs").getPublicUrl(storagePath);
     const pdf_url = urlData?.publicUrl || "";
 
-    // Save to DB
-    const { data: beoData, error: dbError } = await supabase
-      .from("beo_events")
-      .insert({
-        event_name,
-        event_date,
-        pdf_path: storagePath,
-        pdf_url,
-        uploaded_by: session.employee.id,
-      })
-      .select("id, event_name, event_date, pdf_url")
-      .single();
+    if (existing) {
+      // --- UPDATE existing event (revision / duplicate) ---
 
-    if (dbError) return json({ ok: false, error: dbError.message }, 500);
+      // Delete the old PDF from storage if it exists
+      if (existing.pdf_path) {
+        await supabase.storage.from("beo-pdfs").remove([existing.pdf_path]).catch(() => {});
+      }
 
-    return json({ ok: true, event: beoData });
+      // Update the DB row — new name (revision), new PDF, preserve everything else
+      const { data: updated, error: updateError } = await supabase
+        .from("beo_events")
+        .update({
+          event_name,          // Updated to new revision name
+          pdf_path: storagePath,
+          pdf_url,
+          uploaded_by: session.employee.id,
+          uploaded_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+        .select("id, event_name, event_date, pdf_url")
+        .single();
+
+      if (updateError) return json({ ok: false, error: updateError.message }, 500);
+
+      console.log(`[beo-upload] Updated existing event "${existing.event_name}" → "${event_name}"`);
+
+      return json({
+        ok: true,
+        event: updated,
+        action: "updated",
+        previous_name: existing.event_name,
+        message: `Updated from "${existing.event_name}" to "${event_name}"`,
+      });
+
+    } else {
+      // --- CREATE new event ---
+      const { data: beoData, error: dbError } = await supabase
+        .from("beo_events")
+        .insert({
+          event_name,
+          event_date,
+          pdf_path: storagePath,
+          pdf_url,
+          uploaded_by: session.employee.id,
+        })
+        .select("id, event_name, event_date, pdf_url")
+        .single();
+
+      if (dbError) return json({ ok: false, error: dbError.message }, 500);
+
+      console.log(`[beo-upload] Created new event "${event_name}" on ${event_date}`);
+
+      return json({ ok: true, event: beoData, action: "created" });
+    }
+
   } catch (e: any) {
+    console.error("[beo-upload] Error:", e?.message);
     return json({ ok: false, error: e?.message || "Server error" }, 500);
   }
 };

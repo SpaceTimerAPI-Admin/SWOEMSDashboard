@@ -73,8 +73,15 @@ export default function Events() {
       });
       const result: any = await uploadBeo({ pdf_base64: base64, filename: file.name });
       if (!result?.ok) throw new Error(result?.error || "Upload failed");
-      const ev = (result.data ?? result).event;
-      setUploadStatus({ ok: true, msg: `✓ "${ev.event_name}" added for ${fmtDate(ev.event_date)}` });
+      const data = result.data ?? result;
+      const ev = data.event;
+      const isRevision = data.action === "updated";
+      setUploadStatus({
+        ok: true,
+        msg: isRevision
+          ? `✓ Revised — "${data.previous_name}" updated to "${ev.event_name}" for ${fmtDate(ev.event_date)}`
+          : `✓ Added — "${ev.event_name}" on ${fmtDate(ev.event_date)}`,
+      });
       await load();
     } catch (err: any) {
       setUploadStatus({ ok: false, msg: err?.message || "Upload failed" });
