@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listTickets, listProjects, getTodaySchedule } from "../lib/api";
+import { listTickets, listProjects, getTodaySchedule, getTodayBeo } from "../lib/api";
 import { getProfile } from "../lib/auth";
 
 type TileProps = {
@@ -39,14 +39,18 @@ export default function Home() {
   const [scheduleEntries, setScheduleEntries] = useState<any[] | null>(null);
   const [scheduleDate, setScheduleDate] = useState<string>("");
 
+  // Today's BEO events
+  const [todayEvents, setTodayEvents] = useState<any[]>([]);
+
   useEffect(() => {
     if (!profile?.id) return;
     async function loadAll() {
       try {
-        const [tr, pr, sr] = await Promise.all([
+        const [tr, pr, sr, br] = await Promise.all([
           listTickets({ includeClosed: false }) as any,
           listProjects({ includeClosed: false }) as any,
           getTodaySchedule() as any,
+          getTodayBeo() as any,
         ]);
 
         // Assigned tickets/projects
@@ -68,6 +72,11 @@ export default function Home() {
         } else {
           setScheduleEntries([]);
         }
+
+        // Today's events
+        if (br?.ok) {
+          setTodayEvents((br.data ?? br).events || []);
+        }
       } catch {
         setScheduleEntries([]);
       }
@@ -87,6 +96,54 @@ export default function Home() {
         <div className="page-title">Dashboard</div>
         <div className="page-subtitle">SeaWorld Entertainment Maintenance</div>
       </div>
+
+      {/* Today's Events Alert */}
+      {todayEvents.length > 0 && (
+        <Link to="/events" style={{ textDecoration: "none", display: "block", marginBottom: 16 }}>
+          <div style={{
+            background: "linear-gradient(135deg, rgba(255,182,39,0.18) 0%, rgba(255,84,84,0.15) 100%)",
+            border: "1px solid rgba(255,182,39,0.35)",
+            borderRadius: 12, padding: "14px 16px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 18 }}>🎪</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#FFD07A", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Event{todayEvents.length > 1 ? "s" : ""} Today — Action Required
+              </span>
+            </div>
+            {todayEvents.map((ev: any) => {
+              const setup = ev.beo_actions?.find((a: any) => a.action_type === "setup");
+              const strike = ev.beo_actions?.find((a: any) => a.action_type === "strike");
+              return (
+                <div key={ev.id} style={{
+                  background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "8px 12px", marginBottom: 6,
+                }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
+                    {ev.event_name}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{
+                      fontSize: 11, padding: "1px 8px", borderRadius: 99, fontWeight: 600,
+                      background: setup ? "rgba(46,232,160,0.15)" : "rgba(255,182,39,0.2)",
+                      color: setup ? "#7EEFC4" : "#FFD07A",
+                    }}>
+                      {setup ? "✓ Setup done" : "⏳ Setup needed"}
+                    </span>
+                    <span style={{
+                      fontSize: 11, padding: "1px 8px", borderRadius: 99, fontWeight: 600,
+                      background: strike ? "rgba(46,232,160,0.15)" : "rgba(255,255,255,0.07)",
+                      color: strike ? "#7EEFC4" : "var(--muted2)",
+                    }}>
+                      {strike ? "✓ Strike done" : "Strike pending"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 11, color: "rgba(255,210,120,0.7)", marginTop: 2 }}>Tap to manage →</div>
+          </div>
+        </Link>
+      )}
 
       {/* Today's Shift — bottom */}
       <div className="card" style={{ padding: "14px 16px", marginTop: 16 }}>

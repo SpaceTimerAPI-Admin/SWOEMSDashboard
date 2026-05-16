@@ -330,3 +330,25 @@ export async function getWeekSchedule(week_start?: string): Promise<ApiResult<{
 }>> {
   return apiFetch("/api/schedule-week", { method: "POST", body: { week_start: week_start || "" } });
 }
+
+// -------------------- BEO Events --------------------
+
+export async function uploadBeo(payload: { pdf_base64: string; filename: string }): Promise<ApiResult<{ event: any }>> {
+  return apiFetch("/api/beo-upload", { method: "POST", body: payload });
+}
+
+export async function listBeoEvents(month?: string): Promise<ApiResult<{ events: any[] }>> {
+  return apiFetch("/api/beo-list", { method: "POST", body: { month: month || "" } });
+}
+
+export async function completeBeoAction(beo_id: string, action_type: "setup" | "strike"): Promise<ApiResult<{}>> {
+  return apiFetch("/api/beo-action", { method: "POST", body: { beo_id, action_type } });
+}
+
+export async function uploadBeoPhoto(payload: { beo_id: string; image_base64: string; content_type: string }): Promise<ApiResult<{ public_url: string }>> {
+  return apiFetch("/api/beo-photo-upload", { method: "POST", body: payload });
+}
+
+export async function getTodayBeo(): Promise<ApiResult<{ today: string; events: any[] }>> {
+  return apiFetch("/api/beo-today", { method: "POST", body: {} });
+}

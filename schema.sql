@@ -37,3 +37,44 @@ alter table public.schedule_entries enable row level security;
 
 -- Migration: add all_shifts column for second shift support
 alter table public.schedule_entries add column if not exists all_shifts text null;
+
+-- ============================================================
+-- NEW: BEO Events
+-- ============================================================
+create table if not exists public.beo_events (
+  id uuid primary key default gen_random_uuid(),
+  event_name text not null,
+  event_date date not null,
+  pdf_path text not null,         -- Supabase storage path
+  pdf_url text not null,          -- Public URL
+  uploaded_by uuid not null references public.employees(id),
+  uploaded_at timestamptz not null default now()
+);
+create index if not exists beo_events_date_idx on public.beo_events(event_date);
+alter table public.beo_events enable row level security;
+
+-- BEO setup/strike actions log
+create table if not exists public.beo_actions (
+  id uuid primary key default gen_random_uuid(),
+  beo_id uuid not null references public.beo_events(id) on delete cascade,
+  action_type text not null check (action_type in ('setup','strike')),
+  completed_by uuid not null references public.employees(id),
+  completed_at timestamptz not null default now(),
+  unique (beo_id, action_type)    -- one setup, one strike per event
+);
+alter table public.beo_actions enable row level security;
+
+-- BEO photos
+create table if not exists public.beo_photos (
+  id uuid primary key default gen_random_uuid(),
+  beo_id uuid not null references public.beo_events(id) on delete cascade,
+  storage_path text not null,
+  public_url text not null,
+  uploaded_by uuid not null references public.employees(id),
+  uploaded_at timestamptz not null default now()
+);
+alter table public.beo_photos enable row level security;
+
+-- Supabase storage bucket for BEO PDFs (run separately in Supabase dashboard)
+-- insert into storage.buckets (id, name, public) values ('beo-pdfs', 'beo-pdfs', true) on conflict do nothing;
+-- insert into storage.buckets (id, name, public) values ('beo-photos', 'beo-photos', true) on conflict do nothing;

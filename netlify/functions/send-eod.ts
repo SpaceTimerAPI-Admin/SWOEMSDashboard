@@ -100,8 +100,9 @@ function buildEmailHtml(opts: {
   employees: any[];
   siteBaseUrl: string;
   shiftLogEntries: any[];
+  beoEvents: any[];
 }): string {
-  const { day, generatedBy, generatedAt, handoffNotes, tickets, ticketComments, projects, projectComments, employees, siteBaseUrl, shiftLogEntries } = opts;
+  const { day, generatedBy, generatedAt, handoffNotes, tickets, ticketComments, projects, projectComments, employees, siteBaseUrl, shiftLogEntries, beoEvents } = opts;
 
   const dateDisplay = new Date(day + "T12:00:00").toLocaleDateString("en-US", { timeZone: TZ, weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
@@ -263,6 +264,28 @@ function buildEmailHtml(opts: {
         <!-- Body -->
         <tr><td style="background:#FFFFFF;border:1px solid #E8E8E8;border-top:0;border-radius:0 0 14px 14px;padding:24px 28px">
 
+          ${beoEvents.length > 0 ? `
+          <!-- BEO Events -->
+          <div style="margin-bottom:24px">
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:10px">🎪 Events Today (${beoEvents.length})</div>
+            ${beoEvents.map((ev: any) => {
+              const setup = ev.beo_actions?.find((a: any) => a.action_type === "setup");
+              const strike = ev.beo_actions?.find((a: any) => a.action_type === "strike");
+              return `<div style="padding:10px 14px;background:#FAFAFA;border:1px solid #E8E8E8;border-radius:8px;margin-bottom:8px">
+                <div style="font-size:14px;font-weight:700;color:#1A1A2E;margin-bottom:6px">${escapeHtml(ev.event_name)}</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <span style="font-size:12px;padding:2px 8px;border-radius:99px;font-weight:600;background:${setup ? "#F0FBF7" : "#FFF8E6"};color:${setup ? "#0D6644" : "#92600A"};border:1px solid ${setup ? "#34C48A" : "#F5C842"}">
+                    ${setup ? `✓ Setup — ${escapeHtml(setup.employees?.name || "")}` : "⏳ Setup not completed"}
+                  </span>
+                  <span style="font-size:12px;padding:2px 8px;border-radius:99px;font-weight:600;background:${strike ? "#F0FBF7" : "#F5F5F5"};color:${strike ? "#0D6644" : "#555"};border:1px solid ${strike ? "#34C48A" : "#DDD"}">
+                    ${strike ? `✓ Strike — ${escapeHtml(strike.employees?.name || "")}` : "Strike pending"}
+                  </span>
+                </div>
+              </div>`;
+            }).join("")}
+          </div>
+          ` : ""}
+
           ${shiftLogEntries.length > 0 ? `
           <!-- Shift Log -->
           <div style="margin-bottom:24px">
@@ -325,7 +348,7 @@ export const handler: Handler = async (event) => {
     const { start, end } = etDayRange(day);
 
     // Fetch tickets active today: created today OR closed today OR updated today
-    const [ticketsCreated, ticketsClosed, ticketsCommented, projectsCreated, projectsClosed, projectsCommented, employees, shiftLogRes] = await Promise.all([
+    const [ticketsCreated, ticketsClosed, ticketsCommented, projectsCreated, projectsClosed, projectsCommented, employees, shiftLogRes, beoRes] = await Promise.all([
       supabase.from("tickets").select("*").gte("created_at", start).lte("created_at", end),
       supabase.from("tickets").select("*").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
       supabase.from("ticket_comments").select("*").gte("created_at", start).lte("created_at", end),
@@ -337,6 +360,10 @@ export const handler: Handler = async (event) => {
         .select("id, note, created_at, employee_id, employees!shift_log_entries_employee_id_fkey(name)")
         .gte("created_at", start).lte("created_at", end)
         .order("created_at", { ascending: true }),
+      supabase.from("beo_events")
+        .select(`id, event_name, event_date, pdf_url,
+          beo_actions(action_type, completed_at, employees!beo_actions_completed_by_fkey(name))`)
+        .eq("event_date", day),
     ]);
 
     // Deduplicate tickets by id (union of created + closed + commented-on)
@@ -373,6 +400,7 @@ export const handler: Handler = async (event) => {
       ...e,
       employee_name: e.employees?.name || "Unknown",
     }));
+    const beoEvents = beoRes.data || [];
     const generatedAt = new Date().toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
     const siteBaseUrl = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
 
@@ -388,6 +416,7 @@ export const handler: Handler = async (event) => {
       employees: allEmployees,
       siteBaseUrl,
       shiftLogEntries,
+      beoEvents,
     });
 
     const subject = `EOD Report — ${day} — SeaWorld Maintenance`;
