@@ -78,3 +78,7 @@ alter table public.beo_photos enable row level security;
 -- Supabase storage bucket for BEO PDFs (run separately in Supabase dashboard)
 -- insert into storage.buckets (id, name, public) values ('beo-pdfs', 'beo-pdfs', true) on conflict do nothing;
 -- insert into storage.buckets (id, name, public) values ('beo-photos', 'beo-photos', true) on conflict do nothing;
+
+-- Migration: allow pdf_path and pdf_url to be nullable (cleared after 2-day auto-delete)
+alter table public.beo_events alter column pdf_path drop not null;
+alter table public.beo_events alter column pdf_url drop not null;

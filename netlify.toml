@@ -23,3 +23,7 @@
 # Scheduled: post previous day's EOD report to GroupMe at 3 AM Eastern (7 AM UTC)
 [functions."eod-scheduled"]
   schedule = "0 7 * * *"
+
+# Scheduled: delete BEO PDFs for events 2+ days old, runs at 4 AM Eastern (8 AM UTC)
+[functions."beo-cleanup"]
+  schedule = "0 8 * * *"

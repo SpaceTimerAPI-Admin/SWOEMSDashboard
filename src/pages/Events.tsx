@@ -270,15 +270,21 @@ export default function Events() {
                     {isExpanded && (
                       <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
                         {/* View PDF */}
-                        <a
-                          href={ev.pdf_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn"
-                          style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 14, fontSize: 13 }}
-                        >
-                          📄 View BEO PDF
-                        </a>
+                        {ev.pdf_url ? (
+                          <a
+                            href={ev.pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 14, fontSize: 13 }}
+                          >
+                            📄 View BEO PDF
+                          </a>
+                        ) : (
+                          <div style={{ fontSize: 13, color: "var(--muted2)", marginBottom: 14, fontStyle: "italic" }}>
+                            📄 PDF expired (auto-deleted after 2 days)
+                          </div>
+                        )}
 
                         {/* Action buttons */}
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
