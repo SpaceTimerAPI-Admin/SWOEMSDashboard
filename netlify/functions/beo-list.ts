@@ -11,16 +11,22 @@ export const handler: Handler = async (event) => {
     if (!session) return unauthorized();
 
     const body = event.body ? JSON.parse(event.body) : {};
-    const month = String(body.month || "").trim(); // "2026-05" optional filter
+    const month = String(body.month || "").trim();
+    const include_deleted = body.include_deleted === true;
 
     const supabase = supabaseAdmin();
     let q = supabase
       .from("beo_events")
-      .select(`id, event_name, event_date, pdf_url, uploaded_at,
+      .select(`id, event_name, event_date, pdf_url, uploaded_at, deleted_at, deleted_reason,
         beo_actions(id, action_type, completed_at, employees!beo_actions_completed_by_fkey(name)),
         beo_photos(id, public_url, uploaded_at)`)
-      .is("deleted_at", null)
-      .order("event_date", { ascending: true });
+      .order("event_date", { ascending: false });
+
+    if (include_deleted) {
+      q = q.not("deleted_at", "is", null);
+    } else {
+      q = q.is("deleted_at", null).order("event_date", { ascending: true });
+    }
 
     if (month) {
       const start = `${month}-01`;

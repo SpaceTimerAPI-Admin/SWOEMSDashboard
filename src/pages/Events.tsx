@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { listBeoEvents, uploadBeo, completeBeoAction, uploadBeoPhoto } from "../lib/api";
+import { listBeoEvents, listDeletedBeoEvents, uploadBeo, completeBeoAction, uploadBeoPhoto, restoreBeoEvent } from "../lib/api";
 
 const TZ = "America/New_York";
 
@@ -50,6 +50,12 @@ export default function Events() {
   const [fileDateOverrides, setFileDateOverrides] = useState<string[]>([]);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
+  // Deleted events panel
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedEvents, setDeletedEvents] = useState<any[]>([]);
+  const [deletedLoading, setDeletedLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   async function load(offset?: number) {
     const off = offset !== undefined ? offset : monthOffset;
@@ -138,6 +144,28 @@ export default function Events() {
     setDragOver(false);
   }
 
+  async function loadDeleted() {
+    setDeletedLoading(true);
+    try {
+      const res: any = await listDeletedBeoEvents();
+      if (res?.ok) setDeletedEvents((res.data ?? res).events || []);
+    } catch {}
+    setDeletedLoading(false);
+  }
+
+  async function handleRestore(beo_id: string) {
+    setRestoringId(beo_id);
+    try {
+      const res: any = await restoreBeoEvent(beo_id);
+      if (!res?.ok) throw new Error(res?.error || "Failed to restore");
+      await Promise.all([load(monthOffset), loadDeleted()]);
+    } catch (err: any) {
+      alert(err?.message || "Failed to restore");
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
   async function onAction(beo_id: string, action_type: "setup" | "strike") {
     setActionBusy(`${beo_id}-${action_type}`);
     try {
@@ -196,14 +224,72 @@ export default function Events() {
           <div className="page-title">Events</div>
           <div className="page-subtitle">BEO Calendar</div>
         </div>
-        <button
-          className="btn primary"
-          style={{ fontSize: 13, padding: "8px 14px" }}
-          onClick={() => { setShowUploadModal(true); setUploadResults([]); }}
-        >
-          📄 Upload BEO
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            onClick={() => { setShowDeleted(v => { if (!v) loadDeleted(); return !v; }); }}
+            style={{
+              padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)",
+              background: showDeleted ? "rgba(255,84,84,0.1)" : "rgba(255,255,255,0.05)",
+              color: showDeleted ? "#FFB0B0" : "var(--muted)",
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            🗑 Deleted
+          </button>
+          <button
+            className="btn primary"
+            style={{ fontSize: 13, padding: "8px 14px" }}
+            onClick={() => { setShowUploadModal(true); setUploadResults([]); }}
+          >
+            📄 Upload BEO
+          </button>
+        </div>
       </div>
+
+      {/* Deleted Events Panel */}
+      {showDeleted && (
+        <div className="card" style={{ padding: "14px 16px", marginBottom: 16, border: "1px solid rgba(255,84,84,0.25)" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#FFB0B0", marginBottom: 12 }}>
+            🗑 Deleted Events
+          </div>
+          {deletedLoading ? (
+            <div style={{ fontSize: 13, color: "var(--muted2)" }}>Loading…</div>
+          ) : deletedEvents.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--muted2)", fontStyle: "italic" }}>No deleted events.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {deletedEvents.map((ev: any) => (
+                <div key={ev.id} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  gap: 10, padding: "10px 12px", borderRadius: 8,
+                  background: "rgba(255,84,84,0.06)", border: "1px solid rgba(255,84,84,0.15)",
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>
+                      {ev.event_name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted2)" }}>
+                      {fmtDate(ev.event_date)}
+                      {ev.deleted_reason && <> · <span style={{ color: "#FFB0B0" }}>{ev.deleted_reason}</span></>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRestore(ev.id)}
+                    disabled={restoringId === ev.id}
+                    style={{
+                      padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(46,232,160,0.3)",
+                      background: "rgba(46,232,160,0.1)", color: "#7EEFC4",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+                    }}
+                  >
+                    {restoringId === ev.id ? <span className="spinner" /> : "↩ Restore"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Hidden inputs */}
       <input

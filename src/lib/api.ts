@@ -360,3 +360,11 @@ export async function getBeoEvent(beo_id: string): Promise<ApiResult<{ event: an
 export async function deleteBeoEvent(beo_id: string, reason: string): Promise<ApiResult<{}>> {
   return apiFetch("/api/beo-delete", { method: "POST", body: { beo_id, reason } });
 }
+
+export async function listDeletedBeoEvents(): Promise<ApiResult<{ events: any[] }>> {
+  return apiFetch("/api/beo-list", { method: "POST", body: { include_deleted: true } });
+}
+
+export async function restoreBeoEvent(beo_id: string): Promise<ApiResult<{}>> {
+  return apiFetch("/api/beo-restore", { method: "POST", body: { beo_id } });
+}
