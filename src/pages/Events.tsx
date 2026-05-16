@@ -347,7 +347,6 @@ export default function Events() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([date, dayEvents]) => (
             <div key={date}>
-              {/* Date header */}
               <div style={{
                 fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em",
                 color: isToday(date) ? "#B0B8FF" : "var(--muted2)",
@@ -360,137 +359,55 @@ export default function Events() {
                 {fmtDate(date)}
               </div>
 
-              {(dayEvents as any[]).map(ev => {
+              {(dayEvents as any[]).map((ev: any) => {
                 const setupAction = ev.beo_actions?.find((a: any) => a.action_type === "setup");
                 const strikeAction = ev.beo_actions?.find((a: any) => a.action_type === "strike");
-                const isExpanded = expandedId === ev.id;
                 const photos: any[] = ev.beo_photos || [];
-
                 return (
-                  <div key={ev.id} className="card" style={{
-                    padding: "14px 16px",
-                    borderLeft: isToday(date) ? "3px solid rgba(92,107,255,0.6)" : undefined,
-                    opacity: isPast(date) && !isToday(date) ? 0.75 : 1,
-                  }}>
-                    {/* Event header */}
+                  <Link
+                    key={ev.id}
+                    to={`/events/${ev.id}`}
+                    className="card"
+                    style={{
+                      display: "block", textDecoration: "none", padding: "14px 16px",
+                      borderLeft: isToday(date) ? "3px solid rgba(92,107,255,0.6)" : undefined,
+                      opacity: isPast(date) && !isToday(date) ? 0.8 : 1,
+                    }}
+                  >
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>
                           {ev.event_name}
                         </div>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {/* Setup badge */}
-                          {setupAction ? (
-                            <span style={{
-                              fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
-                              background: "rgba(46,232,160,0.12)", color: "#7EEFC4",
-                              border: "1px solid rgba(46,232,160,0.2)",
-                            }}>
-                              ✓ Setup — {setupAction.employees?.name} {fmtTime(setupAction.completed_at)}
-                            </span>
-                          ) : (
-                            <span style={{
-                              fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
-                              background: "rgba(255,182,39,0.1)", color: "#FFD07A",
-                              border: "1px solid rgba(255,182,39,0.2)",
-                            }}>⏳ Setup pending</span>
-                          )}
-                          {/* Strike badge */}
-                          {strikeAction ? (
-                            <span style={{
-                              fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
-                              background: "rgba(46,232,160,0.12)", color: "#7EEFC4",
-                              border: "1px solid rgba(46,232,160,0.2)",
-                            }}>
-                              ✓ Strike — {strikeAction.employees?.name} {fmtTime(strikeAction.completed_at)}
-                            </span>
-                          ) : (
+                          <span style={{
+                            fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
+                            background: setupAction ? "rgba(46,232,160,0.12)" : "rgba(255,182,39,0.1)",
+                            color: setupAction ? "#7EEFC4" : "#FFD07A",
+                            border: `1px solid ${setupAction ? "rgba(46,232,160,0.2)" : "rgba(255,182,39,0.2)"}`,
+                          }}>
+                            {setupAction ? `✓ Setup` : "⏳ Setup pending"}
+                          </span>
+                          <span style={{
+                            fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
+                            background: strikeAction ? "rgba(46,232,160,0.12)" : "rgba(255,255,255,0.06)",
+                            color: strikeAction ? "#7EEFC4" : "var(--muted2)",
+                            border: `1px solid ${strikeAction ? "rgba(46,232,160,0.2)" : "var(--border)"}`,
+                          }}>
+                            {strikeAction ? "✓ Strike" : "Strike pending"}
+                          </span>
+                          {photos.length > 0 && (
                             <span style={{
                               fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
                               background: "rgba(255,255,255,0.06)", color: "var(--muted2)",
                               border: "1px solid var(--border)",
-                            }}>Strike pending</span>
+                            }}>📷 {photos.length}</span>
                           )}
                         </div>
                       </div>
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : ev.id)}
-                        style={{
-                          background: "none", border: "none", cursor: "pointer",
-                          color: "var(--muted)", fontSize: 18, padding: "0 4px", lineHeight: 1,
-                        }}
-                      >{isExpanded ? "▲" : "▼"}</button>
+                      <span style={{ color: "var(--muted2)", fontSize: 16, flexShrink: 0 }}>›</span>
                     </div>
-
-                    {/* Expanded section */}
-                    {isExpanded && (
-                      <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
-                        {/* View PDF */}
-                        {ev.pdf_url ? (
-                          <a
-                            href={ev.pdf_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn"
-                            style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 14, fontSize: 13 }}
-                          >
-                            📄 View BEO PDF
-                          </a>
-                        ) : (
-                          <div style={{ fontSize: 13, color: "var(--muted2)", marginBottom: 14, fontStyle: "italic" }}>
-                            📄 PDF expired (auto-deleted after 2 days)
-                          </div>
-                        )}
-
-                        {/* Action buttons */}
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                          {!setupAction && (
-                            <button
-                              className="btn primary small"
-                              disabled={actionBusy === `${ev.id}-setup`}
-                              onClick={() => onAction(ev.id, "setup")}
-                            >
-                              {actionBusy === `${ev.id}-setup` ? <span className="spinner" /> : "✓ Mark Setup Complete"}
-                            </button>
-                          )}
-                          {!strikeAction && (
-                            <button
-                              className="btn small"
-                              style={{ background: "rgba(255,84,84,0.12)", color: "#FFB0B0", border: "1px solid rgba(255,84,84,0.25)" }}
-                              disabled={actionBusy === `${ev.id}-strike`}
-                              onClick={() => onAction(ev.id, "strike")}
-                            >
-                              {actionBusy === `${ev.id}-strike` ? <span className="spinner" /> : "✓ Mark Strike Complete"}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Photos */}
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 8 }}>
-                            Photos {photos.length > 0 ? `(${photos.length})` : ""}
-                          </div>
-                          {photos.length > 0 && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 10 }}>
-                              {photos.map((p: any, i: number) => (
-                                <a key={i} href={p.public_url} target="_blank" rel="noopener noreferrer">
-                                  <img src={p.public_url} alt="Event photo"
-                                    style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8 }} />
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                          <button
-                            className="btn small"
-                            disabled={photoBusy === ev.id}
-                            onClick={() => { setPhotoTargetId(ev.id); photoInputRef.current?.click(); }}
-                          >
-                            {photoBusy === ev.id ? <><span className="spinner" /> Uploading…</> : "📷 Add Photo"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  </Link>
                 );
               })}
             </div>

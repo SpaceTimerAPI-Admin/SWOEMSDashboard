@@ -352,3 +352,11 @@ export async function uploadBeoPhoto(payload: { beo_id: string; image_base64: st
 export async function getTodayBeo(): Promise<ApiResult<{ today: string; events: any[] }>> {
   return apiFetch("/api/beo-today", { method: "POST", body: {} });
 }
+
+export async function getBeoEvent(beo_id: string): Promise<ApiResult<{ event: any }>> {
+  return apiFetch("/api/beo-get", { method: "POST", body: { beo_id } });
+}
+
+export async function deleteBeoEvent(beo_id: string, reason: string): Promise<ApiResult<{}>> {
+  return apiFetch("/api/beo-delete", { method: "POST", body: { beo_id, reason } });
+}

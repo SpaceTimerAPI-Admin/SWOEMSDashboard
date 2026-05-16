@@ -82,3 +82,22 @@ alter table public.beo_photos enable row level security;
 -- Migration: allow pdf_path and pdf_url to be nullable (cleared after 2-day auto-delete)
 alter table public.beo_events alter column pdf_path drop not null;
 alter table public.beo_events alter column pdf_url drop not null;
+
+-- ============================================================
+-- NEW: BEO Activity Log
+-- ============================================================
+create table if not exists public.beo_log (
+  id uuid primary key default gen_random_uuid(),
+  beo_id uuid not null references public.beo_events(id) on delete cascade,
+  employee_id uuid not null references public.employees(id),
+  action text not null, -- 'uploaded','revised','setup','strike','deleted','photo_added'
+  note text null,       -- deletion reason, revision note, etc.
+  created_at timestamptz not null default now()
+);
+create index if not exists beo_log_beo_id_idx on public.beo_log(beo_id);
+create index if not exists beo_log_created_at_idx on public.beo_log(created_at);
+alter table public.beo_log enable row level security;
+
+-- Allow soft-deleted events to keep log entries (add deleted_at column)
+alter table public.beo_events add column if not exists deleted_at timestamptz null;
+alter table public.beo_events add column if not exists deleted_reason text null;

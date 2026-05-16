@@ -145,6 +145,14 @@ event_date must be YYYY-MM-DD. Return nothing else.`,
 
       if (updateError) return json({ ok: false, error: updateError.message }, 500);
 
+      // Log the revision
+      await supabase.from("beo_log").insert({
+        beo_id: existing.id,
+        employee_id: session.employee.id,
+        action: "revised",
+        note: `Updated from "${existing.event_name}" to "${event_name}"`,
+      });
+
       console.log(`[beo-upload] Updated existing event "${existing.event_name}" → "${event_name}"`);
 
       return json({
@@ -171,8 +179,15 @@ event_date must be YYYY-MM-DD. Return nothing else.`,
 
       if (dbError) return json({ ok: false, error: dbError.message }, 500);
 
-      console.log(`[beo-upload] Created new event "${event_name}" on ${event_date}`);
+      // Log the upload
+      await supabase.from("beo_log").insert({
+        beo_id: beoData.id,
+        employee_id: session.employee.id,
+        action: "uploaded",
+        note: `BEO uploaded: "${event_name}"`,
+      });
 
+      console.log(`[beo-upload] Created new event "${event_name}" on ${event_date}`);
       return json({ ok: true, event: beoData, action: "created" });
     }
 

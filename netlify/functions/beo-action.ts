@@ -32,6 +32,15 @@ export const handler: Handler = async (event) => {
       }, { onConflict: "beo_id,action_type" });
 
     if (error) return json({ ok: false, error: error.message }, 500);
+
+    // Log the action
+    await supabase.from("beo_log").insert({
+      beo_id,
+      employee_id: session.employee.id,
+      action: action_type,
+      note: `${action_type === "setup" ? "Setup" : "Strike"} marked complete by ${session.employee.name}`,
+    });
+
     return json({ ok: true, completed_by: session.employee.name, completed_at: new Date().toISOString() });
   } catch (e: any) {
     return json({ ok: false, error: e?.message || "Server error" }, 500);
