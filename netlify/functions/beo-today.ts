@@ -25,6 +25,7 @@ export const handler: Handler = async (event) => {
         beo_actions(id, action_type, completed_at, employees!beo_actions_completed_by_fkey(name)),
         beo_photos(id, public_url)`)
       .eq("event_date", today)
+      .is("deleted_at", null)
       .order("event_name");
 
     if (error) return json({ ok: false, error: error.message }, 500);

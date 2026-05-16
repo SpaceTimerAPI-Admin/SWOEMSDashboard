@@ -19,6 +19,7 @@ export const handler: Handler = async (event) => {
       .select(`id, event_name, event_date, pdf_url, uploaded_at,
         beo_actions(id, action_type, completed_at, employees!beo_actions_completed_by_fkey(name)),
         beo_photos(id, public_url, uploaded_at)`)
+      .is("deleted_at", null)
       .order("event_date", { ascending: true });
 
     if (month) {
