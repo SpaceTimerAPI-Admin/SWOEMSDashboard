@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { listBeoEvents, uploadBeo, completeBeoAction, uploadBeoPhoto } from "../lib/api";
 
 const TZ = "America/New_York";
@@ -26,26 +26,28 @@ function fmtTime(iso: string) {
   });
 }
 
-function isToday(dateStr: string) {
-  return dateStr === todayStr();
-}
+function isToday(dateStr: string) { return dateStr === todayStr(); }
+function isPast(dateStr: string) { return dateStr < todayStr(); }
 
-function isPast(dateStr: string) {
-  return dateStr < todayStr();
-}
+type UploadResult = { filename: string; ok: boolean; msg: string };
 
 export default function Events() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthOffset, setMonthOffset] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const dropInputRef = useRef<HTMLInputElement>(null);
   const [photoTargetId, setPhotoTargetId] = useState<string | null>(null);
+
+  // Upload modal state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [queuedFiles, setQueuedFiles] = useState<File[]>([]);
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
 
   async function load(offset = monthOffset) {
     setLoading(true);
@@ -58,36 +60,69 @@ export default function Events() {
 
   useEffect(() => { void load(); }, [monthOffset]);
 
-  async function onPdfFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setUploadStatus(null);
-    setUploading(true);
-    try {
-      const base64 = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res((r.result as string).split(",")[1]);
-        r.onerror = () => rej(new Error("Read failed"));
-        r.readAsDataURL(file);
-      });
-      const result: any = await uploadBeo({ pdf_base64: base64, filename: file.name });
-      if (!result?.ok) throw new Error(result?.error || "Upload failed");
-      const data = result.data ?? result;
-      const ev = data.event;
-      const isRevision = data.action === "updated";
-      setUploadStatus({
-        ok: true,
-        msg: isRevision
-          ? `✓ Revised — "${data.previous_name}" updated to "${ev.event_name}" for ${fmtDate(ev.event_date)}`
-          : `✓ Added — "${ev.event_name}" on ${fmtDate(ev.event_date)}`,
-      });
-      await load();
-    } catch (err: any) {
-      setUploadStatus({ ok: false, msg: err?.message || "Upload failed" });
-    } finally {
-      setUploading(false);
+  function addFiles(files: FileList | File[]) {
+    const pdfs = Array.from(files).filter(f => f.type === "application/pdf" || f.name.endsWith(".pdf"));
+    if (pdfs.length === 0) return;
+    setQueuedFiles(prev => {
+      const names = new Set(prev.map(f => f.name));
+      return [...prev, ...pdfs.filter(f => !names.has(f.name))];
+    });
+  }
+
+  function removeQueued(idx: number) {
+    setQueuedFiles(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    addFiles(e.dataTransfer.files);
+  }
+
+  async function processQueue() {
+    if (queuedFiles.length === 0) return;
+    setUploadResults([]);
+    const results: UploadResult[] = [];
+
+    for (let i = 0; i < queuedFiles.length; i++) {
+      const file = queuedFiles[i];
+      setUploadingIndex(i);
+      try {
+        const base64 = await new Promise<string>((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res((r.result as string).split(",")[1]);
+          r.onerror = () => rej(new Error("Read failed"));
+          r.readAsDataURL(file);
+        });
+        const result: any = await uploadBeo({ pdf_base64: base64, filename: file.name });
+        if (!result?.ok) throw new Error(result?.error || "Upload failed");
+        const data = result.data ?? result;
+        const ev = data.event;
+        const isRevision = data.action === "updated";
+        results.push({
+          filename: file.name,
+          ok: true,
+          msg: isRevision
+            ? `Revised — updated to "${ev.event_name}" for ${fmtDate(ev.event_date)}`
+            : `Added — "${ev.event_name}" on ${fmtDate(ev.event_date)}`,
+        });
+      } catch (err: any) {
+        results.push({ filename: file.name, ok: false, msg: err?.message || "Upload failed" });
+      }
     }
+
+    setUploadingIndex(null);
+    setUploadResults(results);
+    setQueuedFiles([]);
+    await load();
+  }
+
+  function closeModal() {
+    setShowUploadModal(false);
+    setQueuedFiles([]);
+    setUploadResults([]);
+    setUploadingIndex(null);
+    setDragOver(false);
   }
 
   async function onAction(beo_id: string, action_type: "setup" | "strike") {
@@ -130,11 +165,11 @@ export default function Events() {
     }
   }
 
+  const isUploading = uploadingIndex !== null;
   const currentMonth = new Date();
   currentMonth.setMonth(currentMonth.getMonth() + monthOffset);
   const monthLabel = currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-  // Group events by date
   const grouped = events.reduce((acc: Record<string, any[]>, ev) => {
     acc[ev.event_date] = acc[ev.event_date] || [];
     acc[ev.event_date].push(ev);
@@ -151,23 +186,137 @@ export default function Events() {
         <button
           className="btn primary"
           style={{ fontSize: 13, padding: "8px 14px" }}
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          onClick={() => { setShowUploadModal(true); setUploadResults([]); }}
         >
-          {uploading ? <><span className="spinner" /> Reading…</> : "📄 Upload BEO"}
+          📄 Upload BEO
         </button>
       </div>
 
-      <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: "none" }} onChange={onPdfFile} />
+      {/* Hidden inputs */}
+      <input
+        ref={dropInputRef}
+        type="file"
+        accept="application/pdf"
+        multiple
+        style={{ display: "none" }}
+        onChange={e => { addFiles(e.target.files || []); e.target.value = ""; }}
+      />
       <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onPhotoFile} />
 
-      {uploadStatus && (
-        <div style={{
-          marginBottom: 12, padding: "10px 13px", borderRadius: 10, fontSize: 13,
-          background: uploadStatus.ok ? "var(--success-bg)" : "var(--danger-bg)",
-          color: uploadStatus.ok ? "#7EEFC4" : "#FFB0B0",
-          border: `1px solid ${uploadStatus.ok ? "rgba(46,232,160,0.22)" : "rgba(255,84,84,0.25)"}`,
-        }}>{uploadStatus.msg}</div>
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="card modal-card" style={{ maxWidth: 480, width: "100%" }}>
+            <div className="modal-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h3 className="modal-title">Upload BEO PDFs</h3>
+              <button onClick={closeModal} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 20, lineHeight: 1 }}>×</button>
+            </div>
+            <div className="modal-body">
+
+              {/* Drag and drop zone */}
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={onDrop}
+                onClick={() => dropInputRef.current?.click()}
+                style={{
+                  border: `2px dashed ${dragOver ? "rgba(92,107,255,0.7)" : "rgba(255,255,255,0.15)"}`,
+                  borderRadius: 12,
+                  padding: "28px 20px",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  background: dragOver ? "rgba(92,107,255,0.08)" : "rgba(255,255,255,0.03)",
+                  transition: "all 0.15s",
+                  marginBottom: 14,
+                }}
+              >
+                <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
+                  Drag & drop PDFs here
+                </div>
+                <div style={{ fontSize: 12, color: "var(--muted2)" }}>
+                  or tap to browse — multiple files supported
+                </div>
+              </div>
+
+              {/* Queued files */}
+              {queuedFiles.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)", marginBottom: 8 }}>
+                    Ready to upload ({queuedFiles.length})
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {queuedFiles.map((f, i) => (
+                      <div key={i} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.05)",
+                        gap: 8,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          {isUploading && uploadingIndex === i ? (
+                            <span className="spinner" />
+                          ) : (
+                            <span style={{ fontSize: 14 }}>📄</span>
+                          )}
+                          <span style={{ fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {f.name}
+                          </span>
+                        </div>
+                        {!isUploading && (
+                          <button
+                            onClick={() => removeQueued(i)}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted2)", fontSize: 16, flexShrink: 0 }}
+                          >×</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Upload results */}
+              {uploadResults.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)", marginBottom: 8 }}>
+                    Results
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {uploadResults.map((r, i) => (
+                      <div key={i} style={{
+                        padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                        background: r.ok ? "var(--success-bg)" : "var(--danger-bg)",
+                        color: r.ok ? "#7EEFC4" : "#FFB0B0",
+                        border: `1px solid ${r.ok ? "rgba(46,232,160,0.22)" : "rgba(255,84,84,0.25)"}`,
+                      }}>
+                        <div style={{ fontWeight: 600, marginBottom: 2 }}>{r.ok ? "✓" : "✗"} {r.filename}</div>
+                        <div style={{ fontSize: 12, opacity: 0.85 }}>{r.msg}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button className="btn small" onClick={closeModal} disabled={isUploading}>
+                  {uploadResults.length > 0 ? "Close" : "Cancel"}
+                </button>
+                {queuedFiles.length > 0 && (
+                  <button
+                    className="btn primary small"
+                    onClick={processQueue}
+                    disabled={isUploading}
+                  >
+                    {isUploading
+                      ? <><span className="spinner" /> Uploading {uploadingIndex! + 1}/{queuedFiles.length}…</>
+                      : `Upload ${queuedFiles.length} PDF${queuedFiles.length > 1 ? "s" : ""}`
+                    }
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Month navigation */}
