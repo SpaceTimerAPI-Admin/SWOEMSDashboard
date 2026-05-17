@@ -69,7 +69,7 @@ export const handler: Handler = async (event) => {
       for (const t of (extra || [])) ticketMap.set(t.id, t);
     }
 
-    // Deduplicate today's projects
+    // Deduplicate today's projects (created + closed + commented-on today)
     const projectMap = new Map<string, any>();
     for (const p of [...(projectsCreated.data || []), ...(projectsClosed.data || [])]) projectMap.set(p.id, p);
     const commentedProjectIds = [...new Set((projectsCommented.data || []).map((c: any) => c.project_id))].filter(id => !projectMap.has(id));

@@ -335,10 +335,9 @@ export const handler: Handler = async (event) => {
         .order("created_at", { ascending: true }),
     ]);
 
-    // Deduplicate tickets (created + closed today)
+    // Deduplicate tickets (created + closed + commented-on today)
     const ticketMap = new Map<string, any>();
     for (const t of [...(ticketsRes.data || []), ...(ticketsClosedRes.data || [])]) ticketMap.set(t.id, t);
-    // Pull in tickets that only got a comment today
     const commentedTicketIds = [...new Set((ticketCommentsRes.data || []).map((c: any) => c.ticket_id))].filter(id => !ticketMap.has(id));
     if (commentedTicketIds.length) {
       const { data: extra } = await supabase.from("tickets").select("*").in("id", commentedTicketIds);

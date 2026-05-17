@@ -371,7 +371,6 @@ export const handler: Handler = async (event) => {
     for (const t of [...(ticketsCreated.data || []), ...(ticketsClosed.data || [])]) {
       ticketMap.set(t.id, t);
     }
-    // For tickets that only got a comment today, fetch them
     const commentedTicketIds = [...new Set((ticketsCommented.data || []).map((c: any) => c.ticket_id))].filter(id => !ticketMap.has(id));
     if (commentedTicketIds.length > 0) {
       const { data: extra } = await supabase.from("tickets").select("*").in("id", commentedTicketIds);

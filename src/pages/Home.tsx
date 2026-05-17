@@ -257,6 +257,9 @@ export default function Home() {
         <Tile to="/shift-log"    icon="📓" title="Shift Log"    desc="Log notes throughout your shift"    accent="rgba(168,144,255,0.15)" />
         <Tile to="/eod"          icon="📝" title="EOD Report"   desc="Generate & email today's recap"     accent="rgba(255,84,84,0.12)" />
         <DocsButton />
+        {getRole() === "admin" && (
+          <Tile to="/admin" icon="🛡️" title="Admin" desc="User management & settings" accent="rgba(255,182,39,0.15)" />
+        )}
         <Tile to="/settings"     icon="⚙️" title="Settings"    desc="Account & preferences"              accent="rgba(255,255,255,0.06)" />
       </div>
     </div>
