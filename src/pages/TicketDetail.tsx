@@ -202,12 +202,16 @@ export default function TicketDetail() {
           </div>
 
           {/* Assigned person in header */}
-          {(ticket.assigned_to || ticket.assigned_to_name) && (
+          {(ticket.assigned_to || ticket.assigned_to_name || ticket.assigned_to_show_tech) && (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 14,
               padding: "3px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600,
               background: "rgba(92,107,255,0.12)", color: "#B0B8FF",
               border: "1px solid rgba(92,107,255,0.25)" }}>
-              📌 {ticket.assigned_to === profile?.id ? "Assigned to you" : `Assigned to ${ticket.assigned_to_name || employees.find((e: any) => e.id === ticket.assigned_to)?.name || "someone"}`}
+              📌 {ticket.assigned_to_show_tech
+                ? "Assigned to Show Tech"
+                : ticket.assigned_to === profile?.id
+                  ? "Assigned to you"
+                  : `Assigned to ${ticket.assigned_to_name || employees.find((e: any) => e.id === ticket.assigned_to)?.name || "someone"}`}
             </div>
           )}
 
