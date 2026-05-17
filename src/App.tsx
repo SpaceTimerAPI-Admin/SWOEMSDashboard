@@ -6,6 +6,7 @@ import ResetPin from "./pages/ResetPin";
 import Home from "./pages/Home";
 import ShowTechHome from "./pages/ShowTechHome";
 import Admin from "./pages/Admin";
+import AdminSchedule from "./pages/AdminSchedule";
 import Tickets from "./pages/Tickets";
 import TicketNew from "./pages/TicketNew";
 import TicketDetail from "./pages/TicketDetail";
@@ -87,6 +88,7 @@ export default function App() {
         <Route path="/" element={<RequireAuth><HomeComponent /></RequireAuth>} />
 
         <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
+        <Route path="/admin/schedule" element={<RequireAdmin><AdminSchedule /></RequireAdmin>} />
 
         <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
         <Route path="/tickets/new" element={<RequireAuth><TicketNew /></RequireAuth>} />

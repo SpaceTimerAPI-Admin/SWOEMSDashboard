@@ -96,11 +96,6 @@ export default function ShowTechHome() {
           <div className="tile-title">Shift Log</div>
           <div className="tile-desc">Log notes from your shift</div>
         </Link>
-        <Link to="/settings" className="home-tile" style={{ background: "rgba(255,255,255,0.05)" }}>
-          <div className="tile-icon" style={{ background: "rgba(255,255,255,0.1)" }}>⚙️</div>
-          <div className="tile-title">Settings</div>
-          <div className="tile-desc">Your account</div>
-        </Link>
       </div>
     </div>
   );

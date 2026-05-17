@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { adminListUsers, adminCreateUser, adminUpdateUser } from "../lib/api";
 
 const ROLES = ["ems", "show_tech", "admin"] as const;
@@ -85,13 +86,19 @@ export default function Admin() {
           <div className="page-title">Admin</div>
           <div className="page-subtitle">User Management</div>
         </div>
-        <button
-          className="btn primary"
-          style={{ fontSize: 13 }}
-          onClick={() => { setShowCreateModal(true); setCreateError(null); setForm({ employee_id: "", name: "", email: "", pin: "", role: "ems" }); }}
-        >
-          + Create Account
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link to="/admin/schedule"
+            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+            📅 Schedule
+          </Link>
+          <button
+            className="btn primary"
+            style={{ fontSize: 13 }}
+            onClick={() => { setShowCreateModal(true); setCreateError(null); setForm({ employee_id: "", name: "", email: "", pin: "", role: "ems" }); }}
+          >
+            + Create Account
+          </button>
+        </div>
       </div>
 
       {statusMsg && (

@@ -260,7 +260,6 @@ export default function Home() {
         {getRole() === "admin" && (
           <Tile to="/admin" icon="🛡️" title="Admin" desc="User management & settings" accent="rgba(255,182,39,0.15)" />
         )}
-        <Tile to="/settings"     icon="⚙️" title="Settings"    desc="Account & preferences"              accent="rgba(255,255,255,0.06)" />
       </div>
     </div>
   );
