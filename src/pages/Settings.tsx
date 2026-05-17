@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { logout, getProfile, setProfile } from "../lib/auth";
+import { logout, getProfile, setProfile, getRole } from "../lib/auth";
 import { updateEmail, uploadSchedule } from "../lib/api";
 
 export default function Settings() {
@@ -119,8 +119,8 @@ export default function Settings() {
         </div>
       )}
 
-      {/* EOD Email */}
-      <div className="card" style={{ padding: "14px 16px", marginBottom: 10 }}>
+      {/* EOD Email — EMS and Admin only */}
+      {getRole() !== "show_tech" && <div className="card" style={{ padding: "14px 16px", marginBottom: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 10 }}>
           EOD Report Email
         </div>
@@ -158,10 +158,10 @@ export default function Settings() {
             {emailSaving ? <><span className="spinner" /> Saving…</> : "Save email"}
           </button>
         </form>
-      </div>
+      </div>}
 
-      {/* Team Schedule */}
-      <div className="card" style={{ padding: "14px 16px", marginBottom: 10 }}>
+      {/* Team Schedule — EMS and Admin only */}
+      {getRole() !== "show_tech" && <div className="card" style={{ padding: "14px 16px", marginBottom: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 10 }}>
           Team Schedule
         </div>
@@ -200,7 +200,7 @@ export default function Settings() {
             {scheduleStatus.msg}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Sign out */}
       <div className="card" style={{ padding: "14px 16px" }}>
