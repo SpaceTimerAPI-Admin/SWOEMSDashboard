@@ -101,3 +101,17 @@ alter table public.beo_log enable row level security;
 -- Allow soft-deleted events to keep log entries (add deleted_at column)
 alter table public.beo_events add column if not exists deleted_at timestamptz null;
 alter table public.beo_events add column if not exists deleted_reason text null;
+
+-- ============================================================
+-- NEW: Roles & permissions
+-- ============================================================
+alter table public.employees add column if not exists role text not null default 'ems'
+  check (role in ('admin','ems','show_tech'));
+alter table public.employees add column if not exists last_login_at timestamptz null;
+
+-- Update login function to record last_login_at (done in login.ts)
+-- Migrate existing users: all current employees default to 'ems' role
+
+-- Migration: assigned_to_show_tech flag for group assignment
+alter table public.tickets add column if not exists assigned_to_show_tech boolean not null default false;
+alter table public.projects add column if not exists assigned_to_show_tech boolean not null default false;

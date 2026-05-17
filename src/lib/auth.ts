@@ -84,7 +84,11 @@ export async function logout(): Promise<void> {
   window.location.href = "/login";
 }
 
-export type EmployeeProfile = { id: string; employee_id: string; name: string; email: string };
+export type EmployeeProfile = { id: string; employee_id: string; name: string; email: string; role: "admin" | "ems" | "show_tech" };
+
+export function getRole(): "admin" | "ems" | "show_tech" {
+  return getProfile()?.role || "ems";
+}
 
 export function getProfile(): EmployeeProfile | null {
   try {

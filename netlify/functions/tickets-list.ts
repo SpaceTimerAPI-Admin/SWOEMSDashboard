@@ -27,13 +27,15 @@ export const handler: Handler = async (event) => {
       }
     }
 
+    const role = (session.employee as any).role || "ems";
+
     let q = supabase
       .from("tickets")
       .select(`
         id, title, location, details, status, tag, created_at, sla_due_at, sla_minutes,
-        created_by, assigned_to,
-        employees!tickets_created_by_fkey(name),
-        assignee:employees!tickets_assigned_to_fkey(name)
+        created_by, assigned_to, assigned_to_show_tech,
+        employees!tickets_created_by_fkey(name, role),
+        assignee:employees!tickets_assigned_to_fkey(name, role)
       `)
       .order("sla_due_at", { ascending: true });
 
@@ -43,17 +45,22 @@ export const handler: Handler = async (event) => {
     if (error) return json({ ok: false, error: error.message }, 500);
 
     const now = Date.now();
-    const items = (data || []).map((t: any) => {
-      const due = new Date(t.sla_due_at).getTime();
-      const msLeft = due - now;
-      return {
-        ...t,
-        created_by_name: t.employees?.name || "Unknown",
-        assigned_to_name: (t as any).assignee?.name || null,
-        ms_left: msLeft,
-        is_overdue: msLeft < 0,
-      };
-    });
+    let items = (data || []).map((t: any) => ({
+      ...t,
+      created_by_name: t.employees?.name || "Unknown",
+      created_by_role: t.employees?.role || "ems",
+      assigned_to_name: (t as any).assignee?.name || null,
+      assigned_to_role: (t as any).assignee?.role || null,
+      ms_left: new Date(t.sla_due_at).getTime() - now,
+      is_overdue: new Date(t.sla_due_at).getTime() - now < 0,
+    }));
+
+    // Show Tech: only see tickets created by show_tech users OR assigned to show_tech group
+    if (role === "show_tech") {
+      items = items.filter((t: any) =>
+        t.created_by_role === "show_tech" || t.assigned_to_show_tech === true
+      );
+    }
 
     // overdue first, then due soonest
     items.sort((a: any, b: any) => {

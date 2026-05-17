@@ -5,31 +5,20 @@ import { json, unauthorized } from "./_shared";
 
 export const handler: Handler = async (event) => {
   try {
-    if (event.httpMethod !== "GET" && event.httpMethod !== "POST")
+    if (event.httpMethod !== "POST" && event.httpMethod !== "GET")
       return json({ ok: false, error: "Method not allowed" }, 405);
     const session = await requireSession(event);
     if (!session) return unauthorized();
+    if ((session.employee as any).role !== "admin") return json({ ok: false, error: "Forbidden" }, 403);
 
     const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from("employees")
-      .select("id, name, employee_id, role")
-      .eq("is_active", true)
-      .order("name");
+      .select("id, employee_id, name, email, role, is_active, last_login_at, created_at")
+      .order("name", { ascending: true });
 
     if (error) return json({ ok: false, error: error.message }, 500);
-
-    // Build assignment options: "Show Tech" group first, then EMS individuals
-    const ems = (data || []).filter((e: any) => e.role === "ems" || e.role === "admin");
-
-    return json({
-      ok: true,
-      employees: data || [],
-      assignment_options: [
-        { id: "show_tech", name: "Show Tech", role: "show_tech" },
-        ...ems,
-      ],
-    });
+    return json({ ok: true, employees: data || [] });
   } catch (e: any) {
     return json({ ok: false, error: e?.message || "Server error" }, 500);
   }

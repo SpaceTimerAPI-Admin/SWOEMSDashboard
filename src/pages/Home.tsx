@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listTickets, listProjects, getTodaySchedule, getTodayBeo } from "../lib/api";
-import { getProfile } from "../lib/auth";
+import { listTickets, listProjects, getTodaySchedule, getTodayBeo, getDocsUrl } from "../lib/api";
+import { getProfile, getRole } from "../lib/auth";
 
 type TileProps = {
   to: string;
@@ -29,6 +29,27 @@ function parseDate(v: any): number {
 function isClosed(t: any): boolean {
   const s = (t?.status || "").toLowerCase();
   return s === "closed" || s === "done" || !!t?.closed_at;
+}
+
+function DocsButton() {
+  const [busy, setBusy] = useState(false);
+  async function open() {
+    setBusy(true);
+    try {
+      const res: any = await getDocsUrl();
+      const url = res?.ok ? (res?.data?.url || res?.url) : null;
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+      else alert("Documents link not configured yet.");
+    } catch { alert("Could not load documents link."); }
+    finally { setBusy(false); }
+  }
+  return (
+    <button onClick={open} disabled={busy} className="home-tile" style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", width: "100%" }}>
+      <div className="tile-icon" style={{ background: "rgba(56,189,248,0.15)" }}>{busy ? <span className="spinner" style={{ width: 18, height: 18 }} /> : "📁"}</div>
+      <div className="tile-title">Documents</div>
+      <div className="tile-desc">Team files & resources</div>
+    </button>
+  );
 }
 
 export default function Home() {
@@ -235,6 +256,7 @@ export default function Home() {
         <Tile to="/events"       icon="🎪" title="Events"       desc="BEO calendar & setup tracking"      accent="rgba(255,84,84,0.13)" />
         <Tile to="/shift-log"    icon="📓" title="Shift Log"    desc="Log notes throughout your shift"    accent="rgba(168,144,255,0.15)" />
         <Tile to="/eod"          icon="📝" title="EOD Report"   desc="Generate & email today's recap"     accent="rgba(255,84,84,0.12)" />
+        <DocsButton />
         <Tile to="/settings"     icon="⚙️" title="Settings"    desc="Account & preferences"              accent="rgba(255,255,255,0.06)" />
       </div>
     </div>

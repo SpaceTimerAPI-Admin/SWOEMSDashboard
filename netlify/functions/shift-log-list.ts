@@ -33,23 +33,32 @@ export const handler: Handler = async (event) => {
     const day = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
     const { start, end } = etDayRange(day);
 
+    const role = (session.employee as any).role || "ems";
+
     const supabase = supabaseAdmin();
-    const { data, error } = await supabase
+    let q = supabase
       .from("shift_log_entries")
-      .select("id, note, created_at, employee_id, employees!shift_log_entries_employee_id_fkey(name)")
+      .select("id, note, created_at, employee_id, employees!shift_log_entries_employee_id_fkey(name, role)")
       .gte("created_at", start)
       .lte("created_at", end)
       .order("created_at", { ascending: false });
 
+    const { data, error } = await q;
     if (error) return json({ ok: false, error: error.message }, 500);
 
-    const entries = (data || []).map((e: any) => ({
+    let entries = (data || []).map((e: any) => ({
       id: e.id,
       note: e.note,
       created_at: e.created_at,
       employee_id: e.employee_id,
       employee_name: e.employees?.name || "Unknown",
+      employee_role: e.employees?.role || "ems",
     }));
+
+    // Show Tech: only see entries from show_tech users
+    if (role === "show_tech") {
+      entries = entries.filter((e: any) => e.employee_role === "show_tech");
+    }
 
     return json({ ok: true, entries });
   } catch (e: any) {

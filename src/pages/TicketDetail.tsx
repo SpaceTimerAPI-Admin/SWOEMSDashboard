@@ -245,14 +245,18 @@ export default function TicketDetail() {
               <select
                 className="input"
                 style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
-                value={ticket.assigned_to || ""}
+                value={ticket.assigned_to_show_tech ? "show_tech" : (ticket.assigned_to || "")}
                 disabled={assigning}
                 onChange={e => handleAssign(e.target.value || null)}
               >
                 <option value="">Unassigned</option>
-                {employees.map((emp: any) => (
-                  <option key={emp.id} value={emp.id}>{emp.name}</option>
-                ))}
+                <option value="show_tech">── Show Tech ──</option>
+                {employees
+                  .filter((e: any) => e.role === "ems" || e.role === "admin" || !e.role)
+                  .map((emp: any) => (
+                    <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))
+                }
               </select>
             </div>
           </div>

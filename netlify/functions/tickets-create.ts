@@ -17,6 +17,10 @@ export const handler: Handler = async (event) => {
     const details = String(body.details || "").trim();
     const tag = String(body.tag || "").trim();
     const sla_minutes = body.sla_minutes ? Number(body.sla_minutes) : 60;
+    // assigned_to: null | uuid (specific EMS) | "show_tech" (group)
+    const assigned_to_raw = body.assigned_to || null;
+    const assign_to_show_tech = assigned_to_raw === "show_tech";
+    const assigned_to = assign_to_show_tech ? null : (assigned_to_raw || null);
 
     if (!title) return badRequest("Title required");
     if (!location) return badRequest("Location required");
@@ -32,15 +36,13 @@ export const handler: Handler = async (event) => {
     const { data, error } = await supabase
       .from("tickets")
       .insert({
-        title,
-        location,
-        details,
+        title, location, details,
         tag: tag || null,
         status: "open",
         created_by: session.employee.id,
-        created_at,
-        sla_minutes,
-        sla_due_at,
+        created_at, sla_minutes, sla_due_at,
+        assigned_to,
+        assigned_to_show_tech: assign_to_show_tech,
       })
       .select("id, title, location, tag, created_at, sla_due_at")
       .single();

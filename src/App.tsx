@@ -4,6 +4,8 @@ import Login from "./pages/Login";
 import Enroll from "./pages/Enroll";
 import ResetPin from "./pages/ResetPin";
 import Home from "./pages/Home";
+import ShowTechHome from "./pages/ShowTechHome";
+import Admin from "./pages/Admin";
 import Tickets from "./pages/Tickets";
 import TicketNew from "./pages/TicketNew";
 import TicketDetail from "./pages/TicketDetail";
@@ -16,9 +18,10 @@ import EventDetail from "./pages/EventDetail";
 import EOD from "./pages/EOD";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
-import { isAuthed, clearToken, clearProfile } from "./lib/auth";
+import ShowTechNav from "./components/ShowTechNav";
+import { isAuthed, clearToken, clearProfile, getRole } from "./lib/auth";
 
-// Global 401 interceptor — monkey-patch fetch once at startup
+// Global 401 interceptor
 let _interceptorInstalled = false;
 function installAuthInterceptor(onUnauthed: () => void) {
   if (_interceptorInstalled) return;
@@ -26,34 +29,53 @@ function installAuthInterceptor(onUnauthed: () => void) {
   const orig = window.fetch.bind(window);
   window.fetch = async (...args) => {
     const res = await orig(...args);
-    if (res.status === 401) {
-      // Clone so the caller can still read the body if they want, but redirect
-      onUnauthed();
-    }
+    if (res.status === 401) onUnauthed();
     return res;
   };
 }
 
+const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin"];
+const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings"];
+
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const loc = useLocation();
   const navigate = useNavigate();
+  const role = getRole();
 
   useEffect(() => {
     installAuthInterceptor(() => {
-      clearToken();
-      clearProfile();
-      const currentPath = window.location.pathname + window.location.search;
-      navigate("/login", { replace: true, state: { from: currentPath } });
+      clearToken(); clearProfile();
+      navigate("/login", { replace: true, state: { from: window.location.pathname } });
     });
   }, [navigate]);
 
   if (!isAuthed()) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
+
+  // Show Tech: block EMS-only routes
+  if (role === "show_tech") {
+    const allowed = ST_ALLOWED.some(p => loc.pathname === p || loc.pathname.startsWith("/tickets/"));
+    if (!allowed) return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  if (!isAuthed()) return <Navigate to="/login" replace />;
+  if (getRole() !== "admin") return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
 export default function App() {
   const loc = useLocation();
-  const showNav = !["/login", "/enroll", "/reset-pin"].includes(loc.pathname);
+  const role = getRole();
+  const isPublic = PUBLIC_PATHS.includes(loc.pathname);
+  const isShowTech = isAuthed() && role === "show_tech";
+
+  // Home component based on role
+  const HomeComponent = isAuthed()
+    ? (role === "show_tech" ? ShowTechHome : Home)
+    : Home;
 
   return (
     <>
@@ -62,7 +84,9 @@ export default function App() {
         <Route path="/enroll" element={<Enroll />} />
         <Route path="/reset-pin" element={<ResetPin />} />
 
-        <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
+        <Route path="/" element={<RequireAuth><HomeComponent /></RequireAuth>} />
+
+        <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
 
         <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
         <Route path="/tickets/new" element={<RequireAuth><TicketNew /></RequireAuth>} />
@@ -82,7 +106,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {showNav ? <BottomNav /> : null}
+      {!isPublic && (isShowTech ? <ShowTechNav /> : <BottomNav />)}
     </>
   );
 }
