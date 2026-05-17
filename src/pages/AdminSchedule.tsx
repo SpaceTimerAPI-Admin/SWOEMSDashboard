@@ -152,8 +152,8 @@ export default function AdminSchedule() {
           action: "upsert",
           work_date: date,
           employee_name: name,
-          shift_start: times ? times[1] : null,
-          shift_end: times ? times[2] : null,
+          shift_start: times ? times[1] : undefined,
+          shift_end: times ? times[2] : undefined,
         });
         saved++;
       } catch { failed++; }
