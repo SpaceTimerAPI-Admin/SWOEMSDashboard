@@ -11,7 +11,7 @@ import {
   listEmployees,
   reopenTicket,
 } from "../lib/api";
-import { getProfile } from "../lib/auth";
+import { getProfile, getRole } from "../lib/auth";
 
 type Ticket = any;
 
@@ -238,30 +238,34 @@ export default function TicketDetail() {
               <div>
                 <div className="detail-label">Assigned To</div>
                 <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
-                  {ticket.assigned_to
-                    ? employees.find((e: any) => e.id === ticket.assigned_to)?.name || "Someone"
-                    : <span className="muted">Unassigned</span>}
+                  {ticket.assigned_to_show_tech
+                    ? "Show Tech"
+                    : ticket.assigned_to
+                      ? employees.find((e: any) => e.id === ticket.assigned_to)?.name || "Someone"
+                      : <span className="muted">Unassigned</span>}
                   {ticket.assigned_to === profile?.id && (
                     <span style={{ marginLeft: 6, fontSize: 11, background: "rgba(92,107,255,0.15)", color: "#B0B8FF", padding: "1px 7px", borderRadius: 99, fontWeight: 600 }}>You</span>
                   )}
                 </div>
               </div>
-              <select
-                className="input"
-                style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
-                value={ticket.assigned_to_show_tech ? "show_tech" : (ticket.assigned_to || "")}
-                disabled={assigning}
-                onChange={e => handleAssign(e.target.value || null)}
-              >
-                <option value="">Unassigned</option>
-                <option value="show_tech">── Show Tech ──</option>
-                {employees
-                  .filter((e: any) => e.role === "ems" || e.role === "admin" || !e.role)
-                  .map((emp: any) => (
-                    <option key={emp.id} value={emp.id}>{emp.name}</option>
-                  ))
-                }
-              </select>
+              {getRole() !== "show_tech" && (
+                <select
+                  className="input"
+                  style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
+                  value={ticket.assigned_to_show_tech ? "show_tech" : (ticket.assigned_to || "")}
+                  disabled={assigning}
+                  onChange={e => handleAssign(e.target.value || null)}
+                >
+                  <option value="">Unassigned</option>
+                  <option value="show_tech">── Show Tech ──</option>
+                  {employees
+                    .filter((e: any) => e.role === "ems" || e.role === "admin" || !e.role)
+                    .map((emp: any) => (
+                      <option key={emp.id} value={emp.id}>{emp.name}</option>
+                    ))
+                  }
+                </select>
+              )}
             </div>
           </div>
 
