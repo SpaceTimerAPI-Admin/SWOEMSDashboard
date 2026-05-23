@@ -160,8 +160,8 @@ export default function Settings() {
         </form>
       </div>}
 
-      {/* Team Schedule — EMS and Admin only */}
-      {getRole() !== "show_tech" && <div className="card" style={{ padding: "14px 16px", marginBottom: 10 }}>
+      {/* Team Schedule — EMS only (admins use Admin → Schedule Editor) */}
+      {getRole() === "ems" && <div className="card" style={{ padding: "14px 16px", marginBottom: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 10 }}>
           Team Schedule
         </div>

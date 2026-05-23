@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { getWeekSchedule, scheduleUpdateEntry } from "../lib/api";
+import { getWeekSchedule, scheduleUpdateEntry, uploadSchedule } from "../lib/api";
 
 const TZ = "America/New_York";
 
@@ -56,7 +56,11 @@ export default function AdminSchedule() {
 
   // Bulk add modal
   const [bulkModal, setBulkModal] = useState(false);
+  const [bulkTab, setBulkTab] = useState<"manual" | "ai">("manual");
   const [bulkText, setBulkText] = useState("");
+  const [aiUploading, setAiUploading] = useState(false);
+  const [aiStatus, setAiStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -137,7 +141,39 @@ export default function AdminSchedule() {
     setAddForm({ employee_name: "", shift_start: "", shift_end: "" });
   }
 
-  // Bulk add: each line = "Name, HH:MM AM - HH:MM PM, YYYY-MM-DD"
+  async function handleAiUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAiStatus(null);
+    setAiUploading(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res((r.result as string).split(",")[1]);
+        r.onerror = () => rej(new Error("Read failed"));
+        r.readAsDataURL(file);
+      });
+      const result: any = await uploadSchedule({
+        image_base64: base64,
+        content_type: file.type || "image/jpeg",
+      });
+      if (!result?.ok) throw new Error(result?.error || "Failed to read schedule");
+      const data = result.data ?? result;
+      const dates: string[] = data.dates || [];
+      const friendly = dates.map((d: string) =>
+        new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+      );
+      setAiStatus({ ok: true, msg: `✓ Imported ${data.count} shifts across ${dates.length} day${dates.length !== 1 ? "s" : ""}: ${friendly.join(", ")}` });
+      await load(weekStart);
+    } catch (err: any) {
+      setAiStatus({ ok: false, msg: err?.message || "Upload failed" });
+    } finally {
+      setAiUploading(false);
+    }
+  }
+
+  // Bulk manual save
   async function handleBulkSave() {
     const lines = bulkText.split("\n").map(l => l.trim()).filter(Boolean);
     let saved = 0, failed = 0;
@@ -165,7 +201,7 @@ export default function AdminSchedule() {
   }
 
   return (
-    <div className="page fade-up" style={{ paddingBottom: 40 }}>
+    <div className="page fade-up" style={{ paddingBottom: 120 }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
         <Link to="/admin" style={{ color: "var(--muted)", fontSize: 13, textDecoration: "none" }}>← Admin</Link>
@@ -176,7 +212,7 @@ export default function AdminSchedule() {
           <div className="page-subtitle">{fmtWeekRange(weekStart)}</div>
         </div>
         <button
-          onClick={() => { setBulkModal(true); setBulkText(""); }}
+          onClick={() => { setBulkModal(true); setBulkText(""); setBulkTab("manual"); setAiStatus(null); }}
           style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
         >
           Bulk Add
@@ -334,24 +370,75 @@ export default function AdminSchedule() {
               <button onClick={() => setBulkModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 20 }}>×</button>
             </div>
             <div className="modal-body">
-              <div style={{ fontSize: 12, color: "var(--muted2)", marginBottom: 10, lineHeight: 1.6 }}>
-                One entry per line:<br />
-                <code style={{ background: "rgba(255,255,255,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 11 }}>Name, Start - End, YYYY-MM-DD</code><br />
-                Example: <code style={{ background: "rgba(255,255,255,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 11 }}>Andy O., 6:00 AM - 2:30 PM, 2026-05-19</code>
+
+              {/* Tabs */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 16, background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 4 }}>
+                {(["manual", "ai"] as const).map(tab => (
+                  <button key={tab} onClick={() => { setBulkTab(tab); setAiStatus(null); }}
+                    style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                      background: bulkTab === tab ? "rgba(92,107,255,0.2)" : "transparent",
+                      color: bulkTab === tab ? "#B0B8FF" : "var(--muted)" }}>
+                    {tab === "manual" ? "✏️ Manual Entry" : "🤖 AI Upload"}
+                  </button>
+                ))}
               </div>
-              <textarea
-                className="textarea"
-                style={{ minHeight: 160, fontFamily: "monospace", fontSize: 12 }}
-                value={bulkText}
-                onChange={e => setBulkText(e.target.value)}
-                placeholder={"Andy O., 6:00 AM - 2:30 PM, 2026-05-19\nAdam C., 1:30 PM - 10:00 PM, 2026-05-19"}
-              />
-              <div className="btn-row" style={{ marginTop: 12 }}>
-                <button className="btn small" onClick={() => setBulkModal(false)}>Cancel</button>
-                <button className="btn primary small" onClick={handleBulkSave} disabled={saving || !bulkText.trim()}>
-                  {saving ? <span className="spinner" /> : "Save All"}
-                </button>
-              </div>
+
+              {bulkTab === "manual" ? (
+                <>
+                  <div style={{ fontSize: 12, color: "var(--muted2)", marginBottom: 10, lineHeight: 1.6 }}>
+                    One entry per line:<br />
+                    <code style={{ background: "rgba(255,255,255,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 11 }}>Name, Start - End, YYYY-MM-DD</code><br />
+                    Example: <code style={{ background: "rgba(255,255,255,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: 11 }}>Andy O., 6:00 AM - 2:30 PM, 2026-05-19</code>
+                  </div>
+                  <textarea
+                    className="textarea"
+                    style={{ minHeight: 160, fontFamily: "monospace", fontSize: 12 }}
+                    value={bulkText}
+                    onChange={e => setBulkText(e.target.value)}
+                    placeholder={"Andy O., 6:00 AM - 2:30 PM, 2026-05-19\nAdam C., 1:30 PM - 10:00 PM, 2026-05-19"}
+                  />
+                  <div className="btn-row" style={{ marginTop: 12 }}>
+                    <button className="btn small" onClick={() => setBulkModal(false)}>Cancel</button>
+                    <button className="btn primary small" onClick={handleBulkSave} disabled={saving || !bulkText.trim()}>
+                      {saving ? <span className="spinner" /> : "Save All"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <input ref={fileInputRef} type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={handleAiUpload} />
+                  <div style={{ textAlign: "center", padding: "24px 16px" }}>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>📸</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Upload Schedule Photo or PDF</div>
+                    <div style={{ fontSize: 13, color: "var(--muted2)", marginBottom: 20, lineHeight: 1.5 }}>
+                      AI will automatically read the names, dates, and shift times from the image and add them to the schedule.
+                    </div>
+                    <button
+                      className="btn primary"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={aiUploading}
+                      style={{ marginBottom: aiStatus ? 14 : 0 }}
+                    >
+                      {aiUploading ? <><span className="spinner" /> Reading schedule…</> : "Choose Photo or PDF"}
+                    </button>
+                    {aiStatus && (
+                      <div style={{
+                        marginTop: 14, padding: "10px 13px", borderRadius: 10, fontSize: 13, lineHeight: 1.5, textAlign: "left",
+                        background: aiStatus.ok ? "var(--success-bg)" : "var(--danger-bg)",
+                        color: aiStatus.ok ? "#7EEFC4" : "#FFB0B0",
+                        border: `1px solid ${aiStatus.ok ? "rgba(46,232,160,0.22)" : "rgba(255,84,84,0.25)"}`,
+                      }}>
+                        {aiStatus.msg}
+                      </div>
+                    )}
+                  </div>
+                  <div className="btn-row" style={{ marginTop: 4 }}>
+                    <button className="btn small" onClick={() => setBulkModal(false)}>
+                      {aiStatus?.ok ? "Done" : "Cancel"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
