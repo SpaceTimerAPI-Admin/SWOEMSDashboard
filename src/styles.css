@@ -406,10 +406,13 @@ input[type="date"].input {
   padding: 20px 16px;
   z-index: 2000;
   backdrop-filter: blur(4px);
+  overflow-y: auto;
 }
 
 .modal-card {
   width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   max-width: 520px;
   border-radius: var(--radius-xl);
 }

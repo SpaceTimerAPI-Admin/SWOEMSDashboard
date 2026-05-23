@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { sendEod, getEodToday } from "../lib/api";
 
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
@@ -220,7 +221,7 @@ export default function EOD() {
 
                 <div className="cards">
                   {group.tickets.map((t: any) => (
-                    <div key={t.id} className="card" style={{ padding: "12px 14px" }}>
+                    <Link key={t.id} to={`/tickets/${t.id}`} className="card" style={{ padding: "12px 14px", display: "block", textDecoration: "none" }}>
                       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
@@ -237,10 +238,10 @@ export default function EOD() {
                           {isClosed(t) ? "Closed" : "Open"}
                         </span>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                   {group.projects.map((p: any) => (
-                    <div key={p.id} className="card" style={{ padding: "12px 14px" }}>
+                    <Link key={p.id} to={`/projects/${p.id}`} className="card" style={{ padding: "12px 14px", display: "block", textDecoration: "none" }}>
                       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
@@ -257,7 +258,7 @@ export default function EOD() {
                           {isClosed(p) ? "Closed" : "Open"}
                         </span>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>
