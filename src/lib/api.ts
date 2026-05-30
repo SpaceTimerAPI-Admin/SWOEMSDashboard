@@ -250,3 +250,96 @@ export async function notifyEvent(payload: { type: string; message: string }): P
 export async function assignProject(id: string, assigned_to: string | null): Promise<ApiResult<{}>> {
   return apiFetch("/api/projects-assign", { method: "POST", body: { id, assigned_to } });
 }
+
+// -------------------- Auth helpers --------------------
+export async function updateEmail(email: string): Promise<ApiResult<{}>> {
+  return apiFetch("/api/update-email", { method: "POST", body: { email } });
+}
+
+// -------------------- Tickets extended --------------------
+export async function assignTicket(id: string, assigned_to: string | null): Promise<ApiResult<{}>> {
+  return apiFetch("/api/tickets-assign", { method: "POST", body: { id, assigned_to } });
+}
+export async function reopenTicket(id: string): Promise<ApiResult<{}>> {
+  return apiFetch("/api/tickets-reopen", { method: "POST", body: { id } });
+}
+
+// -------------------- Projects extended --------------------
+export async function reopenProject(id: string): Promise<ApiResult<{}>> {
+  return apiFetch("/api/projects-reopen", { method: "POST", body: { id } });
+}
+
+// -------------------- Employees --------------------
+export async function listEmployees(): Promise<ApiResult<{ employees: any[]; assignment_options?: any[] }>> {
+  return apiFetch("/api/employees-list", { method: "POST", body: {} });
+}
+
+// -------------------- Shift Log --------------------
+export async function addShiftLogEntry(note: string): Promise<ApiResult<{}>> {
+  return apiFetch("/api/shift-log-add", { method: "POST", body: { note } });
+}
+export async function listShiftLogEntries(): Promise<ApiResult<{ entries: any[] }>> {
+  return apiFetch("/api/shift-log-list", { method: "POST", body: {} });
+}
+
+// -------------------- EOD --------------------
+export async function getEodToday(): Promise<ApiResult<{ day: string; tickets: any[]; projects: any[]; shift_log_entries?: any[] }>> {
+  return apiFetch("/api/eod-today", { method: "POST", body: {} });
+}
+
+// -------------------- Schedule --------------------
+export async function uploadSchedule(payload: { image_base64: string; content_type: string }): Promise<ApiResult<{ count: number; dates: string[]; entries: any[] }>> {
+  return apiFetch("/api/schedule-upload", { method: "POST", body: payload });
+}
+export async function getTodaySchedule(): Promise<ApiResult<{ date: string; entries: any[] }>> {
+  return apiFetch("/api/schedule-today", { method: "POST", body: {} });
+}
+export async function getWeekSchedule(week_start?: string): Promise<ApiResult<{ week_start: string; week_end: string; entries: any[] }>> {
+  return apiFetch("/api/schedule-week", { method: "POST", body: { week_start: week_start || "" } });
+}
+export async function scheduleUpdateEntry(payload: { action: "upsert" | "delete"; work_date: string; employee_name: string; shift_start?: string; shift_end?: string }): Promise<ApiResult<{}>> {
+  return apiFetch("/api/schedule-update", { method: "POST", body: payload });
+}
+
+// -------------------- BEO Events --------------------
+export async function uploadBeo(payload: { pdf_base64: string; filename: string; event_date?: string }): Promise<ApiResult<{ event: any }>> {
+  return apiFetch("/api/beo-upload", { method: "POST", body: payload });
+}
+export async function listBeoEvents(month?: string): Promise<ApiResult<{ events: any[] }>> {
+  return apiFetch("/api/beo-list", { method: "POST", body: { month: month || "" } });
+}
+export async function listDeletedBeoEvents(): Promise<ApiResult<{ events: any[] }>> {
+  return apiFetch("/api/beo-list", { method: "POST", body: { include_deleted: true } });
+}
+export async function getBeoEvent(beo_id: string): Promise<ApiResult<{ event: any }>> {
+  return apiFetch("/api/beo-get", { method: "POST", body: { beo_id } });
+}
+export async function completeBeoAction(beo_id: string, action_type: "setup" | "strike"): Promise<ApiResult<{}>> {
+  return apiFetch("/api/beo-action", { method: "POST", body: { beo_id, action_type } });
+}
+export async function uploadBeoPhoto(payload: { beo_id: string; image_base64: string; content_type: string }): Promise<ApiResult<{ public_url: string }>> {
+  return apiFetch("/api/beo-photo-upload", { method: "POST", body: payload });
+}
+export async function deleteBeoEvent(beo_id: string, reason: string): Promise<ApiResult<{}>> {
+  return apiFetch("/api/beo-delete", { method: "POST", body: { beo_id, reason } });
+}
+export async function restoreBeoEvent(beo_id: string): Promise<ApiResult<{}>> {
+  return apiFetch("/api/beo-restore", { method: "POST", body: { beo_id } });
+}
+export async function getTodayBeo(): Promise<ApiResult<{ today: string; events: any[] }>> {
+  return apiFetch("/api/beo-today", { method: "POST", body: {} });
+}
+
+// -------------------- Admin --------------------
+export async function adminListUsers(): Promise<ApiResult<{ employees: any[] }>> {
+  return apiFetch("/api/admin-users-list", { method: "POST", body: {} });
+}
+export async function adminCreateUser(payload: { employee_id: string; name: string; email: string; pin: string; role: string }): Promise<ApiResult<{ employee: any }>> {
+  return apiFetch("/api/admin-user-create", { method: "POST", body: payload });
+}
+export async function adminUpdateUser(payload: { id: string; name?: string; email?: string; role?: string; is_active?: boolean; pin?: string }): Promise<ApiResult<{ employee: any }>> {
+  return apiFetch("/api/admin-user-update", { method: "POST", body: payload });
+}
+export async function getDocsUrl(): Promise<ApiResult<{ url: string }>> {
+  return apiFetch("/api/docs-url", { method: "POST", body: {} });
+}
