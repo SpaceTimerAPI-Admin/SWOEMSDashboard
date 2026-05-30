@@ -88,8 +88,8 @@ export default function ShowTechHome() {
         </Link>
         <Link to="/tickets" className="home-tile" style={{ background: "rgba(46,232,160,0.08)" }}>
           <div className="tile-icon" style={{ background: "rgba(46,232,160,0.15)" }}>📋</div>
-          <div className="tile-title">Tickets</div>
-          <div className="tile-desc">View all show tech tickets</div>
+          <div className="tile-title">Work Orders</div>
+          <div className="tile-desc">View all show tech work orders</div>
         </Link>
         <Link to="/shift-log" className="home-tile" style={{ background: "rgba(168,144,255,0.1)" }}>
           <div className="tile-icon" style={{ background: "rgba(168,144,255,0.2)" }}>📓</div>

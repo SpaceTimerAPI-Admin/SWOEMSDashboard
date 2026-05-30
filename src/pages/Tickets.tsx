@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { listTickets } from "../lib/api";
-import { getProfile } from "../lib/auth";
+import { listTickets, listProjects } from "../lib/api";
+import { getProfile, getRole } from "../lib/auth";
 
 type Ticket = any;
 
@@ -34,19 +34,26 @@ function dueInfo(t: Ticket) {
 
 export default function Tickets() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myOnly, setMyOnly] = useState(false);
   const profile = getProfile();
+  const role = getRole();
+  const isShowTech = role === "show_tech";
 
   async function load() {
     setLoading(true); setError(null);
     try {
-      const res: any = await listTickets({ includeClosed: true });
-      if (!res?.ok) throw new Error(res?.error || "Failed to load");
-      setTickets(res?.tickets || res?.data?.tickets || []);
+      const [tr, pr] = await Promise.all([
+        listTickets({ includeClosed: true }) as any,
+        isShowTech ? listProjects({ includeClosed: true }) as any : Promise.resolve(null),
+      ]);
+      if (!tr?.ok) throw new Error(tr?.error || "Failed to load");
+      setTickets(tr?.tickets || tr?.data?.tickets || []);
+      if (pr?.ok) setProjects(pr?.projects || pr?.data?.projects || []);
     } catch (e: any) {
-      setError(e?.message || "Failed to load tickets");
+      setError(e?.message || "Failed to load");
     } finally { setLoading(false); }
   }
 
@@ -115,43 +122,70 @@ export default function Tickets() {
     <div className="page">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
         <div>
-          <h1 className="page-title">Tickets</h1>
-          <div className="page-subtitle">Track urgent issues with SLA status.</div>
+          <h1 className="page-title">{isShowTech ? "Work Orders" : "Tickets"}</h1>
+          <div className="page-subtitle">{isShowTech ? "Your assigned tickets and projects." : "Track urgent issues with SLA status."}</div>
         </div>
       </div>
 
-      {/* My Tickets toggle */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, marginBottom: 4 }}>
-        <button
-          onClick={() => setMyOnly(false)}
-          style={{
-            padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
-            border: "1px solid", transition: "all 0.15s",
-            borderColor: !myOnly ? "rgba(92,107,255,0.4)" : "var(--border)",
-            background: !myOnly ? "rgba(92,107,255,0.14)" : "rgba(255,255,255,0.05)",
-            color: !myOnly ? "#B0B8FF" : "var(--muted)",
-          }}
-        >All Tickets</button>
-        <button
-          onClick={() => setMyOnly(true)}
-          style={{
-            padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
-            border: "1px solid", transition: "all 0.15s",
-            borderColor: myOnly ? "rgba(92,107,255,0.4)" : "var(--border)",
-            background: myOnly ? "rgba(92,107,255,0.14)" : "rgba(255,255,255,0.05)",
-            color: myOnly ? "#B0B8FF" : "var(--muted)",
-          }}
-        >
-          My Tickets {myCount > 0 ? <span style={{ marginLeft: 4, background: "rgba(92,107,255,0.3)", borderRadius: 99, padding: "0 6px", fontSize: 11 }}>{myCount}</span> : null}
-        </button>
-      </div>
+      {/* My Tickets toggle — hide for show_tech since they only see their items */}
+      {!isShowTech && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, marginBottom: 4 }}>
+          <button
+            onClick={() => setMyOnly(false)}
+            style={{
+              padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              border: "1px solid", transition: "all 0.15s",
+              borderColor: !myOnly ? "rgba(92,107,255,0.4)" : "var(--border)",
+              background: !myOnly ? "rgba(92,107,255,0.14)" : "rgba(255,255,255,0.05)",
+              color: !myOnly ? "#B0B8FF" : "var(--muted)",
+            }}
+          >All Tickets</button>
+          <button
+            onClick={() => setMyOnly(true)}
+            style={{
+              padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              border: "1px solid", transition: "all 0.15s",
+              borderColor: myOnly ? "rgba(92,107,255,0.4)" : "var(--border)",
+              background: myOnly ? "rgba(92,107,255,0.14)" : "rgba(255,255,255,0.05)",
+              color: myOnly ? "#B0B8FF" : "var(--muted)",
+            }}
+          >
+            My Tickets {myCount > 0 ? <span style={{ marginLeft: 4, background: "rgba(92,107,255,0.3)", borderRadius: 99, padding: "0 6px", fontSize: 11 }}>{myCount}</span> : null}
+          </button>
+        </div>
+      )}
 
       {loading && <div className="muted" style={{ marginTop: 12 }}>Loading…</div>}
       {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
 
       {!loading && !error && (
         <>
-          <div className="section-head">
+          {/* Projects section — show_tech only */}
+          {isShowTech && projects.length > 0 && (
+            <>
+              <div className="section-head">
+                <h2 className="section-title">Projects</h2>
+                <span className="count-pill">{projects.filter(p => !isClosed(p)).length} open</span>
+              </div>
+              <div className="cards">
+                {projects.filter(p => !isClosed(p)).map((p: any) => (
+                  <Link key={p.id} className="item-card" to={`/projects/${p.id}`}>
+                    <div className="item-top">
+                      <div className="item-title">{p.title || "Untitled"}</div>
+                      {p.tag ? <span className="chip neutral">{p.tag}</span> : null}
+                    </div>
+                    <div className="item-sub">
+                      {p.location && <span>{p.location}</span>}
+                      {p.created_at && <><span className="dot">•</span><span>{fmtDateTime(p.created_at)}</span></>}
+                      {p.created_by_name && <><span className="dot">•</span><span>by {p.created_by_name}</span></>}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="section-head" style={{ marginTop: isShowTech && projects.length > 0 ? 18 : 0 }}>
             <h2 className="section-title">Open</h2>
             <span className="count-pill">{openAll.length} active</span>
           </div>
