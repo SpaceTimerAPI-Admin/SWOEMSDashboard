@@ -2,6 +2,7 @@ import type { Handler } from "@netlify/functions";
 import { requireSession } from "./_auth";
 import { supabaseAdmin } from "./_supabase";
 import { badRequest, json, unauthorized } from "./_shared";
+import { postGroupMe } from "./_groupme";
 
 export const handler: Handler = async (event) => {
   try {
@@ -41,6 +42,13 @@ export const handler: Handler = async (event) => {
         status_change: "closed",
       });
     }
+
+    try {
+      const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
+      const link = base ? `${base}/tickets/${id}` : "";
+      const title = t?.title ? `${t.title}${t.location ? ` @ ${t.location}` : ""}` : `Ticket ${id}`;
+      await postGroupMe(`✅ Closed: ${title} — by ${session.employee.name}${link ? ` — ${link}` : ""}`);
+    } catch {}
 
     return json({ ok: true });
   } catch (e: any) {

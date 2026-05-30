@@ -33,7 +33,6 @@ export const handler: Handler = async (event) => {
         title,
         location,
         details,
-        tag: tag || null,
         status: "open",
         created_by: session.employee.id,
         created_at,
@@ -41,7 +40,7 @@ export const handler: Handler = async (event) => {
         sla_due_at,
         source_ticket_id: null,
       })
-      .select("id, title, location, tag, created_at, sla_due_at")
+      .select("id, title, location, created_at, sla_due_at")
       .single();
 
     if (error) return json({ ok: false, error: error.message }, 500);
@@ -49,15 +48,8 @@ export const handler: Handler = async (event) => {
     try {
       const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
       const link = base ? `${base}/projects/${data.id}` : "";
-      const tagLabel = tag ? ` [${tag}]` : "";
-      const lines = [
-        `📐 New Project${tagLabel}`,
-        `📌 ${title}`,
-        `📍 ${location}`,
-        `👤 Created by ${session.employee.name}`,
-        ...(link ? [`🔗 ${link}`] : []),
-      ];
-      await postGroupMe(lines.join("\n"));
+      const msg = `📁 Project: ${title} @ ${location} — created by ${session.employee.name} — SLA ${sla_days}d${link ? ` — ${link}` : ""}`;
+      await postGroupMe(msg);
     } catch {}
 
     return json({ ok: true, project: data });

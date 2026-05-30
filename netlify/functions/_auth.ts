@@ -29,7 +29,7 @@ export async function requireSession(event: any) {
   // fetch employee profile
   const { data: emp } = await supabase
     .from("employees")
-    .select("id, employee_id, name, email, is_active, role")
+    .select("id, employee_id, name, email, is_active")
     .eq("id", data.employee_id)
     .limit(1)
     .maybeSingle();

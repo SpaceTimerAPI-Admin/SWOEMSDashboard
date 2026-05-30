@@ -46,7 +46,7 @@ export const handler: Handler = async (event) => {
 
     const { data: emp, error: empErr } = await supabase
       .from("employees")
-      .select("id, employee_id, name, email, pin_hash, is_active, role")
+      .select("id, employee_id, name, email, pin_hash, is_active")
       .eq("employee_id", employee_id)
       .limit(1)
       .maybeSingle();
@@ -87,14 +87,11 @@ export const handler: Handler = async (event) => {
 
     if (sErr) return json({ ok: false, error: "Could not create session" }, 500);
 
-    // Record last login time
-    await supabase.from("employees").update({ last_login_at: new Date().toISOString() }).eq("id", emp.id);
-
     return json({
       ok: true,
       token,
       expires_at: expiresAt,
-      employee: { id: emp.id, employee_id: emp.employee_id, name: emp.name, email: emp.email, role: emp.role || "ems" },
+      employee: { id: emp.id, employee_id: emp.employee_id, name: emp.name, email: emp.email },
     });
   } catch (e: any) {
     return json({ ok: false, error: e?.message || "Server error" }, 500);

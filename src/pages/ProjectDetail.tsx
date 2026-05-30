@@ -8,9 +8,8 @@ import {
   getProject,
   getProjectPhotoUploadUrl,
   listEmployees,
-  reopenProject,
 } from "../lib/api";
-import { getProfile } from "../lib/auth";
+import { getProfile, getRole } from "../lib/auth";
 
 type Project = any;
 
@@ -34,15 +33,13 @@ export default function ProjectDetail() {
   const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  // Assignment
   const [employees, setEmployees] = useState<any[]>([]);
   const [assigning, setAssigning] = useState(false);
   const profile = getProfile();
 
   useEffect(() => {
     listEmployees().then((res: any) => {
-      if (res?.ok) setEmployees(res.data?.employees || []);
+      if (res?.ok) setEmployees((res.data ?? res).employees || []);
     });
   }, []);
 
@@ -55,17 +52,6 @@ export default function ProjectDetail() {
     } catch (e: any) {
       alert(e?.message || "Failed to assign");
     } finally { setAssigning(false); }
-  }
-
-  async function handleReopen() {
-    setBusy(true);
-    try {
-      const res: any = await reopenProject(projectId);
-      if (!res?.ok) throw new Error(res?.error || "Failed to reopen");
-      await load();
-    } catch (e: any) {
-      alert(e?.message || "Failed to reopen");
-    } finally { setBusy(false); }
   }
 
   async function load() {
@@ -203,126 +189,104 @@ export default function ProjectDetail() {
     }
   }
 
-  const isClosed = project?.status === "closed" || project?.status === "done";
-
   return (
-    <div className="page fade-up">
-      <Link to="/projects" className="back-link">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        Projects
-      </Link>
+    <div className="page">
+      <div className="row between detail-actions">
+        <Link className="btn" to="/projects">← Back</Link>
+        <button className="btn" onClick={handleClose} disabled={busy}>Close project</button>
+      </div>
 
-      {loading && <div className="muted">Loading…</div>}
-      {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
+      {loading && <div>Loading…</div>}
+      {error && <div className="error">{error}</div>}
 
       {!loading && project && (
         <>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-0.025em", flex: 1 }}>{project.title}</h1>
-            <span className={`chip ${isClosed ? "neutral" : "success"}`} style={{ marginTop: 4 }}>
-              <span className={`status-dot ${isClosed ? "closed" : "open"}`} />
-              {isClosed ? "Closed" : "Open"}
-            </span>
+          <div className="row between" style={{ marginTop: 12, alignItems: "center" }}>
+            <h1 style={{ margin: 0 }}>{project.title}</h1>
+            <div className={"pill sm " + (project.status === "open" ? "primary" : "neutral")}>
+              {project.status === "open" ? "OPEN" : "CLOSED"}
+            </div>
           </div>
-
-          <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>
+          <div className="muted" style={{ marginTop: 10 }}>
             {project.location}
-            {project.tag ? <><span className="dot">•</span><span>{project.tag}</span></> : null}
-            {project.created_by_name ? <><span className="dot">•</span><span>by {project.created_by_name}</span></> : null}
+            {project.tag ? <span className="dot">•</span> : null}
+            {project.tag ? <span>{project.tag}</span> : null}
           </div>
 
-          {/* Assigned person in header */}
-          {(project.assigned_to || project.assigned_to_name) && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 14,
-              padding: "3px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600,
-              background: "rgba(92,107,255,0.12)", color: "#B0B8FF",
-              border: "1px solid rgba(92,107,255,0.25)" }}>
-              📌 {project.assigned_to === profile?.id ? "Assigned to you" : `Assigned to ${project.assigned_to_name || employees.find((e: any) => e.id === project.assigned_to)?.name || "someone"}`}
+          {project.details ? (
+            <div className="card" style={{ marginTop: 12 }}>
+              <h2>Details</h2>
+              <div className="prewrap">{project.details}</div>
             </div>
-          )}
+          ) : null}
 
-          {!isClosed && (
-            <div className="btn-row" style={{ marginBottom: 16 }}>
-              <button className="btn small danger" onClick={handleClose} disabled={busy}>Close project</button>
-            </div>
-          )}
-
-          {isClosed && (
-            <div className="btn-row" style={{ marginBottom: 16 }}>
-              <button className="btn small" onClick={handleReopen} disabled={busy}>
-                {busy ? <span className="spinner" /> : "↩ Reopen project"}
-              </button>
-            </div>
-          )}
-
-          {/* Assign */}
-          <div className="card" style={{ padding: "12px 15px", marginBottom: 10 }}>
+          {/* Assignment card */}
+          <div className="card" style={{ padding: "12px 15px", marginTop: 12 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div>
-                <div className="detail-label">Assigned To</div>
-                <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
-                  {project.assigned_to
-                    ? employees.find((e: any) => e.id === project.assigned_to)?.name || "Someone"
-                    : <span className="muted">Unassigned</span>}
+                <div className="detail-label" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 3 }}>Assigned To</div>
+                <div style={{ fontSize: 13, color: "var(--text)" }}>
+                  {project.assigned_to_show_tech
+                    ? "Show Tech"
+                    : project.assigned_to
+                      ? employees.find((e: any) => e.id === project.assigned_to)?.name || project.assigned_to_name || "Someone"
+                      : <span style={{ color: "var(--muted2)" }}>Unassigned</span>}
                   {project.assigned_to === profile?.id && (
                     <span style={{ marginLeft: 6, fontSize: 11, background: "rgba(92,107,255,0.15)", color: "#B0B8FF", padding: "1px 7px", borderRadius: 99, fontWeight: 600 }}>You</span>
                   )}
                 </div>
               </div>
-              <select
-                className="input"
-                style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
-                value={project.assigned_to || ""}
-                disabled={assigning}
-                onChange={e => handleAssign(e.target.value || null)}
-              >
-                <option value="">Unassigned</option>
-                {employees.map((emp: any) => (
-                  <option key={emp.id} value={emp.id}>{emp.name}</option>
-                ))}
-              </select>
+              {getRole() !== "show_tech" && (
+                <select
+                  className="input"
+                  style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
+                  value={project.assigned_to_show_tech ? "show_tech" : (project.assigned_to || "")}
+                  disabled={assigning}
+                  onChange={e => handleAssign(e.target.value || null)}
+                >
+                  <option value="">Unassigned</option>
+                  <option value="show_tech">── Show Tech ──</option>
+                  {employees
+                    .filter((e: any) => e.role === "ems" || e.role === "admin" || !e.role)
+                    .map((emp: any) => (
+                      <option key={emp.id} value={emp.id}>{emp.name}</option>
+                    ))
+                  }
+                </select>
+              )}
             </div>
           </div>
 
-          {project.details && (
-            <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
-              <div className="detail-label">Details</div>
-              <div className="prewrap detail-value" style={{ marginTop: 4 }}>{project.details}</div>
-            </div>
-          )}
-
-          <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
-            <div className="detail-label" style={{ marginBottom: 8 }}>Add Update</div>
+          <div className="card" style={{ marginTop: 16 }}>
+            <h2>Update / Comment</h2>
             <textarea
-              className="textarea"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Add a note, update, or status change…"
-              rows={3}
-              style={{ minHeight: 70 }}
+              placeholder="Add an update, note, or status change…"
+              rows={4}
             />
-            <div className="btn-row" style={{ marginTop: 10 }}>
-              <label className="btn small" style={{ cursor: "pointer" }}>
-                📎 Photos
+            <div className="row" style={{ marginTop: 10, gap: 12 }}>
+              <label className="btn secondary">
+                Add photos
                 <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
               </label>
-              <button className="btn primary small" disabled={busy} onClick={handleAddComment}>
-                {busy ? <span className="spinner" /> : "Add comment"}
+              <button className="btn primary" disabled={busy} onClick={handleAddComment}>
+                {busy ? "Saving..." : "Add comment"}
               </button>
             </div>
             {commentError && <div className="error" style={{ marginTop: 8 }}>{commentError}</div>}
           </div>
 
           {photos.length > 0 && (
-            <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
-              <div className="detail-label" style={{ marginBottom: 8 }}>Photos</div>
+            <div className="card" style={{ marginTop: 16 }}>
+              <h2>Photos</h2>
               <div className="photos-grid">
                 {photos.map((p: any, idx: number) => {
                   const url = p?.public_url || p?.url || p;
                   if (!url) return null;
                   return (
-                    <a key={idx} className="photo-item" href={url} target="_blank" rel="noreferrer">
-                      <img src={url} alt="" />
+                    <a key={idx} href={url} target="_blank" rel="noreferrer">
+                      <img src={url} />
                     </a>
                   );
                 })}
@@ -330,21 +294,22 @@ export default function ProjectDetail() {
             </div>
           )}
 
-          <div className="card" style={{ padding: "14px 15px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-              <div className="detail-label" style={{ margin: 0 }}>History</div>
-              <span className="count-pill">{history.length}</span>
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="row between" style={{ alignItems: "center" }}>
+              <h2 style={{ margin: 0 }}>History</h2>
+              <span className="badge">{history.length}</span>
             </div>
-            {history.length === 0 && <div className="muted">No updates yet.</div>}
-            {history.map((c: any, idx: number) => (
-              <div key={idx} style={{ padding: "10px 0", borderTop: idx === 0 ? "none" : "1px solid var(--border)" }}>
-                <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.45 }}>{c.comment || c.text || c.message}</div>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>
-                  {(c.employee_name || c.employees?.name || "").toString()}
-                  {c.created_at ? <><span className="dot">•</span>{new Date(c.created_at).toLocaleString()}</> : null}
+            <div className="list" style={{ marginTop: 10 }}>
+              {history.length === 0 && <div className="muted">No updates yet.</div>}
+              {history.map((c: any, idx: number) => (
+                <div key={idx} className="list-item">
+                  <div className="title">{c.comment || c.text || c.message}</div>
+                  <div className="meta">
+                    {(c.employee_name || c.employees?.name || "").toString()} {c.created_at ? "• " + new Date(c.created_at).toLocaleString() : ""}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </>
       )}

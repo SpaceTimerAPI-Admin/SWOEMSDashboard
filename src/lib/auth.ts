@@ -4,7 +4,6 @@
  */
 
 const TOKEN_KEY = "md_session_token";
-const PROFILE_KEY = "md_employee_profile";
 
 export function getToken(): string | null {
   try {
@@ -67,40 +66,12 @@ export function isAuthed(): boolean {
 }
 
 /** Clears auth and returns user to login screen */
-export async function logout(): Promise<void> {
-  // Invalidate server-side session first (best effort)
-  try {
-    const token = getToken();
-    if (token) {
-      await fetch("/api/logout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({}),
-      });
-    }
-  } catch {}
+export function logout(): void {
   clearToken();
-  clearProfile();
+  // Hard redirect keeps things simple for SPA + Netlify
   window.location.href = "/login";
 }
 
-export type EmployeeProfile = { id: string; employee_id: string; name: string; email: string; role: "admin" | "ems" | "show_tech" };
-
 export function getRole(): "admin" | "ems" | "show_tech" {
-  return getProfile()?.role || "ems";
-}
-
-export function getProfile(): EmployeeProfile | null {
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-export function setProfile(profile: EmployeeProfile): void {
-  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch {}
-}
-
-export function clearProfile(): void {
-  try { localStorage.removeItem(PROFILE_KEY); } catch {}
+  return (getProfile() as any)?.role || "ems";
 }

@@ -3,12 +3,6 @@
   publish = "dist"
   functions = "netlify/functions"
 
-[functions]
-  node_bundler = "esbuild"
-
-[functions."schedule-upload"]
-  timeout = 60
-
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
@@ -19,11 +13,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-# Scheduled: post previous day's EOD report to GroupMe at 3 AM Eastern (7 AM UTC)
-[functions."eod-scheduled"]
-  schedule = "0 7 * * *"
-
-# Scheduled: delete BEO PDFs for events 2+ days old, runs at 4 AM Eastern (8 AM UTC)
-[functions."beo-cleanup"]
-  schedule = "0 8 * * *"

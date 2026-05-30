@@ -17,15 +17,11 @@ export const handler: Handler = async (event) => {
     const details = String(body.details || "").trim();
     const tag = String(body.tag || "").trim();
     const sla_minutes = body.sla_minutes ? Number(body.sla_minutes) : 60;
-    // assigned_to: null | uuid (specific EMS) | "show_tech" (group)
-    const assigned_to_raw = body.assigned_to || null;
-    const assign_to_show_tech = assigned_to_raw === "show_tech";
-    const assigned_to = assign_to_show_tech ? null : (assigned_to_raw || null);
 
     if (!title) return badRequest("Title required");
     if (!location) return badRequest("Location required");
     if (!details) return badRequest("Details required");
-    if (!Number.isFinite(sla_minutes) || sla_minutes <= 0 || sla_minutes > 48 * 60) {
+    if (!Number.isFinite(sla_minutes) || sla_minutes <= 0 || sla_minutes > 24 * 60) {
       return badRequest("Invalid SLA minutes");
     }
 
@@ -36,15 +32,16 @@ export const handler: Handler = async (event) => {
     const { data, error } = await supabase
       .from("tickets")
       .insert({
-        title, location, details,
-        tag: tag || null,
+        title,
+        location,
+        details,
         status: "open",
         created_by: session.employee.id,
-        created_at, sla_minutes, sla_due_at,
-        assigned_to,
-        assigned_to_show_tech: assign_to_show_tech,
+        created_at,
+        sla_minutes,
+        sla_due_at,
       })
-      .select("id, title, location, tag, created_at, sla_due_at")
+      .select("id, title, location, created_at, sla_due_at")
       .single();
 
     if (error) return json({ ok: false, error: error.message }, 500);
@@ -52,15 +49,8 @@ export const handler: Handler = async (event) => {
     try {
       const base = (process.env.SITE_BASE_URL || "").replace(/\/$/, "");
       const link = base ? `${base}/tickets/${data.id}` : "";
-      const tagLabel = tag ? ` [${tag}]` : "";
-      const lines = [
-        `🎫 New Ticket${tagLabel}`,
-        `📌 ${title}`,
-        `📍 ${location}`,
-        `👤 Logged by ${session.employee.name}`,
-        ...(link ? [`🔗 ${link}`] : []),
-      ];
-      await postGroupMe(lines.join("\n"));
+      const msg = `🆕 Ticket: ${title} @ ${location} — logged by ${session.employee.name} — SLA ${sla_minutes}m${link ? ` — ${link}` : ""}`;
+      await postGroupMe(msg);
     } catch {}
 
     return json({ ok: true, ticket: data });
