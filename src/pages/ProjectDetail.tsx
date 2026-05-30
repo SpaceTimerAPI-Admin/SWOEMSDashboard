@@ -10,7 +10,7 @@ import {
   listEmployees,
   reopenProject,
 } from "../lib/api";
-import { getProfile } from "../lib/auth";
+import { getProfile, getRole } from "../lib/auth";
 
 type Project = any;
 
