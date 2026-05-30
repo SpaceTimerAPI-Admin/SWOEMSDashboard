@@ -45,7 +45,7 @@ export default function TicketDetail() {
 
   useEffect(() => {
     listEmployees().then((res: any) => {
-      if (res?.ok) setEmployees(res.data?.employees || []);
+      if (res?.ok) setEmployees(res.data?.assignment_options || res.data?.employees || []);
     });
   }, []);
 
@@ -257,13 +257,11 @@ export default function TicketDetail() {
                   onChange={e => handleAssign(e.target.value || null)}
                 >
                   <option value="">Unassigned</option>
-                  <option value="show_tech">── Show Tech ──</option>
-                  {employees
-                    .filter((e: any) => e.role === "ems" || e.role === "admin" || !e.role)
-                    .map((emp: any) => (
-                      <option key={emp.id} value={emp.id}>{emp.name}</option>
-                    ))
-                  }
+                  {employees.map((emp: any) => (
+                    emp.role === "show_tech"
+                      ? <option key="show_tech" value="show_tech">── Show Tech ──</option>
+                      : <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))}
                 </select>
               )}
             </div>

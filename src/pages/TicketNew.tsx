@@ -110,7 +110,7 @@ export default function TicketNew() {
         Home
       </Link>
 
-      <div className="page-title">Log a Call</div>
+      <div className="page-title">Log a Work Order</div>
       <div className="page-subtitle">Report a maintenance issue.</div>
 
       <form onSubmit={onSubmit} className="card" style={{ padding: "16px" }}>

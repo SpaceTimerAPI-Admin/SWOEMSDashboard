@@ -42,7 +42,7 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     listEmployees().then((res: any) => {
-      if (res?.ok) setEmployees(res.data?.employees || []);
+      if (res?.ok) setEmployees(res.data?.assignment_options || res.data?.employees || []);
     });
   }, []);
 
@@ -232,12 +232,16 @@ export default function ProjectDetail() {
           </div>
 
           {/* Assigned person in header */}
-          {(project.assigned_to || project.assigned_to_name) && (
+          {(project.assigned_to || project.assigned_to_name || project.assigned_to_show_tech) && (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 14,
               padding: "3px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600,
               background: "rgba(92,107,255,0.12)", color: "#B0B8FF",
               border: "1px solid rgba(92,107,255,0.25)" }}>
-              📌 {project.assigned_to === profile?.id ? "Assigned to you" : `Assigned to ${project.assigned_to_name || employees.find((e: any) => e.id === project.assigned_to)?.name || "someone"}`}
+              📌 {project.assigned_to_show_tech
+                ? "Assigned to Show Tech"
+                : project.assigned_to === profile?.id
+                  ? "Assigned to you"
+                  : `Assigned to ${project.assigned_to_name || employees.find((e: any) => e.id === project.assigned_to)?.name || "someone"}`}
             </div>
           )}
 
@@ -261,26 +265,32 @@ export default function ProjectDetail() {
               <div>
                 <div className="detail-label">Assigned To</div>
                 <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
-                  {project.assigned_to
-                    ? employees.find((e: any) => e.id === project.assigned_to)?.name || "Someone"
-                    : <span className="muted">Unassigned</span>}
+                  {project.assigned_to_show_tech
+                    ? "Show Tech"
+                    : project.assigned_to
+                      ? employees.find((e: any) => e.id === project.assigned_to)?.name || "Someone"
+                      : <span className="muted">Unassigned</span>}
                   {project.assigned_to === profile?.id && (
                     <span style={{ marginLeft: 6, fontSize: 11, background: "rgba(92,107,255,0.15)", color: "#B0B8FF", padding: "1px 7px", borderRadius: 99, fontWeight: 600 }}>You</span>
                   )}
                 </div>
               </div>
-              <select
-                className="input"
-                style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
-                value={project.assigned_to || ""}
-                disabled={assigning}
-                onChange={e => handleAssign(e.target.value || null)}
-              >
-                <option value="">Unassigned</option>
-                {employees.map((emp: any) => (
-                  <option key={emp.id} value={emp.id}>{emp.name}</option>
-                ))}
-              </select>
+              {getRole() !== "show_tech" && (
+                <select
+                  className="input"
+                  style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
+                  value={project.assigned_to_show_tech ? "show_tech" : (project.assigned_to || "")}
+                  disabled={assigning}
+                  onChange={e => handleAssign(e.target.value || null)}
+                >
+                  <option value="">Unassigned</option>
+                  {employees.map((emp: any) => (
+                    emp.role === "show_tech"
+                      ? <option key="show_tech" value="show_tech">── Show Tech ──</option>
+                      : <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 

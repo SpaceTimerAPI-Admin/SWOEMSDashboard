@@ -83,7 +83,7 @@ export default function ShowTechHome() {
       <div className="home-grid">
         <Link to="/tickets/new" className="home-tile" style={{ background: "rgba(92,107,255,0.12)" }}>
           <div className="tile-icon" style={{ background: "rgba(92,107,255,0.2)" }}>🎫</div>
-          <div className="tile-title">Log a Call</div>
+          <div className="tile-title">Log a Work Order</div>
           <div className="tile-desc">Create a new ticket</div>
         </Link>
         <Link to="/tickets" className="home-tile" style={{ background: "rgba(46,232,160,0.08)" }}>

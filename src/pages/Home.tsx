@@ -250,7 +250,7 @@ export default function Home() {
       )}
 
       <div className="home-grid">
-        <Tile to="/tickets/new"  icon="🎫" title="Log a Call"   desc="Create a new work order ticket"     accent="rgba(92,107,255,0.18)" />
+        <Tile to="/tickets/new"  icon="🎫" title="Log a Work Order"   desc="Create a new work order ticket"     accent="rgba(92,107,255,0.18)" />
         <Tile to="/tickets"      icon="📋" title="Tickets"      desc="View & manage all tickets"          accent="rgba(46,232,160,0.12)" />
         <Tile to="/projects"     icon="📐" title="Projects"     desc="Track longer-term work items"       accent="rgba(255,182,39,0.12)" />
         <Tile to="/events"       icon="🎪" title="Events"       desc="BEO calendar & setup tracking"      accent="rgba(255,84,84,0.13)" />
