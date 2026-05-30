@@ -247,7 +247,7 @@ export default function ProjectDetail() {
                   <option value="">Unassigned</option>
                   <option value="show_tech">── Show Tech ──</option>
                   {employees
-                    .filter((e: any) => e.role === "ems" || e.role === "admin" || !e.role)
+                    .filter((e: any) => e.role === "ems" || e.role === "admin")
                     .map((emp: any) => (
                       <option key={emp.id} value={emp.id}>{emp.name}</option>
                     ))
