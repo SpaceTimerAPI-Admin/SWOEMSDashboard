@@ -171,11 +171,11 @@ export default function Admin() {
                 <input className="input" type="password" inputMode="numeric" maxLength={4} value={form.pin} onChange={e => setForm(f => ({ ...f, pin: e.target.value }))} placeholder="••••" /></label>
               <div style={{ marginTop: 8 }}>
                 <div className="field-label">Role</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
                   {ROLES.map(r => (
                     <button key={r} type="button"
                       onClick={() => setForm(f => ({ ...f, role: r }))}
-                      style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: "1px solid",
+                      style={{ flex: "1 1 80px", padding: "8px 4px", borderRadius: 8, border: "1px solid",
                         borderColor: form.role === r ? ROLE_TEXT[r] + "66" : "var(--border)",
                         background: form.role === r ? ROLE_COLORS[r] : "rgba(255,255,255,0.04)",
                         color: form.role === r ? ROLE_TEXT[r] : "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
@@ -221,11 +221,11 @@ export default function Admin() {
                 <input className="input" type="password" inputMode="numeric" maxLength={4} value={editForm.pin} onChange={e => setEditForm((f: any) => ({ ...f, pin: e.target.value }))} placeholder="••••" /></label>
               <div style={{ marginTop: 8 }}>
                 <div className="field-label">Role</div>
-                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
                   {ROLES.map(r => (
                     <button key={r} type="button"
                       onClick={() => setEditForm((f: any) => ({ ...f, role: r }))}
-                      style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: "1px solid",
+                      style={{ flex: "1 1 80px", padding: "7px 4px", borderRadius: 8, border: "1px solid",
                         borderColor: editForm.role === r ? ROLE_TEXT[r] + "66" : "var(--border)",
                         background: editForm.role === r ? ROLE_COLORS[r] : "rgba(255,255,255,0.04)",
                         color: editForm.role === r ? ROLE_TEXT[r] : "var(--muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -234,7 +234,7 @@ export default function Admin() {
                   ))}
                 </div>
               </div>
-              <div style={{ marginTop: 14, display: "flex", gap: 8, justifyContent: "space-between" }}>
+              <div style={{ marginTop: 14, display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
                 <button
                   onClick={() => handleUpdate(editTarget.id, { is_active: !editTarget.is_active })}
                   disabled={busy}

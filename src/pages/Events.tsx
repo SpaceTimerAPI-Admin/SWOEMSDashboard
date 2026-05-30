@@ -369,12 +369,12 @@ export default function Events() {
                         </div>
                         {/* Optional date override */}
                         {!isUploading && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                             <label style={{ fontSize: 11, color: "var(--muted2)", whiteSpace: "nowrap" }}>Override date:</label>
                             <input
                               type="date"
                               className="input"
-                              style={{ fontSize: 12, padding: "4px 8px", flex: 1 }}
+                              style={{ fontSize: 12, padding: "4px 8px", flex: "1 1 140px", minWidth: 0 }}
                               value={fileDateOverrides[i] || ""}
                               onChange={e => setFileDateOverrides(prev => { const n = [...prev]; n[i] = e.target.value; return n; })}
                             />

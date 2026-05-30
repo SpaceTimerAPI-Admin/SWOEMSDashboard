@@ -251,7 +251,7 @@ export default function TicketDetail() {
               {getRole() !== "show_tech" && (
                 <select
                   className="input"
-                  style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
+                  style={{ minWidth: 140, fontSize: 13, padding: "7px 10px" }}
                   value={ticket.assigned_to_show_tech ? "show_tech" : (ticket.assigned_to || "")}
                   disabled={assigning}
                   onChange={e => handleAssign(e.target.value || null)}

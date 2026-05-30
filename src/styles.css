@@ -403,18 +403,33 @@ input[type="date"].input {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px 16px;
+  padding: 16px;
   z-index: 2000;
   backdrop-filter: blur(4px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-card {
   width: 100%;
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
   max-width: 520px;
+  max-height: calc(100svh - 32px);
+  overflow-y: auto;
   border-radius: var(--radius-xl);
+  margin: auto;
+}
+
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+  .modal-card {
+    max-height: calc(100svh - 24px);
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-sm);
+    width: 100%;
+  }
 }
 
 .modal-head { padding: 16px 16px 0; }
@@ -629,3 +644,43 @@ input[type="date"].input {
 .item-card .item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .item-card .item-title { font-size: 14px; font-weight: 600; margin: 0; line-height: 1.35; letter-spacing: -0.01em; }
 .item-card .item-sub { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+/* ── Mobile touch & tap improvements ── */
+button, .btn, .home-tile, .item-card, .nav-link {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Prevent text selection on interactive elements */
+.nav-link, .btn, .home-tile, .tag-btn {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Full-width selects on mobile */
+@media (max-width: 480px) {
+  select.input {
+    width: 100%;
+    max-width: 100%;
+  }
+  .btn-row {
+    flex-wrap: wrap;
+  }
+  .btn-row .btn {
+    flex: 1;
+    min-width: 100px;
+  }
+}
+
+/* Safe area padding for notched phones */
+.page {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+@media (min-width: 640px) {
+  .page {
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+  }
+}

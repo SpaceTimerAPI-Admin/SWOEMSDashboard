@@ -306,13 +306,13 @@ export default function AdminSchedule() {
             <div className="modal-body">
               <label><div className="field-label">Name</div>
                 <input className="input" value={editForm.employee_name} onChange={e => setEditForm(f => ({ ...f, employee_name: e.target.value }))} /></label>
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <label style={{ flex: 1 }}><div className="field-label">Start</div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <label style={{ flex: "1 1 100px" }}><div className="field-label">Start</div>
                   <input className="input" value={editForm.shift_start} onChange={e => setEditForm(f => ({ ...f, shift_start: e.target.value }))} placeholder="6:00 AM" /></label>
-                <label style={{ flex: 1 }}><div className="field-label">End</div>
+                <label style={{ flex: "1 1 100px" }}><div className="field-label">End</div>
                   <input className="input" value={editForm.shift_end} onChange={e => setEditForm(f => ({ ...f, shift_end: e.target.value }))} placeholder="2:30 PM" /></label>
               </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "space-between" }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "space-between", flexWrap: "wrap" }}>
                 <button onClick={handleDelete} disabled={saving}
                   style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,84,84,0.3)", background: "rgba(255,84,84,0.1)", color: "#FFB0B0", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   Remove
@@ -344,10 +344,10 @@ export default function AdminSchedule() {
                   {allNames.map(n => <option key={n} value={n} />)}
                 </datalist>
               </label>
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <label style={{ flex: 1 }}><div className="field-label">Start</div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <label style={{ flex: "1 1 100px" }}><div className="field-label">Start</div>
                   <input className="input" value={addForm.shift_start} onChange={e => setAddForm(f => ({ ...f, shift_start: e.target.value }))} placeholder="6:00 AM" /></label>
-                <label style={{ flex: 1 }}><div className="field-label">End</div>
+                <label style={{ flex: "1 1 100px" }}><div className="field-label">End</div>
                   <input className="input" value={addForm.shift_end} onChange={e => setAddForm(f => ({ ...f, shift_end: e.target.value }))} placeholder="2:30 PM" /></label>
               </div>
               <div className="btn-row" style={{ marginTop: 14 }}>

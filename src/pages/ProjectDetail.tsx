@@ -278,7 +278,7 @@ export default function ProjectDetail() {
               {getRole() !== "show_tech" && (
                 <select
                   className="input"
-                  style={{ maxWidth: 160, fontSize: 13, padding: "7px 10px" }}
+                  style={{ minWidth: 140, fontSize: 13, padding: "7px 10px" }}
                   value={project.assigned_to_show_tech ? "show_tech" : (project.assigned_to || "")}
                   disabled={assigning}
                   onChange={e => handleAssign(e.target.value || null)}
