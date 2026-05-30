@@ -115,3 +115,33 @@ alter table public.employees add column if not exists last_login_at timestamptz 
 -- Migration: assigned_to_show_tech flag for group assignment
 alter table public.tickets add column if not exists assigned_to_show_tech boolean not null default false;
 alter table public.projects add column if not exists assigned_to_show_tech boolean not null default false;
+
+-- ============================================================
+-- NEW: Procedures
+-- ============================================================
+create table if not exists public.procedures (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  category text not null check (category in ('A Side', 'B Side')),
+  visibility text not null default 'ems' check (visibility in ('admin', 'ems', 'everyone')),
+  created_by uuid not null references public.employees(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  step_count int not null default 0
+);
+alter table public.procedures enable row level security;
+
+create table if not exists public.procedure_steps (
+  id uuid primary key default gen_random_uuid(),
+  procedure_id uuid not null references public.procedures(id) on delete cascade,
+  step_number int not null,
+  title text not null,
+  notes text null,
+  photo_url text null,
+  photo_path text null,
+  created_at timestamptz not null default now(),
+  unique (procedure_id, step_number)
+);
+alter table public.procedure_steps enable row level security;
+
+-- Storage bucket: procedure-photos (create in Supabase dashboard, set to public)

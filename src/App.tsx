@@ -17,6 +17,9 @@ import Schedule from "./pages/Schedule";
 import Events from "./pages/Events";
 import EventDetail from "./pages/EventDetail";
 import EOD from "./pages/EOD";
+import Procedures from "./pages/Procedures";
+import ProcedureView from "./pages/ProcedureView";
+import ProcedureBuilder from "./pages/ProcedureBuilder";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
 import ShowTechNav from "./components/ShowTechNav";
@@ -56,7 +59,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   if (role === "show_tech") {
     const allowed = ST_ALLOWED.some(p => loc.pathname === p)
       || loc.pathname.startsWith("/tickets/")
-      || loc.pathname.startsWith("/projects/");
+      || loc.pathname.startsWith("/projects/")
+      || loc.pathname.startsWith("/procedures");
     if (!allowed) return <Navigate to="/" replace />;
   }
 
@@ -105,6 +109,10 @@ export default function App() {
         <Route path="/events/:id" element={<RequireAuth><EventDetail /></RequireAuth>} />
 
         <Route path="/eod" element={<RequireAuth><EOD /></RequireAuth>} />
+        <Route path="/procedures" element={<RequireAuth><Procedures /></RequireAuth>} />
+        <Route path="/procedures/new" element={<RequireAuth><ProcedureBuilder /></RequireAuth>} />
+        <Route path="/procedures/:id" element={<RequireAuth><ProcedureView /></RequireAuth>} />
+        <Route path="/procedures/:id/edit" element={<RequireAuth><ProcedureBuilder /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

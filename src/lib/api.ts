@@ -390,3 +390,20 @@ export async function getDocsUrl(): Promise<ApiResult<{ url: string }>> {
 export async function scheduleUpdateEntry(payload: { action: "upsert" | "delete"; work_date: string; employee_name: string; shift_start?: string; shift_end?: string }): Promise<ApiResult<{}>> {
   return apiFetch("/api/schedule-update", { method: "POST", body: payload });
 }
+
+// -------------------- Procedures --------------------
+export async function listProcedures(): Promise<ApiResult<{ procedures: any[] }>> {
+  return apiFetch("/api/procedures-list", { method: "POST", body: {} });
+}
+export async function getProcedure(id: string): Promise<ApiResult<{ procedure: any; steps: any[] }>> {
+  return apiFetch("/api/procedures-get", { method: "POST", body: { id } });
+}
+export async function saveProcedure(payload: { id?: string; title: string; category: string; visibility: string; steps: any[] }): Promise<ApiResult<{ id: string }>> {
+  return apiFetch("/api/procedures-save", { method: "POST", body: payload });
+}
+export async function deleteProcedure(id: string): Promise<ApiResult<{}>> {
+  return apiFetch("/api/procedures-delete", { method: "POST", body: { id } });
+}
+export async function uploadProcedurePhoto(payload: { image_base64: string; content_type: string }): Promise<ApiResult<{ photo_url: string; photo_path: string }>> {
+  return apiFetch("/api/procedures-photo-upload", { method: "POST", body: payload });
+}

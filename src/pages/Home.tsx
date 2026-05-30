@@ -250,12 +250,13 @@ export default function Home() {
       )}
 
       <div className="home-grid">
-        <Tile to="/tickets/new"  icon="🎫" title="Log a Work Order"   desc="Create a new work order ticket"     accent="rgba(92,107,255,0.18)" />
+        <Tile to="/tickets/new"  icon="🎫" title="Log a Work Order" desc="Create a new work order ticket"     accent="rgba(92,107,255,0.18)" />
         <Tile to="/tickets"      icon="📋" title="Tickets"      desc="View & manage all tickets"          accent="rgba(46,232,160,0.12)" />
         <Tile to="/projects"     icon="📐" title="Projects"     desc="Track longer-term work items"       accent="rgba(255,182,39,0.12)" />
         <Tile to="/events"       icon="🎪" title="Events"       desc="BEO calendar & setup tracking"      accent="rgba(255,84,84,0.13)" />
         <Tile to="/shift-log"    icon="📓" title="Shift Log"    desc="Log notes throughout your shift"    accent="rgba(168,144,255,0.15)" />
         <Tile to="/eod"          icon="📝" title="EOD Report"   desc="Generate & email today's recap"     accent="rgba(255,84,84,0.12)" />
+        <Tile to="/procedures"   icon="📖" title="Procedures"   desc="Step-by-step guides & references"   accent="rgba(56,189,248,0.12)" />
         <DocsButton />
         {getRole() === "admin" && (
           <Tile to="/admin" icon="🛡️" title="Admin" desc="User management & settings" accent="rgba(255,182,39,0.15)" />
