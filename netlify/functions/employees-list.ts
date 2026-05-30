@@ -19,15 +19,15 @@ export const handler: Handler = async (event) => {
 
     if (error) return json({ ok: false, error: error.message }, 500);
 
-    // EMS assignment options: only ems and admin roles
-    const emsOnly = (data || []).filter((e: any) => e.role === "ems" || e.role === "admin");
+    // Build assignment options: "Show Tech" group first, then EMS individuals
+    const ems = (data || []).filter((e: any) => e.role === "ems" || e.role === "admin");
 
     return json({
       ok: true,
       employees: data || [],
       assignment_options: [
         { id: "show_tech", name: "Show Tech", role: "show_tech" },
-        ...emsOnly,
+        ...ems,
       ],
     });
   } catch (e: any) {

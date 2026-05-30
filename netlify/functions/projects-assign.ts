@@ -11,16 +11,13 @@ export const handler: Handler = async (event) => {
 
     const body = event.body ? JSON.parse(event.body) : {};
     const id = String(body.id || "").trim();
-    const assigned_to_raw = body.assigned_to || null;
+    const assigned_to = body.assigned_to || null;
     if (!id) return badRequest("id required");
-
-    const assign_to_show_tech = assigned_to_raw === "show_tech";
-    const assigned_to = assign_to_show_tech ? null : assigned_to_raw;
 
     const supabase = supabaseAdmin();
     const { error } = await supabase
       .from("projects")
-      .update({ assigned_to, assigned_to_show_tech: assign_to_show_tech })
+      .update({ assigned_to })
       .eq("id", id);
 
     if (error) return json({ ok: false, error: error.message }, 500);

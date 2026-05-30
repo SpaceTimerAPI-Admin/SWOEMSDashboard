@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createProject } from "../lib/api";
 
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
@@ -28,7 +28,7 @@ export default function ProjectNew() {
     if (!payload.title) return setError("Title required");
     if (!payload.location) return setError("Location required");
     if (!payload.details) return setError("Details required");
-    if (!payload.tag) return setError("Tag required");
+    if (!payload.tag) return setError("Please select a tag");
 
     setLoading(true);
     try {
@@ -46,43 +46,67 @@ export default function ProjectNew() {
   }
 
   return (
-    <div className="page">
-      <h1>Create Project</h1>
+    <div className="page fade-up">
+      <Link to="/projects" className="back-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Projects
+      </Link>
 
-      <form onSubmit={onSubmit} className="card" style={{ marginTop: 12 }}>
+      <div className="page-title">New Project</div>
+      <div className="page-subtitle">SLA: resolve within 14 days.</div>
+
+      <form onSubmit={onSubmit} className="card" style={{ padding: "16px" }}>
         <label>
-          Project title
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          <div className="field-label">Title</div>
+          <input
+            className="input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Project name"
+          />
         </label>
 
-        <label>
-          Location
-          <input value={location} onChange={(e) => setLocation(e.target.value)} />
+        <label style={{ marginTop: 2 }}>
+          <div className="field-label">Location</div>
+          <input
+            className="input"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Where?"
+          />
         </label>
 
-        <label style={{ marginTop: 10 }}>Tag</label>
-        <div className="chip-row">
-          {TAGS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={"chip" + (tag === t ? " active" : "")}
-              onClick={() => setTag(t)}
-            >
-              {t}
-            </button>
-          ))}
+        <div style={{ marginTop: 2 }}>
+          <div className="field-label">Category</div>
+          <div className="tag-row">
+            {TAGS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`tag-btn${tag === t ? " active" : ""}`}
+                onClick={() => setTag(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <label style={{ marginTop: 12 }}>
-          Details
-          <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={5} />
+        <label style={{ marginTop: 2 }}>
+          <div className="field-label">Details</div>
+          <textarea
+            className="textarea"
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            rows={4}
+            placeholder="Describe the project…"
+          />
         </label>
 
         {error && <div className="error" style={{ marginTop: 10 }}>{error}</div>}
 
-        <button className="btn primary" style={{ marginTop: 12 }} disabled={loading}>
-          {loading ? "Creating..." : "Create project"}
+        <button className="btn primary full" style={{ marginTop: 14 }} disabled={loading}>
+          {loading ? <><span className="spinner" /> Creating…</> : "Create project"}
         </button>
       </form>
     </div>

@@ -32,8 +32,9 @@ export const handler: Handler = async (event) => {
       .from("tickets")
       .select(`
         id, title, location, details, tag, status, created_at, sla_due_at, sla_minutes,
-        created_by,
-        employees!tickets_created_by_fkey(name)
+        created_by, assigned_to, assigned_to_show_tech,
+        employees!tickets_created_by_fkey(name),
+        assignee:employees!tickets_assigned_to_fkey(name, role)
       `)
       .eq("id", id)
       .maybeSingle();
@@ -66,6 +67,8 @@ export const handler: Handler = async (event) => {
       ticket: {
         ...ticket,
         created_by_name: (ticket as any).employees?.name || "Unknown",
+        assigned_to_name: (ticket as any).assignee?.name || null,
+        assigned_to_show_tech: (ticket as any).assigned_to_show_tech || false,
       },
       photos: (photos || []).map((p: any) => ({
         ...p,

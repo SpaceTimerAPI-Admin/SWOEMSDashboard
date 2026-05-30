@@ -26,12 +26,15 @@ export const handler: Handler = async (event) => {
       }
     }
 
+    const role = (session.employee as any).role || "ems";
+
     let q = supabase
       .from("projects")
       .select(`
-        id, title, location, details, status, created_at, sla_due_at, sla_days,
-        created_by, source_ticket_id,
-        employees!projects_created_by_fkey(name)
+        id, title, location, details, status, tag, created_at, sla_due_at, sla_days,
+        created_by, assigned_to, assigned_to_show_tech, source_ticket_id,
+        employees!projects_created_by_fkey(name, role),
+        assignee:employees!projects_assigned_to_fkey(name, role)
       `)
       .order("sla_due_at", { ascending: true });
 
@@ -41,16 +44,26 @@ export const handler: Handler = async (event) => {
     if (error) return json({ ok: false, error: error.message }, 500);
 
     const now = Date.now();
-    const items = (data || []).map((p: any) => {
+    let items = (data || []).map((p: any) => {
       const due = new Date(p.sla_due_at).getTime();
       const msLeft = due - now;
       return {
         ...p,
         created_by_name: p.employees?.name || "Unknown",
+        created_by_role: p.employees?.role || "ems",
+        assigned_to_name: (p as any).assignee?.name || null,
+        assigned_to_show_tech: p.assigned_to_show_tech || false,
         ms_left: msLeft,
         is_overdue: msLeft < 0,
       };
     });
+
+    // Show Tech: only see projects assigned to show_tech group OR created by show_tech users
+    if (role === "show_tech") {
+      items = items.filter((p: any) =>
+        p.assigned_to_show_tech === true || p.created_by_role === "show_tech"
+      );
+    }
 
     items.sort((a: any, b: any) => {
       const ao = a.is_overdue ? 0 : 1;

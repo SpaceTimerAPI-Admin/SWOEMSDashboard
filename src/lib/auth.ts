@@ -4,6 +4,7 @@
  */
 
 const TOKEN_KEY = "md_session_token";
+const PROFILE_KEY = "md_employee_profile";
 
 export function getToken(): string | null {
   try {
@@ -66,44 +67,40 @@ export function isAuthed(): boolean {
 }
 
 /** Clears auth and returns user to login screen */
-export function logout(): void {
+export async function logout(): Promise<void> {
+  // Invalidate server-side session first (best effort)
+  try {
+    const token = getToken();
+    if (token) {
+      await fetch("/api/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({}),
+      });
+    }
+  } catch {}
   clearToken();
   clearProfile();
   window.location.href = "/login";
 }
 
-// -------------------- Profile --------------------
-const PROFILE_KEY = "md_employee_profile";
+export type EmployeeProfile = { id: string; employee_id: string; name: string; email: string; role: "admin" | "ems" | "show_tech" };
 
-export type EmployeeProfile = {
-  id: string;
-  employee_id: string;
-  name: string;
-  email: string;
-  role: "admin" | "ems" | "show_tech";
-};
+export function getRole(): "admin" | "ems" | "show_tech" {
+  return getProfile()?.role || "ems";
+}
 
 export function getProfile(): EmployeeProfile | null {
   try {
     const raw = localStorage.getItem(PROFILE_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 export function setProfile(profile: EmployeeProfile): void {
-  try {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-  } catch {}
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch {}
 }
 
 export function clearProfile(): void {
-  try {
-    localStorage.removeItem(PROFILE_KEY);
-  } catch {}
-}
-
-export function getRole(): "admin" | "ems" | "show_tech" {
-  return getProfile()?.role || "ems";
+  try { localStorage.removeItem(PROFILE_KEY); } catch {}
 }

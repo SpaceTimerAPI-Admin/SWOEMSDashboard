@@ -2,7 +2,6 @@ import type { Handler } from "@netlify/functions";
 import { requireSession } from "./_auth";
 import { supabaseAdmin } from "./_supabase";
 import { badRequest, json, unauthorized } from "./_shared";
-import { postGroupMe } from "./_groupme";
 
 export const handler: Handler = async (event) => {
   try {

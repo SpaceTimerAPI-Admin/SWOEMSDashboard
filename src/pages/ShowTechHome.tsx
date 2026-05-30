@@ -39,6 +39,7 @@ export default function ShowTechHome() {
       <div className="page-title">Dashboard</div>
       <div className="page-subtitle">Show Tech Portal</div>
 
+      {/* Open items */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 8 }}>
           Open Items ({loading ? "…" : items.length})
@@ -78,11 +79,12 @@ export default function ShowTechHome() {
         )}
       </div>
 
+      {/* Quick actions */}
       <div className="home-grid">
         <Link to="/tickets/new" className="home-tile" style={{ background: "rgba(92,107,255,0.12)" }}>
           <div className="tile-icon" style={{ background: "rgba(92,107,255,0.2)" }}>🎫</div>
-          <div className="tile-title">Create Work Order</div>
-          <div className="tile-desc">Submit a new work request</div>
+          <div className="tile-title">Log a Call</div>
+          <div className="tile-desc">Create a new ticket</div>
         </Link>
         <Link to="/tickets" className="home-tile" style={{ background: "rgba(46,232,160,0.08)" }}>
           <div className="tile-icon" style={{ background: "rgba(46,232,160,0.15)" }}>📋</div>
