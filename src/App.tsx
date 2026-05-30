@@ -54,7 +54,9 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
   // Show Tech: block EMS-only routes
   if (role === "show_tech") {
-    const allowed = ST_ALLOWED.some(p => loc.pathname === p || loc.pathname.startsWith("/tickets/"));
+    const allowed = ST_ALLOWED.some(p => loc.pathname === p)
+      || loc.pathname.startsWith("/tickets/")
+      || loc.pathname.startsWith("/projects/");
     if (!allowed) return <Navigate to="/" replace />;
   }
 
