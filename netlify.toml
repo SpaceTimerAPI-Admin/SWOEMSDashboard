@@ -27,3 +27,7 @@
 # Scheduled: delete BEO PDFs for events 2+ days old, runs at 4 AM Eastern (8 AM UTC)
 [functions."beo-cleanup"]
   schedule = "0 8 * * *"
+
+# Scheduled: overdue ticket alert — Mondays and Thursdays at 8 AM ET (12 PM UTC)
+[functions."overdue-alert"]
+  schedule = "0 12 * * 1,4"
