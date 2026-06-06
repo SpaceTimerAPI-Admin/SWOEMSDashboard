@@ -30,7 +30,10 @@ export const handler: Handler = async (event) => {
 
     if (month) {
       const start = `${month}-01`;
-      const end = `${month}-31`;
+      // Get the actual last day of the month
+      const [y, m] = month.split("-").map(Number);
+      const lastDay = new Date(y, m, 0).getDate(); // day 0 of next month = last day of this month
+      const end = `${month}-${String(lastDay).padStart(2, "0")}`;
       q = q.gte("event_date", start).lte("event_date", end);
     }
 
