@@ -411,3 +411,7 @@ export async function uploadProcedurePhoto(payload: { image_base64: string; cont
 export async function showTechRegister(payload: { code: string; name: string; employee_id: string; email: string; pin: string; pin_confirm: string }): Promise<ApiResult<{ message: string }>> {
   return apiFetch("/api/showtech-register", { method: "POST", body: payload });
 }
+
+export async function getEnrollmentCode(): Promise<ApiResult<{ code: string }>> {
+  return apiFetch("/api/showtech-enrollment-code", { method: "POST", body: {} });
+}

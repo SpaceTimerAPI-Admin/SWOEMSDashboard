@@ -1,33 +1,30 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { getEnrollmentCode } from "../lib/api";
 
 const SITE_URL = window.location.origin;
 
-// Minimal QR code generator using a public API
 function qrUrl(text: string) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}&bgcolor=ffffff&color=000000&margin=2`;
 }
 
 export default function AdminQR() {
-  const [code, setCode] = useState("");
   const [registrationUrl, setRegistrationUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Fetch the code from backend so it stays server-side
-    fetch("/api/showtech-enrollment-code", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("md_token") || ""}` },
-    })
-      .then(r => r.json())
-      .then(d => {
-        if (d.ok && d.code) {
-          setCode(d.code);
-          setRegistrationUrl(`${SITE_URL}/register/${d.code}`);
-        }
-      })
-      .catch(() => {});
+    async function load() {
+      try {
+        const res: any = await getEnrollmentCode();
+        if (!res?.ok) throw new Error(res?.error || "Failed to load code");
+        const code = (res.data ?? res).code;
+        setRegistrationUrl(`${SITE_URL}/register/${code}`);
+      } catch (e: any) {
+        setError(e?.message || "Failed to load QR code.");
+      }
+    }
+    void load();
   }, []);
 
   function copyLink() {
@@ -61,7 +58,15 @@ export default function AdminQR() {
 
         {/* Preview card */}
         <div className="card" style={{ padding: "24px 20px", marginBottom: 16, textAlign: "center" }}>
-          {registrationUrl ? (
+          {error ? (
+          <div style={{ padding: "24px 0", textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+            <div style={{ fontSize: 13, color: "#FFB0B0", marginBottom: 6 }}>{error}</div>
+            <div style={{ fontSize: 12, color: "var(--muted2)" }}>
+              Make sure <code>SHOW_TECH_ENROLLMENT_CODE</code> is set in Netlify environment variables.
+            </div>
+          </div>
+        ) : registrationUrl ? (
             <>
               <img
                 src={qrUrl(registrationUrl)}
