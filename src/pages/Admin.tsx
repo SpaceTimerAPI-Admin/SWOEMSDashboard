@@ -91,6 +91,10 @@ export default function Admin() {
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
             📅 Schedule
           </Link>
+          <Link to="/admin/qr"
+            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+            📲 QR Code
+          </Link>
           <button
             className="btn primary"
             style={{ fontSize: 13 }}

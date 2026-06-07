@@ -7,6 +7,8 @@ import Home from "./pages/Home";
 import ShowTechHome from "./pages/ShowTechHome";
 import Admin from "./pages/Admin";
 import AdminSchedule from "./pages/AdminSchedule";
+import AdminQR from "./pages/AdminQR";
+import ShowTechRegister from "./pages/ShowTechRegister";
 import Tickets from "./pages/Tickets";
 import TicketNew from "./pages/TicketNew";
 import TicketDetail from "./pages/TicketDetail";
@@ -95,6 +97,8 @@ export default function App() {
 
         <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
         <Route path="/admin/schedule" element={<RequireAdmin><AdminSchedule /></RequireAdmin>} />
+        <Route path="/admin/qr" element={<RequireAdmin><AdminQR /></RequireAdmin>} />
+        <Route path="/register/:code" element={<ShowTechRegister />} />
 
         <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
         <Route path="/tickets/new" element={<RequireAuth><TicketNew /></RequireAuth>} />

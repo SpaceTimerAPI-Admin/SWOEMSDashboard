@@ -407,3 +407,7 @@ export async function deleteProcedure(id: string): Promise<ApiResult<{}>> {
 export async function uploadProcedurePhoto(payload: { image_base64: string; content_type: string }): Promise<ApiResult<{ photo_url: string; photo_path: string }>> {
   return apiFetch("/api/procedures-photo-upload", { method: "POST", body: payload });
 }
+
+export async function showTechRegister(payload: { code: string; name: string; employee_id: string; email: string; pin: string; pin_confirm: string }): Promise<ApiResult<{ message: string }>> {
+  return apiFetch("/api/showtech-register", { method: "POST", body: payload });
+}
