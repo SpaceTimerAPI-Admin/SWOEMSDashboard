@@ -60,7 +60,7 @@ export default function ShowTechRegister() {
       <div style={styles.card}>
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={styles.icon}>🎡</div>
+          <div style={styles.icon}>🔧</div>
           <h1 style={styles.title}>Show Tech Portal</h1>
           <p style={styles.sub}>SeaWorld Entertainment Maintenance</p>
           <div style={{

@@ -138,7 +138,7 @@ export default function AdminQR() {
           background: "#fff", padding: 40,
         }}>
           <div style={{ textAlign: "center", maxWidth: 400 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🎡</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🔧</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: "#111", marginBottom: 4 }}>
               SeaWorld Entertainment
             </div>
