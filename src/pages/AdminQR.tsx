@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-const SITE_URL = import.meta.env.VITE_SITE_URL || "https://www.swoems.com";
+const SITE_URL = window.location.origin;
 
 // Minimal QR code generator using a public API
 function qrUrl(text: string) {
