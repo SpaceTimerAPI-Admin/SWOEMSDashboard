@@ -16,9 +16,9 @@ type Message = {
 const AVATAR_URL = "/assets/elijah-avatar.png";
 
 const SUGGESTED_PROMPTS = [
-  "Has this issue happened before?",
-  "What's the status on JTA?",
-  "Any recurring problems this month?",
+  "Yo has this happened before?",
+  "What's the deal with JTA rn?",
+  "Anything keep breaking lately?",
 ];
 
 function renderAnswerText(text: string): string {
@@ -82,7 +82,7 @@ export default function AskElijah() {
       setMessages(prev => [...prev, {
         id: `e-err-${Date.now()}`,
         role: "elijah",
-        text: e?.message || "I hit a snag answering that. Try again?",
+        text: e?.message || "Ah man, hit a snag there. Try me again?",
         isError: true,
       }]);
     } finally {
@@ -171,7 +171,7 @@ export default function AskElijah() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#e5e7eb" }}>Ask Elijah</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Cross-references tickets, projects & GroupMe</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>your tech, digs through tickets & GroupMe</div>
               </div>
               <button
                 onClick={() => setOpen(false)}
@@ -189,9 +189,9 @@ export default function AskElijah() {
                   }}>
                     <img src={AVATAR_URL} alt="Elijah" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }} />
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#e5e7eb", marginBottom: 4 }}>Hey, I'm Elijah.</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#e5e7eb", marginBottom: 4 }}>Yo, I'm Elijah. 🔧</div>
                   <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.5, marginBottom: 18 }}>
-                    Ask me about past tickets, ongoing projects, or anything from the GroupMe chat. I'll pull up what I can find.
+                    Got a question about a ticket, a project, or somethin' that came up in the group chat? Lemme pull it up for you, dawg.
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {SUGGESTED_PROMPTS.map(p => (
@@ -318,7 +318,7 @@ export default function AskElijah() {
                       send();
                     }
                   }}
-                  placeholder="Ask about a ticket, project, or issue…"
+                  placeholder="Ask Elijah somethin'…"
                   rows={1}
                   style={{
                     flex: 1, resize: "none", maxHeight: 90, padding: "10px 14px", borderRadius: 14,
