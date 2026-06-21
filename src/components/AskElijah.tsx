@@ -15,12 +15,6 @@ type Message = {
 
 const AVATAR_URL = "/assets/elijah-avatar.png";
 
-const SUGGESTED_PROMPTS = [
-  "Yo has this happened before?",
-  "What's the deal with JTA rn?",
-  "Anything keep breaking lately?",
-];
-
 function renderAnswerText(text: string): string {
   // Strip the [TICKET #id] / [PROJECT #id] citation markers from display text —
   // they're rendered as clickable chips below instead, so the markers would
@@ -34,6 +28,9 @@ function renderAnswerText(text: string): string {
 
 export default function AskElijah() {
   const [open, setOpen] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(() => {
+    try { return localStorage.getItem("elijah_seen") === "1"; } catch { return false; }
+  });
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -97,37 +94,67 @@ export default function AskElijah() {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating button + indicator */}
       {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Ask Elijah"
-          style={{
-            position: "fixed",
-            bottom: "calc(var(--nav-h, 64px) + 16px)",
-            right: 16,
-            zIndex: 1500,
-            width: 58,
-            height: 58,
-            borderRadius: "50%",
-            border: "2px solid rgba(92,107,255,0.5)",
-            background: "#161827",
-            padding: 0,
-            cursor: "pointer",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 0 0 4px rgba(92,107,255,0.08)",
-            overflow: "hidden",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <img
-            src={AVATAR_URL}
-            alt="Elijah"
-            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
-        </button>
+        <div style={{
+          position: "fixed",
+          bottom: "calc(var(--nav-h, 64px) + 16px)",
+          right: 16,
+          zIndex: 1500,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 8,
+        }}>
+          {!hasInteracted && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "7px 12px", borderRadius: 99,
+              background: "#161827", border: "1px solid rgba(92,107,255,0.4)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+              animation: "elijah-float 2.6s ease-in-out infinite",
+              whiteSpace: "nowrap",
+            }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: "50%",
+                background: "#818cf8",
+                boxShadow: "0 0 0 0 rgba(129,140,248,0.7)",
+                animation: "elijah-ping 1.8s cubic-bezier(0,0,0.2,1) infinite",
+              }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#c7d2fe" }}>Ask Elijah</span>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              setOpen(true);
+              setHasInteracted(true);
+              try { localStorage.setItem("elijah_seen", "1"); } catch {}
+            }}
+            aria-label="Ask Elijah"
+            style={{
+              width: 58,
+              height: 58,
+              borderRadius: "50%",
+              border: "2px solid rgba(92,107,255,0.5)",
+              background: "#161827",
+              padding: 0,
+              cursor: "pointer",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 0 0 4px rgba(92,107,255,0.08)",
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <img
+              src={AVATAR_URL}
+              alt="Elijah"
+              style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          </button>
+        </div>
       )}
 
       {/* Chat panel */}
@@ -190,22 +217,8 @@ export default function AskElijah() {
                     <img src={AVATAR_URL} alt="Elijah" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }} />
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#e5e7eb", marginBottom: 4 }}>Yo, I'm Elijah. 🔧</div>
-                  <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.5, marginBottom: 18 }}>
+                  <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.5 }}>
                     Got a question about a ticket, a project, or somethin' that came up in the group chat? Lemme pull it up for you, dawg.
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {SUGGESTED_PROMPTS.map(p => (
-                      <button
-                        key={p}
-                        onClick={() => send(p)}
-                        style={{
-                          padding: "9px 14px", borderRadius: 10, border: "1px solid #2d3147",
-                          background: "#161827", color: "#9ca3af", fontSize: 13, textAlign: "left", cursor: "pointer",
-                        }}
-                      >
-                        {p}
-                      </button>
-                    ))}
                   </div>
                 </div>
               )}
@@ -349,6 +362,15 @@ export default function AskElijah() {
         @keyframes elijah-bounce {
           0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
           30% { transform: translateY(-4px); opacity: 1; }
+        }
+        @keyframes elijah-float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-3px); }
+        }
+        @keyframes elijah-ping {
+          0% { box-shadow: 0 0 0 0 rgba(129,140,248,0.7); }
+          70% { box-shadow: 0 0 0 7px rgba(129,140,248,0); }
+          100% { box-shadow: 0 0 0 0 rgba(129,140,248,0); }
         }
       `}</style>
     </>
