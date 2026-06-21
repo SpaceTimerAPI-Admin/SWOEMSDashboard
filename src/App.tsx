@@ -25,6 +25,7 @@ import ProcedureBuilder from "./pages/ProcedureBuilder";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
 import ShowTechNav from "./components/ShowTechNav";
+import AskElijah from "./components/AskElijah";
 import { isAuthed, clearToken, clearProfile, getRole } from "./lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin"];
@@ -130,6 +131,7 @@ export default function App() {
       </Routes>
 
       {!isPublic && (isShowTech ? <ShowTechNav /> : <BottomNav />)}
+      {!isPublic && isAuthed() && !isShowTech && <AskElijah />}
     </>
   );
 }

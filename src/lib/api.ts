@@ -416,3 +416,12 @@ export async function showTechRegister(payload: { code: string; name: string; em
 export async function getEnrollmentCode(): Promise<ApiResult<{ code: string }>> {
   return apiFetch("/api/showtech-enrollment-code", { method: "POST", body: {} });
 }
+
+export async function askElijah(question: string): Promise<ApiResult<{
+  answer: string;
+  cited_tickets: { id: string; title: string; location: string }[];
+  cited_projects: { id: string; title: string; location: string }[];
+  context_found: boolean;
+}>> {
+  return apiFetch("/api/ask-elijah", { method: "POST", body: { question } });
+}
