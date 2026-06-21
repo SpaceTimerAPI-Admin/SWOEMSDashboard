@@ -57,10 +57,15 @@ export default function EOD() {
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Date search — defaults to today's business day (4 AM ET cutoff handled server-side)
+  const [selectedDate, setSelectedDate] = useState<string>(""); // "" = today
+  const isToday = selectedDate === "";
+
   // Live ticket/project data
   const [tickets, setTickets] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [reportDay, setReportDay] = useState<string>("");
 
   // Shift log entries for today
   const [shiftEntries, setShiftEntries] = useState<any[]>([]);
@@ -72,18 +77,19 @@ export default function EOD() {
     async function load() {
       setDataLoading(true);
       try {
-        const res = await getEodToday() as any;
+        const res = await getEodToday(selectedDate || undefined) as any;
         if (res?.ok) {
           const data = res.data ?? res;
           setTickets(data.tickets || []);
           setProjects(data.projects || []);
           setShiftEntries(data.shift_log_entries || []);
+          setReportDay(data.day || "");
         }
       } catch {}
       setDataLoading(false);
     }
     void load();
-  }, []);
+  }, [selectedDate]);
 
   // Group by tag
   const grouped = useMemo(() => {
@@ -113,7 +119,7 @@ export default function EOD() {
     setStatus(null);
     setBusy(true);
     try {
-      const res: any = await sendEod({ handoff_notes: handoffNotes });
+      const res: any = await sendEod({ handoff_notes: handoffNotes, report_date: selectedDate || undefined });
       if (!res?.ok) throw new Error(res?.error || "Failed to send");
       const tc = res.data?.ticket_count ?? 0;
       const pc = res.data?.project_count ?? 0;
@@ -133,7 +139,39 @@ export default function EOD() {
     <div className="page fade-up">
       <div className="page-title">End of Day</div>
       <div className="page-subtitle">
-        {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+        {reportDay
+          ? new Date(reportDay + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+          : new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+        {!isToday && (
+          <span style={{
+            marginLeft: 8, fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+            background: "rgba(255,182,39,0.12)", color: "#FFD07A", border: "1px solid rgba(255,182,39,0.25)",
+          }}>VIEWING PAST DAY</span>
+        )}
+      </div>
+
+      {/* Date search */}
+      <div className="card" style={{ padding: "10px 14px", marginTop: 10, marginBottom: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "var(--muted2)", fontWeight: 600, whiteSpace: "nowrap" }}>📅 Jump to date:</span>
+        <input
+          type="date"
+          className="input"
+          style={{ flex: "1 1 160px", fontSize: 13, padding: "6px 10px", minWidth: 0 }}
+          value={selectedDate}
+          max={new Date().toLocaleDateString("en-CA")}
+          onChange={e => setSelectedDate(e.target.value)}
+        />
+        {!isToday && (
+          <button
+            onClick={() => setSelectedDate("")}
+            style={{
+              padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)",
+              background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            ← Today
+          </button>
+        )}
       </div>
 
       {/* Summary stats */}
@@ -325,7 +363,11 @@ export default function EOD() {
           onClick={onSend}
           disabled={busy}
         >
-          {busy ? <><span className="spinner" /> Sending report…</> : `Send EOD report${totalItems > 0 ? ` (${totalItems} items)` : ""}`}
+          {busy
+            ? <><span className="spinner" /> Sending report…</>
+            : isToday
+              ? `Send EOD report${totalItems > 0 ? ` (${totalItems} items)` : ""}`
+              : `Send report for ${reportDay ? new Date(reportDay + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "this day"}${totalItems > 0 ? ` (${totalItems} items)` : ""}`}
         </button>
       </div>
     </div>

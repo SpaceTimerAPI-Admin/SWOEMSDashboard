@@ -2,10 +2,9 @@ import type { Handler } from "@netlify/functions";
 import { requireSession } from "./_auth";
 import { supabaseAdmin } from "./_supabase";
 import { badRequest, json, unauthorized } from "./_shared";
+import { businessDayRange, todayBusinessDay, TZ } from "./_eod-day";
 
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
-
-const TZ = "America/New_York";
 
 function ymd(d: Date) {
   return d.toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD in ET
@@ -23,25 +22,6 @@ function escapeHtml(s: string) {
 function empName(employees: any[], empId: string) {
   const e = employees.find((x: any) => x.id === empId);
   return e ? e.name : "Unknown";
-}
-
-/** Returns correct UTC ISO start/end for a YYYY-MM-DD date in Eastern Time, DST-aware. */
-function etDayRange(day: string): { start: string; end: string } {
-  const offsetMs = (d: Date): number => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-    }).formatToParts(d);
-    const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
-    const etMs = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-    return d.getTime() - etMs;
-  };
-  const s = new Date(`${day}T00:00:00`);
-  const e = new Date(`${day}T23:59:59.999`);
-  return {
-    start: new Date(s.getTime() + offsetMs(s)).toISOString(),
-    end:   new Date(e.getTime() + offsetMs(e)).toISOString(),
-  };
 }
 
 function fmtTime(iso: string) {
@@ -340,12 +320,11 @@ export const handler: Handler = async (event) => {
     const report_date = String(body.report_date || "").trim();
     const handoff_notes = String(body.handoff_notes || "");
 
-    const date = report_date ? new Date(report_date + "T00:00:00") : new Date();
-    const day = ymd(date);
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(report_date) ? report_date : todayBusinessDay();
 
     const supabase = supabaseAdmin();
 
-    const { start, end } = etDayRange(day);
+    const { start, end } = businessDayRange(day);
 
     // Fetch tickets active today: created today OR closed today OR updated today
     const [ticketsCreated, ticketsClosed, ticketsCommented, projectsCreated, projectsClosed, projectsCommented, employees, shiftLogRes, beoRes] = await Promise.all([

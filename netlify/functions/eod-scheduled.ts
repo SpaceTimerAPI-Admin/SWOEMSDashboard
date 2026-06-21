@@ -1,20 +1,22 @@
 /**
  * Netlify Scheduled Function
- * Runs at 3:00 AM Eastern every day and posts the PREVIOUS day's EOD report to GroupMe.
+ * Runs at 4:30 AM Eastern every day and posts the PREVIOUS business day's EOD report to GroupMe.
  *
- * Example: runs at 3 AM on Friday April 10 → posts Thursday April 9's report.
+ * Business day = 4:00 AM ET to 3:59:59 AM ET the next day. So this fires just after
+ * the cutoff closes, ensuring all of "yesterday" (4am-4am) is captured before posting.
+ *
+ * Example: runs at 4:30 AM on Friday April 10 → posts Thursday April 9's business-day report
+ * (which covers Thu 4:00 AM through Fri 3:59 AM).
  *
  * Cron in UTC:
- *   ET is UTC-4 in summer (EDT), UTC-5 in winter (EST)
- *   3 AM EDT = 7 AM UTC  → "0 7 * * *"
- *   3 AM EST = 8 AM UTC  → "0 8 * * *"
- *   Using "0 7 * * *" — fires at 3 AM in summer, 2 AM in winter. Close enough year-round.
+ *   4:30 AM EDT (summer) = 8:30 AM UTC
+ *   4:30 AM EST (winter) = 9:30 AM UTC
+ *   Using "30 8 * * *" — fires at 4:30 AM in summer, 3:30 AM in winter. Close enough year-round.
  */
 import type { Handler } from "@netlify/functions";
 import { postGroupMe } from "./_groupme";
 import { supabaseAdmin } from "./_supabase";
-
-const TZ = "America/New_York";
+import { businessDayRange, todayBusinessDay, TZ } from "./_eod-day";
 
 export const handler: Handler = async () => {
   try {
@@ -24,27 +26,9 @@ export const handler: Handler = async () => {
       return { statusCode: 500, body: "SITE_BASE_URL not configured" };
     }
 
-    // Get yesterday's date in ET — subtract 1 from today's ET date string to stay timezone-safe
-    const todayET = new Date().toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD in ET
-    const d = new Date(`${todayET}T12:00:00`); // noon ET, safe midpoint
-    d.setDate(d.getDate() - 1);
-    const reportDay = d.toLocaleDateString("en-CA", { timeZone: TZ }); // yesterday YYYY-MM-DD in ET
-    const yesterday = new Date(`${reportDay}T12:00:00`);
-
-    // Build ET-correct date range for yesterday
-    const offsetMs = (d: Date): number => {
-      const parts = new Intl.DateTimeFormat("en-US", {
-        timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-      }).formatToParts(d);
-      const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
-      const etMs = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-      return d.getTime() - etMs;
-    };
-    const s = new Date(`${reportDay}T00:00:00`);
-    const e = new Date(`${reportDay}T23:59:59.999`);
-    const start = new Date(s.getTime() + offsetMs(s)).toISOString();
-    const end   = new Date(e.getTime() + offsetMs(e)).toISOString();
+    // Current business day at run-time is the day that JUST closed (since we run after the 4am cutoff)
+    const reportDay = todayBusinessDay();
+    const { start, end } = businessDayRange(reportDay);
 
     const supabase = supabaseAdmin();
 
@@ -63,7 +47,7 @@ export const handler: Handler = async () => {
 
     const reportUrl = `${base}/api/eod-report?date=${reportDay}`;
 
-    const friendlyDate = yesterday.toLocaleDateString("en-US", {
+    const friendlyDate = new Date(`${reportDay}T12:00:00`).toLocaleDateString("en-US", {
       timeZone: TZ, weekday: "long", month: "long", day: "numeric",
     });
 
@@ -79,7 +63,7 @@ export const handler: Handler = async () => {
 
     await postGroupMe(lines.join("\n"));
 
-    console.log(`[eod-scheduled] Posted EOD summary for ${reportDay}`);
+    console.log(`[eod-scheduled] Posted EOD summary for business day ${reportDay}`);
     return { statusCode: 200, body: "OK" };
   } catch (e: any) {
     console.error("[eod-scheduled] Error:", e?.message);

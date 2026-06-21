@@ -8,28 +8,9 @@
  */
 import type { Handler } from "@netlify/functions";
 import { supabaseAdmin } from "./_supabase";
+import { businessDayRange, todayBusinessDay, TZ } from "./_eod-day";
 
 const TAGS = ["Lighting", "Sound", "Video", "Rides", "Misc"] as const;
-const TZ = "America/New_York";
-
-/** Returns correct UTC ISO start/end for a YYYY-MM-DD date in Eastern Time, DST-aware. */
-function etDayRange(day: string): { start: string; end: string } {
-  const offsetMs = (d: Date): number => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-    }).formatToParts(d);
-    const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
-    const etMs = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-    return d.getTime() - etMs;
-  };
-  const s = new Date(`${day}T00:00:00`);
-  const e = new Date(`${day}T23:59:59.999`);
-  return {
-    start: new Date(s.getTime() + offsetMs(s)).toISOString(),
-    end:   new Date(e.getTime() + offsetMs(e)).toISOString(),
-  };
-}
 
 function ymd(d: Date): string {
   // Get YYYY-MM-DD in ET
@@ -315,11 +296,11 @@ export const handler: Handler = async (event) => {
     const supabase = supabaseAdmin();
     const qs = event.queryStringParameters || {};
 
-    // Determine the day to show
+    // Determine the business day to show (4 AM ET cutoff)
     const rawDate = (qs.date || "").trim();
-    const day = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : ymd(new Date());
+    const day = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayBusinessDay();
 
-    const { start, end } = etDayRange(day);
+    const { start, end } = businessDayRange(day);
 
     const [ticketsRes, ticketsClosedRes, ticketCommentsRes, projectsRes, projectsClosedRes, projectCommentsRes, employeesRes, shiftLogRes] = await Promise.all([
       supabase.from("tickets").select("*").gte("created_at", start).lte("created_at", end),

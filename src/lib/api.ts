@@ -248,12 +248,13 @@ export async function confirmProjectPhoto(input: { project_id: string; storage_k
 
 // -------------------- EOD / Events --------------------
 
-export async function sendEod(payload: { handoff_notes?: string }): Promise<ApiResult<{ emailed_to: string; ticket_count: number; project_count: number }>> {
+export async function sendEod(payload: { handoff_notes?: string; report_date?: string }): Promise<ApiResult<{ emailed_to: string; ticket_count: number; project_count: number }>> {
   return apiFetch<{ emailed_to: string; ticket_count: number; project_count: number }>("/api/send-eod", {
     method: "POST",
     body: {
       notes: "",
       handoff_notes: payload.handoff_notes ?? "",
+      report_date: payload.report_date ?? "",
     },
   });
 }
@@ -276,14 +277,14 @@ export async function reopenProject(id: string): Promise<ApiResult<{}>> {
   return apiFetch<{}>("/api/projects-reopen", { method: "POST", body: { id } });
 }
 
-export async function getEodToday(): Promise<ApiResult<{
+export async function getEodToday(date?: string): Promise<ApiResult<{
   day: string;
   tickets: any[];
   projects: any[];
   older_open_tickets: any[];
   older_open_projects: any[];
 }>> {
-  return apiFetch("/api/eod-today", { method: "POST", body: {} });
+  return apiFetch("/api/eod-today", { method: "POST", body: { date: date || "" } });
 }
 
 export async function listEmployees(): Promise<ApiResult<{ employees: { id: string; name: string; employee_id: string }[] }>> {

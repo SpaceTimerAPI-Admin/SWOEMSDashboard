@@ -1,5 +1,6 @@
 /**
- * Returns today's ticket/project activity for the EOD preview screen.
+ * Returns ticket/project activity for the EOD preview screen, for a given business day.
+ * A "business day" runs 4:00 AM ET to 3:59:59.999 AM ET the next day.
  * Mirrors the exact same data logic used by send-eod.ts so the preview
  * always matches what gets emailed.
  */
@@ -7,27 +8,7 @@ import type { Handler } from "@netlify/functions";
 import { requireSession } from "./_auth";
 import { supabaseAdmin } from "./_supabase";
 import { json, unauthorized } from "./_shared";
-
-const TZ = "America/New_York";
-
-/** Returns UTC ISO start/end for a YYYY-MM-DD date in Eastern Time (handles DST). */
-function etDayRange(day: string): { start: string; end: string } {
-  const offsetMs = (d: Date): number => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-    }).formatToParts(d);
-    const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
-    const etMs = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-    return d.getTime() - etMs;
-  };
-  const s = new Date(`${day}T00:00:00`);
-  const e = new Date(`${day}T23:59:59.999`);
-  return {
-    start: new Date(s.getTime() + offsetMs(s)).toISOString(),
-    end:   new Date(e.getTime() + offsetMs(e)).toISOString(),
-  };
-}
+import { businessDayRange, todayBusinessDay } from "./_eod-day";
 
 export const handler: Handler = async (event) => {
   try {
@@ -38,8 +19,10 @@ export const handler: Handler = async (event) => {
     const session = await requireSession(event);
     if (!session) return unauthorized();
 
-    const day = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
-    const { start, end } = etDayRange(day);
+    const body = event.body ? JSON.parse(event.body) : {};
+    const requestedDay = String(body.date || "").trim();
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(requestedDay) ? requestedDay : todayBusinessDay();
+    const { start, end } = businessDayRange(day);
 
     const supabase = supabaseAdmin();
 

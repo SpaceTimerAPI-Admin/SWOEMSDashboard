@@ -20,9 +20,9 @@
   to = "/index.html"
   status = 200
 
-# Scheduled: post previous day's EOD report to GroupMe at 3 AM Eastern (7 AM UTC)
+# Scheduled: post previous business day's EOD report to GroupMe at 4:30 AM Eastern (8:30 AM UTC)
 [functions."eod-scheduled"]
-  schedule = "0 7 * * *"
+  schedule = "30 8 * * *"
 
 # Scheduled: delete BEO PDFs for events 2+ days old, runs at 4 AM Eastern (8 AM UTC)
 [functions."beo-cleanup"]
