@@ -5,7 +5,11 @@ import { login } from "../lib/api";
 export default function Login() {
   const nav = useNavigate();
   const loc = useLocation();
-  const from = (loc.state as any)?.from || "/";
+  // Redirect target can come from either client-side nav (router state, used by
+  // RequireAuth before a hard reload) or the ?from= query param (used by the
+  // global 401 interceptor's hard redirect, which can't carry router state).
+  const fromQuery = new URLSearchParams(loc.search).get("from");
+  const from = (loc.state as any)?.from || fromQuery || "/";
   const [employeeId, setEmployeeId] = useState("");
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);

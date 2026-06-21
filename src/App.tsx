@@ -27,33 +27,40 @@ import BottomNav from "./components/BottomNav";
 import ShowTechNav from "./components/ShowTechNav";
 import { isAuthed, clearToken, clearProfile, getRole } from "./lib/auth";
 
-// Global 401 interceptor
-let _interceptorInstalled = false;
-function installAuthInterceptor(onUnauthed: () => void) {
-  if (_interceptorInstalled) return;
-  _interceptorInstalled = true;
-  const orig = window.fetch.bind(window);
-  window.fetch = async (...args) => {
-    const res = await orig(...args);
-    if (res.status === 401) onUnauthed();
-    return res;
-  };
-}
-
 const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin"];
 const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings"];
 
+/**
+ * Global session-expiry handler.
+ * Installed exactly once at module load — patches window.fetch so that ANY
+ * 401 response from ANY API call, on ANY page (including admin pages,
+ * background calls, etc.), immediately clears the session and hard-redirects
+ * to /login. This runs independently of React render/mount timing, so a user
+ * never sees a half-loaded page or an "Unauthorized" error string — they're
+ * bounced to login the instant the server rejects their session.
+ */
+let _redirecting = false;
+const _origFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const res = await _origFetch(...args);
+  if (res.status === 401 && !_redirecting) {
+    const path = window.location.pathname;
+    // Don't loop if we're already on a public/auth page
+    if (!PUBLIC_PATHS.includes(path) && !path.startsWith("/register/")) {
+      _redirecting = true;
+      clearToken();
+      clearProfile();
+      // Hard redirect (not client-side nav) guarantees a clean reload of
+      // app state — no stale component state, no half-mounted guarded routes.
+      window.location.href = `/login?from=${encodeURIComponent(path)}`;
+    }
+  }
+  return res;
+};
+
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const loc = useLocation();
-  const navigate = useNavigate();
   const role = getRole();
-
-  useEffect(() => {
-    installAuthInterceptor(() => {
-      clearToken(); clearProfile();
-      navigate("/login", { replace: true, state: { from: window.location.pathname } });
-    });
-  }, [navigate]);
 
   if (!isAuthed()) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
 
