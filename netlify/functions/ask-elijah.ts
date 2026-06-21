@@ -212,7 +212,12 @@ Answer the question using the context above. Cite tickets/projects you reference
     if (!claudeRes.ok) {
       const errText = await claudeRes.text();
       console.error("[ask-elijah] Claude API error:", claudeRes.status, errText);
-      return json({ ok: false, error: "Yo my brain's lagging rn, give it another shot in a sec." }, 500);
+      // Surface the real reason in dev/debugging — still keeps Elijah's voice for the user-facing part.
+      return json({
+        ok: false,
+        error: `Yo my brain's lagging rn, give it another shot in a sec. (${claudeRes.status})`,
+        debug: errText,
+      }, 500);
     }
 
     const claudeData = await claudeRes.json();
