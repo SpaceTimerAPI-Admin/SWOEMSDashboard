@@ -100,36 +100,89 @@ export const handler: Handler = async (event) => {
     const projects = projectsRes.data || [];
     const groupmeMessages = groupmeRes.data || [];
 
+    // ── Detect time-window phrasing in the question ──────────────────────────
+    // Keyword scoring alone doesn't catch "this morning" / "today" / "yesterday" —
+    // those words don't appear in ticket text, so without this the assistant just
+    // falls back to "whatever's recent" and the answer gets fuzzy about timing.
+    // When detected, we hard-filter the dataset to that actual window before scoring,
+    // so Elijah is reasoning over the right slice of time, not guessing from labels.
+    const qLower = question.toLowerCase();
+    const startOfTodayET = (() => {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+      }).formatToParts(now);
+      const get = (t: string) => parts.find(p => p.type === t)?.value;
+      return new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00-04:00`); // approx ET offset, fine for day-boundary purposes
+    })();
+
+    let windowStart: Date | null = null;
+    let windowLabel = "";
+    if (/\bthis morning\b/.test(qLower)) {
+      windowStart = startOfTodayET;
+      windowLabel = "this morning / today";
+    } else if (/\btoday\b/.test(qLower)) {
+      windowStart = startOfTodayET;
+      windowLabel = "today";
+    } else if (/\byesterday\b/.test(qLower)) {
+      windowStart = new Date(startOfTodayET.getTime() - 24 * 60 * 60 * 1000);
+      windowLabel = "yesterday";
+    } else if (/\bthis week\b/.test(qLower)) {
+      windowStart = new Date(startOfTodayET.getTime() - 7 * 24 * 60 * 60 * 1000);
+      windowLabel = "this week";
+    }
+    const windowEnd = windowLabel === "yesterday" ? startOfTodayET : null; // yesterday is bounded both sides
+
+    function withinWindow(iso: string): boolean {
+      if (!windowStart) return true; // no time-window detected — don't filter
+      const t = new Date(iso).getTime();
+      if (t < windowStart.getTime()) return false;
+      if (windowEnd && t >= windowEnd.getTime()) return false;
+      return true;
+    }
+
     // ── Score and rank by keyword relevance ──────────────────────────────────
     const scoredTickets = tickets
+      .filter((t: any) => withinWindow(t.created_at))
       .map((t: any) => ({
         item: t,
         score: scoreRelevance(queryTokens, `${t.title} ${t.location} ${t.details || ""} ${t.tag || ""} ${(t.comments || []).map((c: any) => c.comment).join(" ")}`),
       }))
-      .filter(x => x.score > 0)
-      .sort((a, b) => b.score - a.score)
+      .sort((a: any, b: any) => b.score - a.score)
       .slice(0, 8);
 
     const scoredProjects = projects
+      .filter((p: any) => withinWindow(p.created_at))
       .map((p: any) => ({
         item: p,
         score: scoreRelevance(queryTokens, `${p.title} ${p.location} ${p.details || ""} ${p.tag || ""} ${(p.comments || []).map((c: any) => c.comment).join(" ")}`),
       }))
-      .filter(x => x.score > 0)
-      .sort((a, b) => b.score - a.score)
+      .sort((a: any, b: any) => b.score - a.score)
       .slice(0, 5);
 
     const scoredMessages = groupmeMessages
+      .filter((m: any) => withinWindow(m.created_at))
       .map((m: any) => ({ item: m, score: scoreRelevance(queryTokens, m.text || "") }))
-      .filter(x => x.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 15);
+      .sort((a: any, b: any) => b.score - a.score)
+      .slice(0, windowStart ? 30 : 15); // wider net for a time-scoped ask since relevance scoring matters less here
 
-    // If literally nothing matched, fall back to most recent items so Elijah
-    // still has *something* to reason about (better than a hard "no results").
-    const ticketContext = scoredTickets.length > 0 ? scoredTickets : tickets.slice(0, 5).map(t => ({ item: t, score: 0 }));
-    const projectContext = scoredProjects.length > 0 ? scoredProjects : projects.slice(0, 3).map(p => ({ item: p, score: 0 }));
-    const messageContext = scoredMessages; // no fallback for chat — irrelevant chat noise isn't helpful
+    // If a time window was detected, trust the window filter completely — don't
+    // backfill with unrelated older items, since that's exactly what caused the
+    // "this morning" question to get answered with 6/13 and 6/15 chat instead.
+    // If NO time window was detected and keyword scoring also found nothing,
+    // THEN fall back to recent items so Elijah still has something to go on.
+    const ticketContext = windowStart
+      ? scoredTickets
+      : (scoredTickets.filter((x: any) => x.score > 0).length > 0
+          ? scoredTickets.filter((x: any) => x.score > 0)
+          : tickets.slice(0, 5).map((t: any) => ({ item: t, score: 0 })));
+    const projectContext = windowStart
+      ? scoredProjects
+      : (scoredProjects.filter((x: any) => x.score > 0).length > 0
+          ? scoredProjects.filter((x: any) => x.score > 0)
+          : projects.slice(0, 3).map((p: any) => ({ item: p, score: 0 })));
+    const messageContext = windowStart
+      ? scoredMessages
+      : scoredMessages.filter((x: any) => x.score > 0); // no fallback for chat — irrelevant chat noise isn't helpful
 
     // ── Build context blocks for the prompt ──────────────────────────────────
     const ticketBlocks = ticketContext.map(({ item: t }: any) => {
@@ -141,8 +194,8 @@ export const handler: Handler = async (event) => {
 Title: ${t.title}
 Location: ${t.location}${t.tag ? ` | Category: ${t.tag}` : ""}
 Status: ${t.status}
-Created: ${new Date(t.created_at).toLocaleDateString("en-US", { timeZone: TZ })} by ${t.employees?.name || "Unknown"}
-${t.closed_at ? `Closed: ${new Date(t.closed_at).toLocaleDateString("en-US", { timeZone: TZ })}` : ""}
+Created: ${new Date(t.created_at).toLocaleString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} by ${t.employees?.name || "Unknown"}
+${t.closed_at ? `Closed: ${new Date(t.closed_at).toLocaleString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}` : ""}
 Details: ${escapeForPrompt(t.details || "(none)")}
 ${comments ? `Updates:\n${comments}` : "Updates: (none)"}`;
     }).join("\n\n---\n\n");
@@ -156,19 +209,28 @@ ${comments ? `Updates:\n${comments}` : "Updates: (none)"}`;
 Title: ${p.title}
 Location: ${p.location}${p.tag ? ` | Category: ${p.tag}` : ""}
 Status: ${p.status}
-Created: ${new Date(p.created_at).toLocaleDateString("en-US", { timeZone: TZ })} by ${p.employees?.name || "Unknown"}
+Created: ${new Date(p.created_at).toLocaleString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} by ${p.employees?.name || "Unknown"}
 Details: ${escapeForPrompt(p.details || "(none)")}
 ${comments ? `Updates:\n${comments}` : "Updates: (none)"}`;
     }).join("\n\n---\n\n");
 
     const messageBlocks = messageContext.map(({ item: m }: any) =>
-      `[${new Date(m.created_at).toLocaleDateString("en-US", { timeZone: TZ })} ${new Date(m.created_at).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })}] ${m.sender_name || "Unknown"}: ${escapeForPrompt(m.text)}`
+      `[${new Date(m.created_at).toLocaleDateString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" })} ${new Date(m.created_at).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })}] ${m.sender_name || "Unknown"}: ${escapeForPrompt(m.text)}`
     ).join("\n");
 
-    const noContextFound = ticketContext.every(x => x.score === 0) && projectContext.every(x => x.score === 0) && messageContext.length === 0;
+    const noContextFound = ticketContext.length === 0 && projectContext.length === 0 && messageContext.length === 0;
 
     // ── Build the prompt ──────────────────────────────────────────────────────
+    const nowDisplay = now.toLocaleString("en-US", {
+      timeZone: TZ, weekday: "long", year: "numeric", month: "long", day: "numeric",
+      hour: "numeric", minute: "2-digit", hour12: true,
+    });
+    const todayDateOnly = now.toLocaleDateString("en-US", { timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric" });
+
     const systemPrompt = `You are Elijah, a SeaWorld maintenance tech with serious experience and a laid-back, hipster energy. You live in the SWOEMS dashboard helping EMS staff troubleshoot by digging through past tickets, projects, and the team GroupMe chat.
+
+CURRENT DATE & TIME: ${nowDisplay} (Eastern Time). Today is ${todayDateOnly}.
+Every ticket, project, and chat message timestamp given to you below is already in Eastern Time. Use the current date above to correctly figure out what "today," "this morning," "yesterday," "this week," etc. actually mean relative to right now. Never guess at the current date from the data itself — you've been told exactly what it is above, trust it.
 
 Your voice: chill, a little hipster, talks like one of the crew — not a corporate bot. Drop in casual slang naturally (not forced into every sentence): "yo", "dawg", "fr fr", "no cap", "bet", "lowkey/highkey", "say less", "that's wild", "ngl", "lemme pull that up", "facts". Keep it real and a little playful, but never at the expense of being useful — you're still the guy who actually knows what's wrong with the JTA sensor.
 
@@ -176,12 +238,13 @@ Rules:
 - Answer using ONLY the context provided below. Do not invent ticket numbers, names, or details not present in the context.
 - When you reference a specific ticket or project, cite it like this: [TICKET #abc-123] or [PROJECT #abc-123] so the UI can link to it.
 - If the context doesn't actually answer the question, say so plainly in your voice — don't pad with vague guesses. Something like "ngl I got nothing on that one, no tickets matching" is better than making stuff up.
+- If someone asks about a specific time window (today, this morning, yesterday, this week) and there's genuinely nothing in the context from that window, say that clearly and directly — don't blur it into "here's what's been happening lately" as a workaround. It's fine to also mention recent relevant stuff afterward, but be upfront that it's not from the window they asked about.
 - If you spot a pattern across multiple tickets (e.g. this panel keeps failing), call it out — that's the good stuff, lean into it with some personality ("yo this is the THIRD time this thing's acted up, might be time to actually fix it instead of bandaid it").
 - Keep responses tight — a few short paragraphs or a quick bulleted list max. People are reading this on their phone mid-shift, not before bed.
 - Don't overdo the slang to the point it's hard to read or unprofessional — sprinkle it, don't drown the answer in it. The information always comes first.`;
 
     const userPrompt = `QUESTION: ${question}
-
+${windowStart ? `\nTIME WINDOW DETECTED: The question asks about "${windowLabel}". The data below has ALREADY been filtered to only include items from that window — if a section says "(none found)", that means there is genuinely nothing from ${windowLabel}, not that the filter failed. Tell the user plainly if a section is empty rather than substituting older unrelated items.\n` : ""}
 ═══ RELEVANT TICKETS ═══
 ${ticketBlocks || "(none found)"}
 
