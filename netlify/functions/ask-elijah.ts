@@ -60,10 +60,11 @@ export const handler: Handler = async (event) => {
     if (!apiKey) return json({ ok: false, error: "AI assistant not configured." }, 500);
 
     const supabase = supabaseAdmin();
+    const now = new Date();
     const queryTokens = tokenize(question);
 
-    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     // ── Pull candidate data in parallel ──────────────────────────────────────
     const [ticketsRes, projectsRes, groupmeRes] = await Promise.all([
