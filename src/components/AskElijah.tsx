@@ -31,6 +31,10 @@ export default function AskElijah() {
   const [hasInteracted, setHasInteracted] = useState(() => {
     try { return localStorage.getItem("elijah_seen") === "1"; } catch { return false; }
   });
+
+  // After Dark: 10 PM – midnight local time (server enforces ET, this is just for the UI indicator)
+  const hour = new Date().getHours();
+  const isAfterDark = hour >= 22;
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -135,11 +139,13 @@ export default function AskElijah() {
               width: 58,
               height: 58,
               borderRadius: "50%",
-              border: "2px solid rgba(92,107,255,0.5)",
+              border: `2px solid ${isAfterDark ? "rgba(168,85,247,0.6)" : "rgba(92,107,255,0.5)"}`,
               background: "#161827",
               padding: 0,
               cursor: "pointer",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.5), 0 0 0 4px rgba(92,107,255,0.08)",
+              boxShadow: isAfterDark
+                ? "0 8px 24px rgba(0,0,0,0.5), 0 0 0 4px rgba(168,85,247,0.12)"
+                : "0 8px 24px rgba(0,0,0,0.5), 0 0 0 4px rgba(92,107,255,0.08)",
               overflow: "hidden",
               display: "flex",
               alignItems: "center",
@@ -192,13 +198,24 @@ export default function AskElijah() {
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: "50%", overflow: "hidden",
-                border: "2px solid rgba(92,107,255,0.4)", flexShrink: 0,
+                border: `2px solid ${isAfterDark ? "rgba(168,85,247,0.5)" : "rgba(92,107,255,0.4)"}`, flexShrink: 0,
               }}>
                 <img src={AVATAR_URL} alt="Elijah" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#e5e7eb" }}>Ask Elijah</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>your tech, digs through tickets & GroupMe</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#e5e7eb", display: "flex", alignItems: "center", gap: 6 }}>
+                  Ask Elijah
+                  {isAfterDark && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 99,
+                      background: "rgba(168,85,247,0.2)", color: "#c084fc",
+                      border: "1px solid rgba(168,85,247,0.3)", letterSpacing: "0.05em",
+                    }}>🌙 AFTER DARK</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: isAfterDark ? "#a855f7" : "#6b7280" }}>
+                  {isAfterDark ? "sassy mode activated, tread carefully" : "your tech, digs through tickets & GroupMe"}
+                </div>
               </div>
               <button
                 onClick={() => setOpen(false)}
@@ -216,9 +233,13 @@ export default function AskElijah() {
                   }}>
                     <img src={AVATAR_URL} alt="Elijah" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }} />
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#e5e7eb", marginBottom: 4 }}>Yo, I'm Elijah. 🔧</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#e5e7eb", marginBottom: 4 }}>
+                    {isAfterDark ? "It's After Dark. You've been warned. 🌙" : "Yo, I'm Elijah. 🔧"}
+                  </div>
                   <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.5 }}>
-                    Got a question about a ticket, a project, or somethin' that came up in the group chat? Lemme pull it up for you, dawg.
+                    {isAfterDark
+                      ? "Ask me whatever. Work stuff, life stuff, whatever's on your mind. I'll relate it back to the job somehow. No promises I'll be nice about it."
+                      : "Got a question about a ticket, a project, or somethin' that came up in the group chat? Lemme pull it up for you, dawg."}
                   </div>
                 </div>
               )}
