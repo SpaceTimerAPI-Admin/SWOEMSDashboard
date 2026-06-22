@@ -425,3 +425,7 @@ export async function askElijah(question: string): Promise<ApiResult<{
 }>> {
   return apiFetch("/api/ask-elijah", { method: "POST", body: { question } });
 }
+
+export async function getElijahHistory(params: { page?: number; employee_id?: string; after_dark?: boolean | null; search?: string }): Promise<ApiResult<{ conversations: any[]; total: number; page: number; pages: number }>> {
+  return apiFetch("/api/elijah-history", { method: "POST", body: params });
+}

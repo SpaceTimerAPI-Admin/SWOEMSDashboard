@@ -317,6 +317,21 @@ Answer the question using the context above. Cite tickets/projects you reference
       .filter((p: any) => citedProjectIds.includes(p.id))
       .map((p: any) => ({ id: p.id, title: p.title, location: p.location }));
 
+    // ── Log the conversation ─────────────────────────────────────────────────
+    // Non-blocking — a logging failure should never prevent the answer from reaching the user.
+    supabase.from("elijah_conversations").insert({
+      employee_id: session.employee.id,
+      employee_name: session.employee.name,
+      question,
+      answer,
+      after_dark: isAfterDark,
+      context_found: !noContextFound,
+      cited_ticket_ids: citedTicketIds.length > 0 ? citedTicketIds : null,
+      cited_project_ids: citedProjectIds.length > 0 ? citedProjectIds : null,
+    }).then(({ error }: any) => {
+      if (error) console.error("[ask-elijah] Failed to log conversation:", error.message);
+    });
+
     return json({
       ok: true,
       answer,

@@ -86,7 +86,7 @@ export default function Admin() {
           <div className="page-title">Admin</div>
           <div className="page-subtitle">User Management</div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link to="/admin/schedule"
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
             📅 Schedule
@@ -94,6 +94,10 @@ export default function Admin() {
           <Link to="/admin/qr"
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
             📲 QR Code
+          </Link>
+          <Link to="/admin/elijah"
+            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(92,107,255,0.3)", background: "rgba(92,107,255,0.08)", color: "#B0B8FF", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+            🤖 Elijah Logs
           </Link>
           <button
             className="btn primary"
