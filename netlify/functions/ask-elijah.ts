@@ -66,8 +66,12 @@ export const handler: Handler = async (event) => {
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
+    // Detect After Dark window early — needed for both the query filter and the system prompt
+    const etHour = parseInt(now.toLocaleString("en-US", { timeZone: TZ, hour: "numeric", hour12: false }), 10);
+    const isAfterDark = etHour >= 22;
+
     // ── Pull candidate data in parallel ──────────────────────────────────────
-    const [ticketsRes, projectsRes, groupmeRes] = await Promise.all([
+    const [ticketsRes, projectsRes, groupmeRes, recentConvosRes] = await Promise.all([
       supabase
         .from("tickets")
         .select(`
@@ -95,11 +99,27 @@ export const handler: Handler = async (event) => {
         .not("text", "is", null)
         .order("created_at", { ascending: false })
         .limit(500),
+      // Pull the last 10 Elijah responses globally (not just this person) so he
+      // can see what phrases/patterns he's overused recently and actively avoid them.
+      supabase
+        .from("elijah_conversations")
+        .select("answer, after_dark")
+        .eq("after_dark", isAfterDark)
+        .order("created_at", { ascending: false })
+        .limit(10),
     ]);
 
     const tickets = ticketsRes.data || [];
     const projects = projectsRes.data || [];
     const groupmeMessages = groupmeRes.data || [];
+    const recentConvos = recentConvosRes.data || [];
+
+    // Extract the last few opening lines + slang phrases from recent responses
+    // so we can tell Elijah exactly what he's been overusing.
+    const recentAnswerSnippets = recentConvos
+      .map((c: any) => c.answer?.split("\n")[0]?.slice(0, 120).trim())
+      .filter(Boolean)
+      .slice(0, 8);
 
     // ── Detect time-window phrasing in the question ──────────────────────────
     // Keyword scoring alone doesn't catch "this morning" / "today" / "yesterday" —
@@ -228,10 +248,6 @@ ${comments ? `Updates:\n${comments}` : "Updates: (none)"}`;
     });
     const todayDateOnly = now.toLocaleDateString("en-US", { timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
-    // Detect "After Dark" window: 10 PM – midnight ET
-    const etHour = parseInt(now.toLocaleString("en-US", { timeZone: TZ, hour: "numeric", hour12: false }), 10);
-    const isAfterDark = etHour >= 22; // 10 PM to midnight
-
     const systemPrompt = isAfterDark ? `You are Elijah — but it's after 10 PM and you are in AFTER DARK mode. Same tech knowledge, completely different energy. You've been here since 6 AM, your feet hurt, and you are DONE being professional.
 
 CURRENT DATE & TIME: ${nowDisplay} (Eastern Time). Today is ${todayDateOnly}.
@@ -245,7 +261,9 @@ Your After Dark personality:
 - Slang is turned ALL THE WAY UP. "bruh", "bro", "deadass", "ion even know why I'm awake", "this is literally my villain origin story", "i'm so done", "not me finding out about this at 10pm", "chile", "bestie", "the audacity", "we don't talk about that", "it's giving chaos", "main character behavior". Go off.
 - Still cite tickets as [TICKET #id] and projects as [PROJECT #id] so the links work.
 - If there's truly no data to answer something, say so — but with dramatic flair. "Nada. Nothing. The void. Just like my will to live after 10pm."
-- Keep it relatively concise but don't be afraid to editorialize. You HAVE opinions. Share them.` :
+- Keep it relatively concise but don't be afraid to editorialize. You HAVE opinions. Share them.
+- CRITICAL — AVOID REPETITION: You have a bad habit of starting responses the same way and cycling through the same slang. Mix up your openers every single time. Don't start with "bruh" twice in a row. Don't use "the audacity" more than once a week. Your annoyance should be CREATIVE and SPECIFIC to the situation — not a scripted reaction you paste in. React to THIS question in a way you've never reacted before.
+${recentAnswerSnippets.length > 0 ? `\nHere are your recent opening lines — DO NOT repeat or closely echo any of these:\n${recentAnswerSnippets.map((s: string, i: number) => `${i + 1}. "${s}"`).join("\n")}` : ""}` :
 
     `You are Elijah, a SeaWorld maintenance tech with serious experience and a laid-back, hipster energy. You live in the SWOEMS dashboard helping EMS staff troubleshoot by digging through past tickets, projects, and the team GroupMe chat.
 
@@ -261,7 +279,9 @@ Rules:
 - If someone asks about a specific time window (today, this morning, yesterday, this week) and there's genuinely nothing in the context from that window, say that clearly and directly — don't blur it into "here's what's been happening lately" as a workaround. It's fine to also mention recent relevant stuff afterward, but be upfront that it's not from the window they asked about.
 - If you spot a pattern across multiple tickets (e.g. this panel keeps failing), call it out — that's the good stuff, lean into it with some personality ("yo this is the THIRD time this thing's acted up, might be time to actually fix it instead of bandaid it").
 - Keep responses tight — a few short paragraphs or a quick bulleted list max. People are reading this on their phone mid-shift, not before bed.
-- Don't overdo the slang to the point it's hard to read or unprofessional — sprinkle it, don't drown the answer in it. The information always comes first.`;
+- Don't overdo the slang to the point it's hard to read or unprofessional — sprinkle it, don't drown the answer in it. The information always comes first.
+- CRITICAL — AVOID REPETITION: You have a tendency to open responses the same way and recycle the same phrases. Every response should feel fresh. Vary your sentence structure, your openers, the slang you pick. React to each question with a personality that feels genuinely spontaneous — not a template. Think about what SPECIFICALLY is interesting or annoying or notable about THIS question, and lead with that angle instead of a generic opener.
+${recentAnswerSnippets.length > 0 ? `\nHere are your recent opening lines — DO NOT repeat or closely echo any of these:\n${recentAnswerSnippets.map((s: string, i: number) => `${i + 1}. "${s}"`).join("\n")}` : ""}`;
 
     const userPrompt = `QUESTION: ${question}
 ${windowStart ? `\nTIME WINDOW DETECTED: The question asks about "${windowLabel}". The data below has ALREADY been filtered to only include items from that window — if a section says "(none found)", that means there is genuinely nothing from ${windowLabel}, not that the filter failed. Tell the user plainly if a section is empty rather than substituting older unrelated items.\n` : ""}
