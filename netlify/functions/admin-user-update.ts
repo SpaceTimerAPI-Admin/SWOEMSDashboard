@@ -20,6 +20,11 @@ export const handler: Handler = async (event) => {
     if (body.email) updates.email = String(body.email).trim().toLowerCase();
     if (body.role && ["admin","ems","show_tech"].includes(body.role)) updates.role = body.role;
     if (typeof body.is_active === "boolean") updates.is_active = body.is_active;
+    // Email alert preferences — each is an explicit boolean toggle
+    if (typeof body.email_overdue_alert === "boolean") updates.email_overdue_alert = body.email_overdue_alert;
+    if (typeof body.email_assigned_recap === "boolean") updates.email_assigned_recap = body.email_assigned_recap;
+    if (typeof body.email_weekly_summary === "boolean") updates.email_weekly_summary = body.email_weekly_summary;
+    if (typeof body.email_assignment_notify === "boolean") updates.email_assignment_notify = body.email_assignment_notify;
     if (body.pin) {
       if (!/^\d{4}$/.test(body.pin)) return badRequest("PIN must be 4 digits");
       updates.pin_hash = await bcrypt.hash(body.pin, 10);

@@ -193,7 +193,8 @@ Return nothing else — no explanation, no markdown, just the JSON object.`,
       .select("email")
       .eq("is_active", true)
       .eq("role", "admin")
-      .neq("email", "");
+      .neq("email", "")
+      .eq("email_weekly_summary", true);
 
     if (adminsErr) throw new Error(adminsErr.message);
     const recipients = (admins || []).map((e: any) => e.email).filter(Boolean);

@@ -144,9 +144,41 @@ export default function Admin() {
                   <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>
                     ID #{emp.employee_id} · {emp.email}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--muted2)" }}>
+                  <div style={{ fontSize: 11, color: "var(--muted2)", marginBottom: 8 }}>
                     Last login: {fmtDate(emp.last_login_at)}
                   </div>
+                  {/* Email alert toggles — only show for EMS/Admin since Show Tech don't get emails */}
+                  {emp.role !== "show_tech" && emp.email && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {([
+                        { key: "email_overdue_alert",      label: "Overdue Alerts" },
+                        { key: "email_assigned_recap",     label: "Assigned Recap" },
+                        { key: "email_assignment_notify",  label: "Assignment Notify" },
+                        { key: "email_weekly_summary",     label: "Weekly Summary", adminOnly: true },
+                      ] as { key: string; label: string; adminOnly?: boolean }[])
+                        .filter(pref => !pref.adminOnly || emp.role === "admin")
+                        .map(pref => {
+                          const on = emp[pref.key] !== false; // default true if null/undefined
+                          return (
+                            <button
+                              key={pref.key}
+                              title={`${on ? "Disable" : "Enable"} ${pref.label}`}
+                              onClick={() => handleUpdate(emp.id, { [pref.key]: !on })}
+                              style={{
+                                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                                border: "1px solid",
+                                borderColor: on ? "rgba(52,211,153,0.3)" : "rgba(255,255,255,0.1)",
+                                background: on ? "rgba(52,211,153,0.1)" : "rgba(255,255,255,0.04)",
+                                color: on ? "#7EEFC4" : "#6b7280",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {on ? "✓" : "✗"} {pref.label}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => openEdit(emp)}
                   style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)",

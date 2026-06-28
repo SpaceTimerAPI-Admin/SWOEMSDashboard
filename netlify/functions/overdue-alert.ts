@@ -252,10 +252,11 @@ export const handler: Handler = async () => {
     // 3. Fetch all active EMS + Admin employees with email set — Show Tech never included
     const { data: employees, error: empErr } = await supabase
       .from("employees")
-      .select("id, name, email, role")
+      .select("id, name, email, role, email_overdue_alert")
       .eq("is_active", true)
       .in("role", ["ems", "admin"])
-      .neq("email", "");
+      .neq("email", "")
+      .eq("email_overdue_alert", true);
 
     if (empErr) {
       console.error("[overdue-alert] Employees fetch error:", empErr.message);

@@ -152,11 +152,11 @@ export const handler: Handler = async (event) => {
       try {
         const { data: assignee } = await supabase
           .from("employees")
-          .select("id, name, email, role")
+          .select("id, name, email, role, email_assignment_notify")
           .eq("id", assigned_to)
           .maybeSingle();
 
-        if (assignee && assignee.role !== "show_tech" && assignee.email) {
+        if (assignee && assignee.role !== "show_tech" && assignee.email && assignee.email_assignment_notify !== false) {
           const { data: ticket } = await supabase
             .from("tickets")
             .select("id, title, location, tag, details, created_at, sla_due_at")

@@ -35,3 +35,7 @@
 # Scheduled: weekly summary to admins — Mondays at 7 AM ET (11 AM UTC)
 [functions."weekly-summary"]
   schedule = "0 11 * * 1"
+
+# Scheduled: tag-specific weekly recaps (Sound → Kalib, Lighting → Adam) — Mondays at 7 AM ET
+[functions."tag-recap"]
+  schedule = "0 11 * * 1"
