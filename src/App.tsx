@@ -24,6 +24,7 @@ import Procedures from "./pages/Procedures";
 import ProcedureView from "./pages/ProcedureView";
 import ProcedureBuilder from "./pages/ProcedureBuilder";
 import Settings from "./pages/Settings";
+import Remote from "./pages/Remote";
 import BottomNav from "./components/BottomNav";
 import ShowTechNav from "./components/ShowTechNav";
 import AskElijah from "./components/AskElijah";
@@ -128,6 +129,7 @@ export default function App() {
         <Route path="/procedures/:id" element={<RequireAuth><ProcedureView /></RequireAuth>} />
         <Route path="/procedures/:id/edit" element={<RequireAuth><ProcedureBuilder /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+        <Route path="/remote" element={<RequireAuth><Remote /></RequireAuth>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
