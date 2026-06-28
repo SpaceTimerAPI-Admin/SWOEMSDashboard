@@ -55,36 +55,6 @@ function DocsButton() {
 export default function Home() {
   const profile = getProfile();
   const [assigned, setAssigned] = useState<any[]>([]);
-  const [atPark, setAtPark] = useState<boolean | null>(null); // null = checking, true = at park, false = not at park
-
-  // SeaWorld Entertainment Orlando park coordinates + radius (meters)
-  const PARKS = [
-    { name: "SeaWorld Orlando",   lat: 28.4118,  lng: -81.4613, radius: 800 },
-    { name: "Aquatica Orlando",   lat: 28.4074,  lng: -81.4613, radius: 600 },
-    { name: "Discovery Cove",     lat: 28.4096,  lng: -81.4706, radius: 600 },
-  ];
-
-  function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-    const R = 6371000; // Earth radius in meters
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  useEffect(() => {
-    if (!navigator.geolocation) { setAtPark(false); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const inPark = PARKS.some(p => haversineDistance(latitude, longitude, p.lat, p.lng) <= p.radius);
-        setAtPark(inPark);
-      },
-      () => setAtPark(false), // denied or error — hide the tile
-      { timeout: 8000, maximumAge: 60000 }
-    );
-  }, []);
 
   // Schedule state
   const [scheduleEntries, setScheduleEntries] = useState<any[] | null>(null);
@@ -288,7 +258,7 @@ export default function Home() {
         <Tile to="/eod"          icon="📝" title="EOD Report"   desc="Generate & email today's recap"     accent="rgba(255,84,84,0.12)" />
         <Tile to="/procedures"   icon="📖" title="Procedures"   desc="Step-by-step guides & references"   accent="rgba(56,189,248,0.12)" />
         <DocsButton />
-        {getRole() !== "show_tech" && atPark === true && (
+        {getRole() !== "show_tech" && (
           <Tile to="/remote" icon="🖥️" title="Q-SYS Viewer" desc="" accent="rgba(52,211,153,0.12)" />
         )}
         {getRole() === "admin" && (
