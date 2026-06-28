@@ -25,6 +25,8 @@ export const handler: Handler = async (event) => {
     if (typeof body.email_assigned_recap === "boolean") updates.email_assigned_recap = body.email_assigned_recap;
     if (typeof body.email_weekly_summary === "boolean") updates.email_weekly_summary = body.email_weekly_summary;
     if (typeof body.email_assignment_notify === "boolean") updates.email_assignment_notify = body.email_assignment_notify;
+    if (typeof body.email_sound_recap === "boolean") updates.email_sound_recap = body.email_sound_recap;
+    if (typeof body.email_lighting_recap === "boolean") updates.email_lighting_recap = body.email_lighting_recap;
     if (body.pin) {
       if (!/^\d{4}$/.test(body.pin)) return badRequest("PIN must be 4 digits");
       updates.pin_hash = await bcrypt.hash(body.pin, 10);

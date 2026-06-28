@@ -155,10 +155,14 @@ export default function Admin() {
                         { key: "email_assigned_recap",     label: "Assigned Recap" },
                         { key: "email_assignment_notify",  label: "Assignment Notify" },
                         { key: "email_weekly_summary",     label: "Weekly Summary", adminOnly: true },
+                        { key: "email_sound_recap",        label: "🎵 Sound Recap" },
+                        { key: "email_lighting_recap",     label: "💡 Lighting Recap" },
                       ] as { key: string; label: string; adminOnly?: boolean }[])
                         .filter(pref => !pref.adminOnly || emp.role === "admin")
                         .map(pref => {
-                          const on = emp[pref.key] !== false; // default true if null/undefined
+                          // Tag recaps are opt-in (default false); all others are opt-out (default true)
+                          const optIn = pref.key.startsWith("email_sound") || pref.key.startsWith("email_lighting");
+                          const on = optIn ? emp[pref.key] === true : emp[pref.key] !== false;
                           return (
                             <button
                               key={pref.key}

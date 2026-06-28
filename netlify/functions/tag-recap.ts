@@ -13,12 +13,10 @@ import { supabaseAdmin } from "./_supabase";
 const TZ = "America/New_York";
 const SITE_URL = (process.env.SITE_BASE_URL || "https://www.swoems.com").replace(/\/$/, "");
 
-// Tag → recipient name mapping.
-// The recipient is looked up by name (case-insensitive partial match) from employees.
-// Add more entries here whenever new tag recaps are needed.
-const TAG_RECIPIENTS: { tag: string; recipientName: string }[] = [
-  { tag: "Sound",    recipientName: "Kalib" },
-  { tag: "Lighting", recipientName: "Adam"  },
+// Tag → which preference column controls who receives it
+const TAG_PREFS: { tag: string; prefColumn: string; emoji: string }[] = [
+  { tag: "Sound",    prefColumn: "email_sound_recap",    emoji: "🎵" },
+  { tag: "Lighting", prefColumn: "email_lighting_recap", emoji: "💡" },
 ];
 
 function escapeHtml(s: string) {
@@ -201,23 +199,22 @@ export const handler: Handler = async () => {
 
   let sentCount = 0;
 
-  for (const { tag, recipientName } of TAG_RECIPIENTS) {
+  for (const { tag, prefColumn, emoji } of TAG_PREFS) {
     try {
-      // Look up recipient by name (case-insensitive partial match), active only
-      const { data: matchedEmps } = await supabase
+      // Find all active employees who have opted in to this tag's recap
+      const { data: recipients } = await supabase
         .from("employees")
-        .select("id, name, email, is_active")
-        .ilike("name", `${recipientName}%`)
+        .select("id, name, email")
         .eq("is_active", true)
-        .limit(1);
+        .eq(prefColumn, true)
+        .neq("email", "");
 
-      const emp = matchedEmps?.[0];
-      if (!emp?.email) {
-        console.warn(`[tag-recap] No active employee found matching "${recipientName}" for ${tag} recap`);
+      if (!recipients || recipients.length === 0) {
+        console.log(`[tag-recap] No recipients opted in for ${tag} recap — skipping.`);
         continue;
       }
 
-      // Fetch this tag's tickets for the week
+      // Fetch this tag's tickets for the week (once per tag, shared across all recipients)
       const [openedRes, closedRes, stillOpenRes] = await Promise.all([
         supabase.from("tickets")
           .select("id, title, location, tag, status, created_at, closed_at, sla_due_at")
@@ -238,27 +235,29 @@ export const handler: Handler = async () => {
       const closed = closedRes.data || [];
       const stillOpen = stillOpenRes.data || [];
 
-      // Skip if nothing happened this week for this tag
       if (opened.length === 0 && closed.length === 0 && stillOpen.length === 0) {
-        console.log(`[tag-recap] No ${tag} activity this week — skipping email to ${emp.name}`);
+        console.log(`[tag-recap] No ${tag} activity this week — skipping.`);
         continue;
       }
 
-      const html = buildTagEmail({ tag, recipientName: emp.name, opened, closed, stillOpen, weekStartLabel, weekEndLabel, now });
-      const subject = `${tag === "Sound" ? "🎵" : tag === "Lighting" ? "💡" : "📊"} ${tag} Weekly Recap · ${weekStartLabel} – ${weekEndLabel}`;
+      const subject = `${emoji} ${tag} Weekly Recap · ${weekStartLabel} – ${weekEndLabel}`;
 
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        body: JSON.stringify({ from, to: [emp.email], subject, html }),
-      });
+      for (const emp of recipients) {
+        const html = buildTagEmail({ tag, recipientName: emp.name, opened, closed, stillOpen, weekStartLabel, weekEndLabel, now });
 
-      if (res.ok) {
-        sentCount++;
-        console.log(`[tag-recap] Sent ${tag} recap to ${emp.name} (${emp.email})`);
-      } else {
-        const err = await res.text();
-        console.error(`[tag-recap] Resend error for ${tag}/${emp.email}:`, res.status, err);
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({ from, to: [emp.email], subject, html }),
+        });
+
+        if (res.ok) {
+          sentCount++;
+          console.log(`[tag-recap] Sent ${tag} recap to ${emp.name} (${emp.email})`);
+        } else {
+          const err = await res.text();
+          console.error(`[tag-recap] Resend error for ${tag}/${emp.email}:`, res.status, err);
+        }
       }
     } catch (e: any) {
       console.error(`[tag-recap] Error for ${tag}:`, e?.message);
