@@ -168,10 +168,13 @@ export default function Remote() {
   }
 
   useEffect(() => {
+    if (locationStatus !== "allowed" || !REMOTE_URL) return;
+
     // Auto-login to Guacamole via token API, then redirect to the connection
     async function autoLogin() {
       try {
         setStatus("connecting");
+        setIframeSrc("");
 
         // Step 1 — Get auth token
         const tokenRes = await fetch(`${REMOTE_URL}/api/tokens`, {
@@ -212,7 +215,7 @@ export default function Remote() {
     }
 
     void autoLogin();
-  }, []);
+  }, [locationStatus]);
 
   function openInTab() {
     window.open(iframeSrc || `${REMOTE_URL}/`, "_blank");
