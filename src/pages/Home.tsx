@@ -259,7 +259,7 @@ export default function Home() {
         <Tile to="/procedures"   icon="📖" title="Procedures"   desc="Step-by-step guides & references"   accent="rgba(56,189,248,0.12)" />
         <DocsButton />
         {getRole() !== "show_tech" && (
-          <Tile to="/remote" icon="🖥️" title="Remote Desktop" desc="Access office PC remotely" accent="rgba(52,211,153,0.12)" />
+          <Tile to="/remote" icon="🖥️" title="Q-SYS Viewer" desc="" accent="rgba(52,211,153,0.12)" />
         )}
         {getRole() === "admin" && (
           <Tile to="/admin" icon="🛡️" title="Admin" desc="User management & settings" accent="rgba(255,182,39,0.15)" />

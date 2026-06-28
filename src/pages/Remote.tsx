@@ -101,7 +101,7 @@ export default function Remote() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", flexWrap: "wrap", gap: 8, flexShrink: 0 }}>
         <div>
-          <div className="page-title">QSys Remote</div>
+          <div className="page-title">Q-SYS Viewer</div>
           <div className="page-subtitle" style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{
               width: 7, height: 7, borderRadius: "50%", display: "inline-block",
