@@ -3,11 +3,40 @@ import { getRole } from "../lib/auth";
 
 const REMOTE_URL = (import.meta.env.VITE_REMOTE_URL || "").replace(/\/$/, "");
 
+const PARKS = [
+  { name: "SeaWorld Orlando",   lat: 28.4118,  lng: -81.4613, radius: 800 },
+  { name: "Aquatica Orlando",   lat: 28.4074,  lng: -81.4613, radius: 600 },
+  { name: "Discovery Cove",     lat: 28.4096,  lng: -81.4706, radius: 600 },
+];
+
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export default function Remote() {
   const role = getRole();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [status, setStatus] = useState<"connecting" | "connected" | "error">("connecting");
   const [iframeSrc, setIframeSrc] = useState<string>("");
+  const [locationStatus, setLocationStatus] = useState<"checking" | "allowed" | "denied">("checking");
+
+  useEffect(() => {
+    if (!navigator.geolocation) { setLocationStatus("denied"); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const inPark = PARKS.some(p => haversineDistance(latitude, longitude, p.lat, p.lng) <= p.radius);
+        setLocationStatus(inPark ? "allowed" : "denied");
+      },
+      () => setLocationStatus("denied"),
+      { timeout: 8000, maximumAge: 60000 }
+    );
+  }, []);
 
   if (role === "show_tech") {
     return (
@@ -15,6 +44,31 @@ export default function Remote() {
         <div className="card" style={{ padding: 24, textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🔒</div>
           <div style={{ fontSize: 14, color: "var(--muted)" }}>Access restricted.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (locationStatus === "checking") {
+    return (
+      <div className="page fade-up">
+        <div className="card" style={{ padding: 32, textAlign: "center" }}>
+          <span className="spinner" style={{ width: 24, height: 24, borderWidth: 3, margin: "0 auto 12px" }} />
+          <div style={{ fontSize: 14, color: "var(--muted)" }}>Verifying location…</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (locationStatus === "denied") {
+    return (
+      <div className="page fade-up">
+        <div className="card" style={{ padding: 24, textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Not available at this location</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+            Q-SYS Viewer is only accessible from SeaWorld Orlando, Aquatica, or Discovery Cove.
+          </div>
         </div>
       </div>
     );
