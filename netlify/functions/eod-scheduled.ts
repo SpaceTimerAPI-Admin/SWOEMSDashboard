@@ -16,7 +16,7 @@
 import type { Handler } from "@netlify/functions";
 import { postGroupMe } from "./_groupme";
 import { supabaseAdmin } from "./_supabase";
-import { businessDayRange, todayBusinessDay, TZ } from "./_eod-day";
+import { businessDayRange, previousBusinessDay, TZ } from "./_eod-day";
 
 export const handler: Handler = async () => {
   try {
@@ -26,8 +26,9 @@ export const handler: Handler = async () => {
       return { statusCode: 500, body: "SITE_BASE_URL not configured" };
     }
 
-    // Current business day at run-time is the day that JUST closed (since we run after the 4am cutoff)
-    const reportDay = todayBusinessDay();
+    // We run at 4:30 AM — the 4 AM cutoff just closed, so "today" is the new business day.
+    // We want to report on the day that JUST finished, which is the PREVIOUS business day.
+    const reportDay = previousBusinessDay();
     const { start, end } = businessDayRange(reportDay);
 
     const supabase = supabaseAdmin();

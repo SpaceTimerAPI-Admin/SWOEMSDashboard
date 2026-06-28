@@ -29,6 +29,13 @@ export function todayBusinessDay(): string {
   return businessDayFor(new Date());
 }
 
+/** Returns the previous business day — used by eod-scheduled which runs just AFTER the cutoff closes. */
+export function previousBusinessDay(): string {
+  // Go back 20 hours from now — guaranteed to land in the previous business day
+  // regardless of DST, since business days are 24h long and we only need "one day back."
+  return businessDayFor(new Date(Date.now() - 20 * 60 * 60 * 1000));
+}
+
 /**
  * Returns UTC ISO start/end for a business day (YYYY-MM-DD).
  * Start = 4:00:00 AM ET on `day`. End = 3:59:59.999 AM ET on `day + 1`.

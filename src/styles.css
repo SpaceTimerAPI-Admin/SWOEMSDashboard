@@ -406,9 +406,11 @@ input[type="date"].input {
   padding: 16px;
   z-index: 2000;
   backdrop-filter: blur(4px);
-  overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  /* Do NOT put overflow-y here — it causes centering to be relative to
+     scrollable content height instead of the visible viewport. The card
+     handles its own internal scrolling instead. */
 }
 
 .modal-card {
@@ -417,16 +419,17 @@ input[type="date"].input {
   max-height: calc(100svh - 32px);
   overflow-y: auto;
   border-radius: var(--radius-xl);
-  margin: auto;
+  /* margin: auto removed — flexbox centering on overlay handles positioning */
+  position: relative;
 }
 
 @media (max-width: 480px) {
   .modal-overlay {
-    padding: 12px;
+    padding: 0;
     align-items: flex-end;
   }
   .modal-card {
-    max-height: calc(100svh - 24px);
+    max-height: 92svh;
     border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-sm);
     width: 100%;
   }
