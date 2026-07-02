@@ -421,13 +421,13 @@ input[type="date"].input {
 
 @media (max-width: 480px) {
   .modal-overlay {
-    padding: 0;
-    padding-bottom: 64px;
-    align-items: flex-end;
+    padding: 16px;
+    padding-bottom: calc(16px + var(--nav-h) + var(--safe-bottom));
+    align-items: center;
   }
   .modal-card {
-    max-height: calc(92svh - 64px);
-    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-sm);
+    max-height: calc(100svh - var(--nav-h) - 48px - var(--safe-bottom));
+    border-radius: var(--radius-lg);
     width: 100%;
   }
 }
@@ -645,7 +645,7 @@ input[type="date"].input {
 .item-card .item-title { font-size: 14px; font-weight: 600; margin: 0; line-height: 1.35; letter-spacing: -0.01em; }
 .item-card .item-sub { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.4; }
 
-/* ── Mobile touch & tap improvements ── */
+/* Mobile touch & tap improvements */
 button, .btn, .home-tile, .item-card, .nav-link {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
