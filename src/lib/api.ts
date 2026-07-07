@@ -447,7 +447,7 @@ export async function createReview(payload: {
 
 export async function updateReview(id: string, updates: {
   review_date?: string;
-  note?: string;
+  note?: string | undefined;
   completed?: boolean;
 }): Promise<ApiResult<{ review: any }>> {
   return apiFetch<{ review: any }>("/api/review-schedule", { method: "PATCH", body: { id, ...updates } });

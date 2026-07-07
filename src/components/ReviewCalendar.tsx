@@ -67,7 +67,7 @@ export default function ReviewCalendar({ weekStart }: Props) {
     if (!editTarget || !editDate) return;
     setSaving(true);
     try {
-      const res: any = await updateReview(editTarget.id, { review_date: editDate, note: editNote || null });
+      const res: any = await updateReview(editTarget.id, { review_date: editDate, note: editNote || undefined });
       const updated = res?.ok ? (res.data?.review ?? res.review) : null;
       if (updated) setReviews(prev => prev.map(x => x.id === editTarget.id ? { ...x, ...updated } : x));
       setEditTarget(null);

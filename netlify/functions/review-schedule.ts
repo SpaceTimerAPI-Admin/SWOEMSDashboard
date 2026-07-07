@@ -15,8 +15,8 @@ function json(body: unknown, status = 200) {
 export const handler: Handler = async (event) => {
   const supabase = supabaseAdmin();
   const session = await requireSession(event);
-  if (!session.ok) return json({ error: "Unauthorized" }, 401);
-  const emp = (session as any).employee as any;
+  if (!session) return json({ error: "Unauthorized" }, 401);
+  const emp = session.employee as any;
 
   // ── GET ──────────────────────────────────────────────────────────────────
   if (event.httpMethod === "GET") {
