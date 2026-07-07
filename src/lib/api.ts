@@ -429,3 +429,30 @@ export async function askElijah(question: string): Promise<ApiResult<{
 export async function getElijahHistory(params: { page?: number; employee_id?: string; after_dark?: boolean | null; search?: string }): Promise<ApiResult<{ conversations: any[]; total: number; page: number; pages: number }>> {
   return apiFetch("/api/elijah-history", { method: "POST", body: params });
 }
+
+// -------------------- Review Schedule --------------------
+export async function getReviewSchedule(week: string): Promise<ApiResult<{ reviews: any[] }>> {
+  return apiFetch<{ reviews: any[] }>(`/api/review-schedule?week=${week}`, { method: "GET" });
+}
+
+export async function createReview(payload: {
+  item_type: "ticket" | "project";
+  item_id: string;
+  item_title: string;
+  review_date: string;
+  note?: string;
+}): Promise<ApiResult<{ review: any }>> {
+  return apiFetch<{ review: any }>("/api/review-schedule", { method: "POST", body: payload });
+}
+
+export async function updateReview(id: string, updates: {
+  review_date?: string;
+  note?: string;
+  completed?: boolean;
+}): Promise<ApiResult<{ review: any }>> {
+  return apiFetch<{ review: any }>("/api/review-schedule", { method: "PATCH", body: { id, ...updates } });
+}
+
+export async function deleteReview(id: string): Promise<ApiResult<{}>> {
+  return apiFetch<{}>(`/api/review-schedule?id=${id}`, { method: "DELETE" });
+}

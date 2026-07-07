@@ -12,6 +12,7 @@ import {
   reopenTicket,
 } from "../lib/api";
 import { getProfile, getRole } from "../lib/auth";
+import ScheduleReviewButton from "../components/ScheduleReviewButton";
 
 type Ticket = any;
 
@@ -221,6 +222,7 @@ export default function TicketDetail() {
               <button className="btn small danger" onClick={() => { setResolutionError(null); setResolution(""); setShowCloseModal(true); }} disabled={busy}>
                 Close ticket
               </button>
+              <ScheduleReviewButton itemType="ticket" itemId={ticketId} itemTitle={ticket?.title || ""} />
             </div>
           )}
 

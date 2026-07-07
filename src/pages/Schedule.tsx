@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { getWeekSchedule } from "../lib/api";
+import ReviewCalendar from "../components/ReviewCalendar";
 
 const TZ = "America/New_York";
 
@@ -267,6 +268,8 @@ export default function Schedule() {
           )}
         </>
       )}
+
+      <ReviewCalendar weekStart={weekStart} />
     </div>
   );
 }
