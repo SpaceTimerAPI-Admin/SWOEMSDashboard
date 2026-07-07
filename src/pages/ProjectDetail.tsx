@@ -7,6 +7,7 @@ import {
   confirmProjectPhoto,
   getProject,
   getProjectPhotoUploadUrl,
+  getItemReviews,
   listEmployees,
   reopenProject,
 } from "../lib/api";
@@ -28,6 +29,7 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   const [comment, setComment] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
@@ -91,7 +93,15 @@ export default function ProjectDetail() {
     }
   }
 
-  useEffect(() => { if (projectId) void load(); }, [projectId]);
+  useEffect(() => {
+    if (projectId) {
+      void load();
+      getItemReviews(projectId).then((res: any) => {
+        const data = res?.ok ? (res.data?.reviews ?? res.reviews) : [];
+        setReviews(data || []);
+      });
+    }
+  }, [projectId]);
 
   const photos = useMemo(() => {
     const arr = project?.photos || [];
@@ -231,6 +241,29 @@ export default function ProjectDetail() {
             {project.tag ? <><span className="dot">•</span><span>{project.tag}</span></> : null}
             {project.created_by_name ? <><span className="dot">•</span><span>by {project.created_by_name}</span></> : null}
           </div>
+
+          {/* Review schedule indicator */}
+          {reviews.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+              {reviews.map((r: any) => {
+                const d = new Date(r.review_date + "T12:00:00");
+                const label = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                const isOverdue = new Date(r.review_date + "T23:59:59") < new Date();
+                return (
+                  <div key={r.id} style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    padding: "4px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600,
+                    background: isOverdue ? "rgba(255,182,39,0.12)" : "rgba(129,140,248,0.12)",
+                    color: isOverdue ? "#FFD07A" : "#c7d2fe",
+                    border: `1px solid ${isOverdue ? "rgba(255,182,39,0.3)" : "rgba(129,140,248,0.3)"}`,
+                  }}>
+                    📅 Review {isOverdue ? "overdue" : "scheduled"}: {label}
+                    {r.note && <span style={{ fontWeight: 400, color: isOverdue ? "#FFD07A" : "#a5b4fc", fontSize: 11 }}>· {r.note}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Assigned person in header */}
           {(project.assigned_to || project.assigned_to_name || project.assigned_to_show_tech) && (

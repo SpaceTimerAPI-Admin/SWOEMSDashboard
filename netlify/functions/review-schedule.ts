@@ -21,7 +21,21 @@ export const handler: Handler = async (event) => {
   // ── GET ──────────────────────────────────────────────────────────────────
   if (event.httpMethod === "GET") {
     const week = event.queryStringParameters?.week;
-    if (!week) return json({ error: "week param required (YYYY-MM-DD)" }, 400);
+    const itemId = event.queryStringParameters?.item_id;
+
+    // Fetch by specific item (for detail page badge)
+    if (itemId) {
+      const { data, error } = await supabase
+        .from("review_schedules")
+        .select("id, item_type, item_id, review_date, note, completed")
+        .eq("item_id", itemId)
+        .eq("completed", false)
+        .order("review_date", { ascending: true });
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true, reviews: data || [] });
+    }
+
+    if (!week) return json({ error: "week or item_id param required" }, 400);
 
     const weekStart = new Date(week + "T12:00:00");
     const weekEnd = new Date(week + "T12:00:00");

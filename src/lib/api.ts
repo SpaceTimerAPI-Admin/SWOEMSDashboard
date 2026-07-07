@@ -435,6 +435,10 @@ export async function getReviewSchedule(week: string): Promise<ApiResult<{ revie
   return apiFetch<{ reviews: any[] }>(`/api/review-schedule?week=${week}`, { method: "GET" });
 }
 
+export async function getItemReviews(itemId: string): Promise<ApiResult<{ reviews: any[] }>> {
+  return apiFetch<{ reviews: any[] }>(`/api/review-schedule?item_id=${itemId}`, { method: "GET" });
+}
+
 export async function createReview(payload: {
   item_type: "ticket" | "project";
   item_id: string;
