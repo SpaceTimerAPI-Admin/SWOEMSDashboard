@@ -296,12 +296,7 @@ export default function PublicWorkOrder() {
           {loading ? "Submitting…" : "Submit Work Order"}
         </button>
 
-        <p style={{ textAlign: "center", fontSize: 12, color: "#4b5563", marginTop: 16 }}>
-          Our team will respond within 3 business days
-        </p>
-      </form>
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
