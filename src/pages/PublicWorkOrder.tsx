@@ -312,6 +312,7 @@ export default function PublicWorkOrder() {
         </button>
 
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </form>
     </div>
   );
 }
