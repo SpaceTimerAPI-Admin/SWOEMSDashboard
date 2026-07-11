@@ -25,12 +25,13 @@ import ProcedureView from "./pages/ProcedureView";
 import ProcedureBuilder from "./pages/ProcedureBuilder";
 import Settings from "./pages/Settings";
 import Remote from "./pages/Remote";
+import PublicWorkOrder from "./pages/PublicWorkOrder";
 import BottomNav from "./components/BottomNav";
 import ShowTechNav from "./components/ShowTechNav";
 import AskElijah from "./components/AskElijah";
 import { isAuthed, clearToken, clearProfile, getRole } from "./lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin"];
+const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin", "/work-order"];
 const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings"];
 
 /**
@@ -102,6 +103,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/enroll" element={<Enroll />} />
         <Route path="/reset-pin" element={<ResetPin />} />
+        <Route path="/work-order" element={<PublicWorkOrder />} />
 
         <Route path="/" element={<RequireAuth><HomeComponent /></RequireAuth>} />
 
