@@ -161,6 +161,21 @@ export default function PublicWorkOrder() {
       {/* Form */}
       <form onSubmit={handleSubmit} style={{ maxWidth: 520, margin: "0 auto", padding: "24px 20px 48px" }}>
 
+        {/* Urgent banner */}
+        <div style={{
+          background: "rgba(220,38,38,0.15)",
+          border: "1px solid rgba(220,38,38,0.35)",
+          borderRadius: 10,
+          padding: "12px 16px",
+          marginBottom: 24,
+          textAlign: "center",
+          fontSize: 13,
+          fontWeight: 600,
+          color: "#fca5a5",
+        }}>
+          🚨 Not for Urgent Requests — Call EMS for Urgent Matters
+        </div>
+
         {/* Name row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           <div>
