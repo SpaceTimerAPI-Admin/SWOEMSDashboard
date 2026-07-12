@@ -166,6 +166,43 @@ export default function Home() {
         </Link>
       )}
 
+      {/* Flamecraft Artist Alert */}
+      {(() => {
+        const FLAMECRAFT: Record<string, string> = {
+          "2026-07-11": "Steven Cardwell",
+          "2026-07-18": "David Faulk",
+          "2026-07-26": "Tim Hamlin",
+          "2026-08-01": "David Faulk",
+          "2026-08-02": "Nathan Allen",
+          "2026-08-08": "Danny Alan",
+          "2026-08-15": "Steven Cardwell",
+          "2026-08-22": "Nathan Allen",
+          "2026-08-23": "Tim Hamlin",
+        };
+        const todayET = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+        const artist = FLAMECRAFT[todayET];
+        if (!artist) return null;
+        return (
+          <div style={{
+            background: "linear-gradient(135deg, rgba(129,140,248,0.18) 0%, rgba(92,107,255,0.12) 100%)",
+            border: "1px solid rgba(129,140,248,0.4)",
+            borderRadius: 12, padding: "14px 16px", marginBottom: 16,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🔥</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#c7d2fe", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
+                  Flamecraft Artist
+                </div>
+                <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 500 }}>
+                  <strong>{artist}</strong> requires set up and soundcheck today
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Today's Shift — bottom */}
       <div className="card" style={{ padding: "14px 16px", marginTop: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
