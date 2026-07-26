@@ -99,6 +99,10 @@ export default function Admin() {
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(92,107,255,0.3)", background: "rgba(92,107,255,0.08)", color: "#B0B8FF", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
             🤖 Elijah Logs
           </Link>
+          <Link to="/admin/report"
+            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(52,211,153,0.3)", background: "rgba(52,211,153,0.08)", color: "#7EEFC4", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+            📊 Reports
+          </Link>
           <button
             className="btn primary"
             style={{ fontSize: 13 }}
