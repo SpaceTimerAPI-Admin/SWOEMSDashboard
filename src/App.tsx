@@ -25,6 +25,7 @@ import ProcedureView from "./pages/ProcedureView";
 import ProcedureBuilder from "./pages/ProcedureBuilder";
 import Settings from "./pages/Settings";
 import Remote from "./pages/Remote";
+import TicketReport from "./pages/TicketReport";
 import PublicWorkOrder from "./pages/PublicWorkOrder";
 import BottomNav from "./components/BottomNav";
 import ShowTechNav from "./components/ShowTechNav";
@@ -103,7 +104,6 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/enroll" element={<Enroll />} />
         <Route path="/reset-pin" element={<ResetPin />} />
-        <Route path="/work-order" element={<PublicWorkOrder />} />
 
         <Route path="/" element={<RequireAuth><HomeComponent /></RequireAuth>} />
 
@@ -111,7 +111,9 @@ export default function App() {
         <Route path="/admin/schedule" element={<RequireAdmin><AdminSchedule /></RequireAdmin>} />
         <Route path="/admin/qr" element={<RequireAdmin><AdminQR /></RequireAdmin>} />
         <Route path="/admin/elijah" element={<RequireAdmin><AdminElijah /></RequireAdmin>} />
+        <Route path="/admin/report" element={<RequireAdmin><TicketReport /></RequireAdmin>} />
         <Route path="/register/:code" element={<ShowTechRegister />} />
+        <Route path="/work-order" element={<PublicWorkOrder />} />
 
         <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
         <Route path="/tickets/new" element={<RequireAuth><TicketNew /></RequireAuth>} />
