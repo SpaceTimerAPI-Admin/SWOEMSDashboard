@@ -3,9 +3,12 @@ import { Link } from "react-router-dom";
 import { getRole } from "../lib/auth";
 
 async function fetchReport(search: string, since: string) {
-  const token = localStorage.getItem("swoems_token");
+  const token = localStorage.getItem("md_session_token");
   const res = await fetch(`/api/ticket-report?search=${encodeURIComponent(search)}&since=${since}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
   });
   return res.json();
 }
