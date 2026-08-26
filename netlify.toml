@@ -14,6 +14,19 @@
   to = "/.netlify/functions/:splat"
   status = 200
 
+# Short ticket/project links — used by Elijah bot in GroupMe
+# /t/:id → /tickets/:id
+# /p/:id → /projects/:id
+[[redirects]]
+  from = "/t/:id"
+  to = "/tickets/:id"
+  status = 301
+
+[[redirects]]
+  from = "/p/:id"
+  to = "/projects/:id"
+  status = 301
+
 # SPA fallback so deep links like /tickets/<id> work
 [[redirects]]
   from = "/*"
@@ -39,3 +52,8 @@
 # Scheduled: tag-specific weekly recaps (Sound → Kalib, Lighting → Adam) — Mondays at 7 AM ET
 [functions."tag-recap"]
   schedule = "0 11 * * 1"
+
+# Scheduled: BEO morning opener alert — daily at 6 AM ET (10 AM UTC)
+# Posts today's events + PDF links to GroupMe. Silent if no events.
+[functions."beo-morning-alert"]
+  schedule = "0 10 * * *"
