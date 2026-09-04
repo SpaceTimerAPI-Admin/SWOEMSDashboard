@@ -151,6 +151,34 @@ export default function Admin() {
                   <div style={{ fontSize: 11, color: "var(--muted2)", marginBottom: 8 }}>
                     Last login: {fmtDate(emp.last_login_at)}
                   </div>
+
+                  {/* Background image preview — admin can see and clear */}
+                  {emp.preferences?.backgroundImage && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 10, color: "var(--muted2)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, fontWeight: 600 }}>
+                        Custom Background
+                      </div>
+                      <div style={{ position: "relative", display: "inline-block" }}>
+                        <img
+                          src={emp.preferences.backgroundImage}
+                          alt="User background"
+                          style={{ width: 120, height: 60, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border)", display: "block" }}
+                        />
+                        <button
+                          title="Remove background"
+                          onClick={() => handleUpdate(emp.id, { preferences: { ...emp.preferences, backgroundImage: "" } })}
+                          style={{
+                            position: "absolute", top: 3, right: 3,
+                            background: "rgba(0,0,0,0.75)", border: "none",
+                            borderRadius: "50%", width: 18, height: 18,
+                            cursor: "pointer", color: "#fff", fontSize: 12,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            lineHeight: 1,
+                          }}
+                        >×</button>
+                      </div>
+                    </div>
+                  )}
                   {/* Email alert toggles — only show for EMS/Admin since Show Tech don't get emails */}
                   {emp.role !== "show_tech" && emp.email && (
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

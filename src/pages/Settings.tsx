@@ -121,7 +121,6 @@ export default function Settings() {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataUrl = ev.target?.result as string;
-      // Resize via canvas if too large
       const img = new Image();
       img.onload = async () => {
         const maxW = 1920;
@@ -133,7 +132,14 @@ export default function Settings() {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const compressed = canvas.toDataURL("image/jpeg", 0.75);
         setBgPreview(compressed);
-        savePrefs({ backgroundImage: compressed });
+        // Use functional update to ensure we have latest prefs including theme
+        setPrefs(latest => {
+          const updated = { ...latest, backgroundImage: compressed };
+          applyTheme(updated);
+          setCachedPrefs(updated);
+          saveUserPreferences(updated);
+          return updated;
+        });
       };
       img.src = dataUrl;
     };

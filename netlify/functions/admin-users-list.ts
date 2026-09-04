@@ -14,7 +14,7 @@ export const handler: Handler = async (event) => {
     const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from("employees")
-      .select("id, employee_id, name, email, role, is_active, last_login_at, created_at, email_overdue_alert, email_assigned_recap, email_weekly_summary, email_assignment_notify, email_sound_recap, email_lighting_recap")
+      .select("id, employee_id, name, email, role, is_active, last_login_at, created_at, email_overdue_alert, email_assigned_recap, email_weekly_summary, email_assignment_notify, email_sound_recap, email_lighting_recap, preferences")
       .order("name", { ascending: true });
 
     if (error) return json({ ok: false, error: error.message }, 500);

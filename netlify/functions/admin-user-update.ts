@@ -27,6 +27,10 @@ export const handler: Handler = async (event) => {
     if (typeof body.email_assignment_notify === "boolean") updates.email_assignment_notify = body.email_assignment_notify;
     if (typeof body.email_sound_recap === "boolean") updates.email_sound_recap = body.email_sound_recap;
     if (typeof body.email_lighting_recap === "boolean") updates.email_lighting_recap = body.email_lighting_recap;
+    // Allow admin to update user preferences (e.g. clear background image)
+    if (body.preferences !== undefined && typeof body.preferences === "object") {
+      updates.preferences = body.preferences;
+    }
     if (body.pin) {
       if (!/^\d{4}$/.test(body.pin)) return badRequest("PIN must be 4 digits");
       updates.pin_hash = await bcrypt.hash(body.pin, 10);
