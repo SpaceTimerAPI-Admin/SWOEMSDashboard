@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { applyTheme, getCachedPrefs } from "./lib/theme";
 import Login from "./pages/Login";
 import Enroll from "./pages/Enroll";
 import ResetPin from "./pages/ResetPin";
@@ -92,6 +93,13 @@ export default function App() {
   const role = getRole();
   const isPublic = PUBLIC_PATHS.includes(loc.pathname);
   const isShowTech = isAuthed() && role === "show_tech";
+
+  // Apply cached theme immediately on every render cycle start
+  // so there's no flash of unstyled content between sessions
+  useEffect(() => {
+    const cached = getCachedPrefs();
+    if (Object.keys(cached).length > 0) applyTheme(cached);
+  }, []);
 
   // Home component based on role
   const HomeComponent = isAuthed()

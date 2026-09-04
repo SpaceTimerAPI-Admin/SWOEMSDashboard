@@ -460,3 +460,12 @@ export async function updateReview(id: string, updates: {
 export async function deleteReview(id: string): Promise<ApiResult<{}>> {
   return apiFetch<{}>(`/api/review-schedule?id=${id}`, { method: "DELETE" });
 }
+
+// -------------------- User Preferences --------------------
+export async function loadUserPreferences(): Promise<ApiResult<{ preferences: any }>> {
+  return apiFetch<{ preferences: any }>("/api/user-preferences", { method: "GET" });
+}
+
+export async function saveUserPreferences(preferences: Record<string, any>): Promise<ApiResult<{ preferences: any }>> {
+  return apiFetch<{ preferences: any }>("/api/user-preferences", { method: "POST", body: { preferences } });
+}
