@@ -47,7 +47,7 @@ export default function BottomNav() {
         </NavLink>
         <NavLink to="/tickets" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           <TicketIcon />
-          Tickets
+          Work Orders
         </NavLink>
         <NavLink to="/schedule" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           <CalendarIcon />

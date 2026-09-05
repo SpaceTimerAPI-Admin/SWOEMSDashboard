@@ -115,7 +115,7 @@ export default function Projects() {
     <div className="page">
       <div style={{ marginBottom: 4 }}>
         <h1 className="page-title">Projects</h1>
-        <div className="page-subtitle">Longer work with SLA tracking.</div>
+        <div className="page-subtitle">Longer-term work orders with SLA tracking.</div>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 4 }}>

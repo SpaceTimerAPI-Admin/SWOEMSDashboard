@@ -122,8 +122,8 @@ export default function Tickets() {
     <div className="page">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
         <div>
-          <h1 className="page-title">{isShowTech ? "Work Orders" : "Tickets"}</h1>
-          <div className="page-subtitle">{isShowTech ? "Your assigned tickets and projects." : "Track urgent issues with SLA status."}</div>
+          <h1 className="page-title">{isShowTech ? "Work Orders" : "Work Orders"}</h1>
+          <div className="page-subtitle">{isShowTech ? "Your assigned work orders." : "Track all work orders with SLA status."}</div>
         </div>
       </div>
 
@@ -139,7 +139,7 @@ export default function Tickets() {
               background: !myOnly ? "rgba(92,107,255,0.14)" : "rgba(255,255,255,0.05)",
               color: !myOnly ? "#B0B8FF" : "var(--muted)",
             }}
-          >All Tickets</button>
+          >All Work Orders</button>
           <button
             onClick={() => setMyOnly(true)}
             style={{
@@ -150,7 +150,7 @@ export default function Tickets() {
               color: myOnly ? "#B0B8FF" : "var(--muted)",
             }}
           >
-            My Tickets {myCount > 0 ? <span style={{ marginLeft: 4, background: "rgba(92,107,255,0.3)", borderRadius: 99, padding: "0 6px", fontSize: 11 }}>{myCount}</span> : null}
+            My Work Orders {myCount > 0 ? <span style={{ marginLeft: 4, background: "rgba(92,107,255,0.3)", borderRadius: 99, padding: "0 6px", fontSize: 11 }}>{myCount}</span> : null}
           </button>
         </div>
       )}

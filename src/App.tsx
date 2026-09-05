@@ -28,6 +28,7 @@ import Settings from "./pages/Settings";
 import Remote from "./pages/Remote";
 import TicketReport from "./pages/TicketReport";
 import PublicWorkOrder from "./pages/PublicWorkOrder";
+import OfficeDashboard from "./pages/OfficeDashboard";
 import XmasTickets from "./pages/XmasTickets";
 import XmasTicketNew from "./pages/XmasTicketNew";
 import XmasTicketDetail from "./pages/XmasTicketDetail";
@@ -36,7 +37,7 @@ import ShowTechNav from "./components/ShowTechNav";
 import AskElijah from "./components/AskElijah";
 import { isAuthed, clearToken, clearProfile, getRole } from "./lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin", "/work-order"];
+const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin", "/work-order", "/dashboard"];
 const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings"];
 
 /**
@@ -115,6 +116,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/enroll" element={<Enroll />} />
         <Route path="/reset-pin" element={<ResetPin />} />
+        <Route path="/dashboard" element={<OfficeDashboard />} />
 
         <Route path="/" element={<RequireAuth><HomeComponent /></RequireAuth>} />
 
