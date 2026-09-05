@@ -5,12 +5,12 @@ import {
   assignTicket,
   closeTicket,
   confirmTicketPhoto,
-  convertTicketToProject,
   getTicket,
   getTicketPhotoUploadUrl,
   getItemReviews,
   listEmployees,
   reopenTicket,
+  updateTicketDue,
 } from "../lib/api";
 import { getProfile, getRole } from "../lib/auth";
 import ScheduleReviewButton from "../components/ScheduleReviewButton";
@@ -35,11 +35,15 @@ export default function TicketDetail() {
 
   const [comment, setComment] = useState("");
   const [showCloseModal, setShowCloseModal] = useState(false);
-  const [showConvertModal, setShowConvertModal] = useState(false);
   const [resolution, setResolution] = useState("");
   const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Due date editing
+  const [editingDue, setEditingDue] = useState(false);
+  const [newDueDate, setNewDueDate] = useState("");
+  const [dueSaving, setDueSaving] = useState(false);
 
   // Assignment
   const [employees, setEmployees] = useState<any[]>([]);
@@ -140,19 +144,17 @@ export default function TicketDetail() {
     } finally { setBusy(false); }
   }
 
-  async function confirmConvert() {
-    if (!ticketId) return;
-    setBusy(true);
+  async function handleUpdateDue() {
+    if (!newDueDate) return;
+    setDueSaving(true);
     try {
-      const res: any = await convertTicketToProject(ticketId);
-      if (!res?.ok) throw new Error(res?.error || "Failed to convert");
-      const data: any = pickData(res);
-      const projectId = data?.project_id || data?.project?.id;
-      setShowConvertModal(false);
-      if (projectId) nav(`/projects/${projectId}`);
-      else nav("/projects");
-    } catch (e: any) { alert(e?.message || "Failed to convert"); }
-    finally { setBusy(false); }
+      const res: any = await updateTicketDue(ticketId, newDueDate);
+      if (!res?.ok) throw new Error(res?.error || "Failed to update due date");
+      setEditingDue(false);
+      await load();
+    } catch (e: any) {
+      setError(e?.message || "Failed to update due date");
+    } finally { setDueSaving(false); }
   }
 
   async function uploadPhoto(file: File): Promise<void> {
@@ -190,7 +192,7 @@ export default function TicketDetail() {
     <div className="page fade-up">
       <Link to="/tickets" className="back-link">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        Tickets
+        Work Orders
       </Link>
 
       {loading && <div className="muted">Loading…</div>}
@@ -251,9 +253,8 @@ export default function TicketDetail() {
 
           {!isClosed && (
             <div className="btn-row" style={{ marginBottom: 16 }}>
-              <button className="btn small" onClick={() => setShowConvertModal(true)} disabled={busy}>Move to project</button>
               <button className="btn small danger" onClick={() => { setResolutionError(null); setResolution(""); setShowCloseModal(true); }} disabled={busy}>
-                Close ticket
+                Close Work Order
               </button>
               <ScheduleReviewButton itemType="ticket" itemId={ticketId} itemTitle={ticket?.title || ""} />
             </div>
@@ -262,8 +263,49 @@ export default function TicketDetail() {
           {isClosed && (
             <div className="btn-row" style={{ marginBottom: 16 }}>
               <button className="btn small" onClick={handleReopen} disabled={busy}>
-                {busy ? <span className="spinner" /> : "↩ Reopen ticket"}
+                {busy ? <span className="spinner" /> : "↩ Reopen"}
               </button>
+            </div>
+          )}
+
+          {/* Editable Due Date */}
+          {getRole() !== "show_tech" && (
+            <div className="card" style={{ padding: "12px 15px", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div>
+                  <div className="detail-label">Due Date</div>
+                  <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
+                    {ticket.sla_due_at
+                      ? new Date(ticket.sla_due_at).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric", year: "numeric" })
+                      : <span className="muted">Not set</span>}
+                    {ticket.sla_due_at && new Date(ticket.sla_due_at) < new Date() && !isClosed && (
+                      <span style={{ marginLeft: 8, fontSize: 11, background: "rgba(255,84,84,0.15)", color: "#f87171", padding: "1px 7px", borderRadius: 99, fontWeight: 600 }}>OVERDUE</span>
+                    )}
+                  </div>
+                </div>
+                {!isClosed && !editingDue && (
+                  <button className="btn small" onClick={() => {
+                    const d = ticket.sla_due_at ? new Date(ticket.sla_due_at).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) : "";
+                    setNewDueDate(d);
+                    setEditingDue(true);
+                  }}>
+                    Edit
+                  </button>
+                )}
+              </div>
+              {editingDue && (
+                <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <input
+                    type="date" className="input" value={newDueDate}
+                    onChange={e => setNewDueDate(e.target.value)}
+                    style={{ flex: 1, minWidth: 150 }}
+                  />
+                  <button className="btn primary small" onClick={handleUpdateDue} disabled={dueSaving || !newDueDate}>
+                    {dueSaving ? <span className="spinner" /> : "Save"}
+                  </button>
+                  <button className="btn small" onClick={() => setEditingDue(false)}>Cancel</button>
+                </div>
+              )}
             </div>
           )}
 
@@ -374,7 +416,7 @@ export default function TicketDetail() {
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="card modal-card">
             <div className="modal-head">
-              <h3 className="modal-title">Close ticket</h3>
+              <h3 className="modal-title">Close Work Order</h3>
             </div>
             <div className="modal-body">
               <div className="field-label">Resolution note</div>
@@ -390,27 +432,6 @@ export default function TicketDetail() {
                 <button className="btn small" type="button" onClick={() => setShowCloseModal(false)} disabled={busy}>Cancel</button>
                 <button className="btn primary small" type="button" onClick={confirmClose} disabled={busy}>
                   {busy ? <span className="spinner" /> : "Confirm close"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showConvertModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="card modal-card">
-            <div className="modal-head">
-              <h3 className="modal-title">Move to project?</h3>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: 1.5, marginBottom: 14 }}>
-                This will convert <strong style={{ color: "var(--text)" }}>{ticket?.title}</strong> into a project and remove it from the ticket list. All comments and photos will be transferred. This cannot be undone.
-              </p>
-              <div className="btn-row">
-                <button className="btn small" type="button" onClick={() => setShowConvertModal(false)} disabled={busy}>Cancel</button>
-                <button className="btn primary small" type="button" onClick={confirmConvert} disabled={busy}>
-                  {busy ? <span className="spinner" /> : "Yes, move to project"}
                 </button>
               </div>
             </div>

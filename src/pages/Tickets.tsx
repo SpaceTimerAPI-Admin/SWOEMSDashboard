@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { listTickets, listProjects } from "../lib/api";
+import { listTickets } from "../lib/api";
 import { getProfile, getRole } from "../lib/auth";
 
 type Ticket = any;
@@ -34,7 +34,6 @@ function dueInfo(t: Ticket) {
 
 export default function Tickets() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myOnly, setMyOnly] = useState(false);
@@ -45,13 +44,9 @@ export default function Tickets() {
   async function load() {
     setLoading(true); setError(null);
     try {
-      const [tr, pr] = await Promise.all([
-        listTickets({ includeClosed: true }) as any,
-        isShowTech ? listProjects({ includeClosed: true }) as any : Promise.resolve(null),
-      ]);
+      const tr: any = await listTickets({ includeClosed: true });
       if (!tr?.ok) throw new Error(tr?.error || "Failed to load");
       setTickets(tr?.tickets || tr?.data?.tickets || []);
-      if (pr?.ok) setProjects(pr?.projects || pr?.data?.projects || []);
     } catch (e: any) {
       setError(e?.message || "Failed to load");
     } finally { setLoading(false); }
@@ -160,37 +155,12 @@ export default function Tickets() {
 
       {!loading && !error && (
         <>
-          {/* Projects section — show_tech only */}
-          {isShowTech && projects.length > 0 && (
-            <>
-              <div className="section-head">
-                <h2 className="section-title">Projects</h2>
-                <span className="count-pill">{projects.filter(p => !isClosed(p)).length} open</span>
-              </div>
-              <div className="cards">
-                {projects.filter(p => !isClosed(p)).map((p: any) => (
-                  <Link key={p.id} className="item-card" to={`/projects/${p.id}`}>
-                    <div className="item-top">
-                      <div className="item-title">{p.title || "Untitled"}</div>
-                      {p.tag ? <span className="chip neutral">{p.tag}</span> : null}
-                    </div>
-                    <div className="item-sub">
-                      {p.location && <span>{p.location}</span>}
-                      {p.created_at && <><span className="dot">•</span><span>{fmtDateTime(p.created_at)}</span></>}
-                      {p.created_by_name && <><span className="dot">•</span><span>by {p.created_by_name}</span></>}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </>
-          )}
-
-          <div className="section-head" style={{ marginTop: isShowTech && projects.length > 0 ? 18 : 0 }}>
+          <div className="section-head">
             <h2 className="section-title">Open</h2>
             <span className="count-pill">{openAll.length} active</span>
           </div>
           {openTickets.length === 0
-            ? <div className="muted">{myOnly ? "No tickets assigned to you." : "No open tickets."}</div>
+            ? <div className="muted">{myOnly ? "No work orders assigned to you." : "No open work orders."}</div>
             : <div className="cards">{openTickets.map(t => <TicketCard key={t.id} t={t} />)}</div>}
           <Pagination total={Math.max(1, Math.ceil(openAll.length / perPage))} page={openPage} setPage={setOpenPage} />
 
@@ -199,7 +169,7 @@ export default function Tickets() {
             <span className="count-pill">{closedAll.length}</span>
           </div>
           {closedTickets.length === 0
-            ? <div className="muted">No closed tickets.</div>
+            ? <div className="muted">No closed work orders.</div>
             : <div className="cards">{closedTickets.map(t => <TicketCard key={t.id} t={t} />)}</div>}
           <Pagination total={Math.max(1, Math.ceil(closedAll.length / perPage))} page={closedPage} setPage={setClosedPage} />
         </>

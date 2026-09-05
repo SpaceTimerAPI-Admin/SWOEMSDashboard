@@ -78,7 +78,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   if (role === "show_tech") {
     const allowed = ST_ALLOWED.some(p => loc.pathname === p)
       || loc.pathname.startsWith("/tickets/")
-      || loc.pathname.startsWith("/projects/")
       || loc.pathname.startsWith("/procedures");
     if (!allowed) return <Navigate to="/" replace />;
   }
@@ -131,9 +130,6 @@ export default function App() {
         <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
         <Route path="/tickets/new" element={<RequireAuth><TicketNew /></RequireAuth>} />
         <Route path="/tickets/:id" element={<RequireAuth><TicketDetail /></RequireAuth>} />
-
-        <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
-        <Route path="/projects/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
 
         <Route path="/shift-log" element={<RequireAuth><ShiftLog /></RequireAuth>} />
         <Route path="/schedule" element={<RequireAuth><Schedule /></RequireAuth>} />

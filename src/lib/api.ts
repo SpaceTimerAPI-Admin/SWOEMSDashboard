@@ -469,3 +469,11 @@ export async function loadUserPreferences(): Promise<ApiResult<{ preferences: an
 export async function saveUserPreferences(preferences: Record<string, any>): Promise<ApiResult<{ preferences: any }>> {
   return apiFetch<{ preferences: any }>("/api/user-preferences", { method: "POST", body: { preferences } });
 }
+
+// -------------------- Update Work Order Due Date --------------------
+export async function updateTicketDue(ticket_id: string, due_date: string): Promise<ApiResult<{ sla_due_at: string; sla_minutes: number }>> {
+  return apiFetch<{ sla_due_at: string; sla_minutes: number }>("/api/tickets-update-due", {
+    method: "POST",
+    body: { ticket_id, due_date },
+  });
+}
