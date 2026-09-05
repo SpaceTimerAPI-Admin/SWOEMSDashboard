@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getToken } from "../lib/auth";
 
 async function apiFetch(path: string, opts: RequestInit = {}) {
   const res = await fetch(path, {
