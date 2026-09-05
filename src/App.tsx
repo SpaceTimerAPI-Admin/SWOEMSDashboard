@@ -16,7 +16,6 @@ import TicketNew from "./pages/TicketNew";
 import TicketDetail from "./pages/TicketDetail";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
-import ProjectDetail from "./pages/ProjectDetail";
 import ShiftLog from "./pages/ShiftLog";
 import Schedule from "./pages/Schedule";
 import Events from "./pages/Events";
