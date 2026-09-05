@@ -16,6 +16,7 @@ import TicketNew from "./pages/TicketNew";
 import TicketDetail from "./pages/TicketDetail";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
+import ProjectDetail from "./pages/ProjectDetail";
 import ShiftLog from "./pages/ShiftLog";
 import Schedule from "./pages/Schedule";
 import Events from "./pages/Events";
@@ -130,6 +131,8 @@ export default function App() {
         <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
         <Route path="/tickets/new" element={<RequireAuth><TicketNew /></RequireAuth>} />
         <Route path="/tickets/:id" element={<RequireAuth><TicketDetail /></RequireAuth>} />
+
+        <Route path="/projects/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
 
         <Route path="/shift-log" element={<RequireAuth><ShiftLog /></RequireAuth>} />
         <Route path="/schedule" element={<RequireAuth><Schedule /></RequireAuth>} />
