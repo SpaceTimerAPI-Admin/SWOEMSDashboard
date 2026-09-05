@@ -66,8 +66,7 @@ export default function XmasTicketNew() {
       });
       if (!uploadRes.publicUrl && !uploadRes.path) throw new Error(uploadRes.error || "Photo upload failed");
 
-      const photoUrl = uploadRes.publicUrl ||
-        `${(process.env.SUPABASE_URL || "").replace(/\/+$/, "")}/storage/v1/object/public/ticket-photos/${uploadRes.path}`;
+      const photoUrl = uploadRes.publicUrl || "";
 
       // Step 2 — Create ticket
       setStep("Creating ticket…");
