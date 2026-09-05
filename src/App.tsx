@@ -28,6 +28,9 @@ import Settings from "./pages/Settings";
 import Remote from "./pages/Remote";
 import TicketReport from "./pages/TicketReport";
 import PublicWorkOrder from "./pages/PublicWorkOrder";
+import XmasTickets from "./pages/XmasTickets";
+import XmasTicketNew from "./pages/XmasTicketNew";
+import XmasTicketDetail from "./pages/XmasTicketDetail";
 import BottomNav from "./components/BottomNav";
 import ShowTechNav from "./components/ShowTechNav";
 import AskElijah from "./components/AskElijah";
@@ -142,6 +145,10 @@ export default function App() {
         <Route path="/procedures/:id/edit" element={<RequireAuth><ProcedureBuilder /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
         <Route path="/remote" element={<RequireAuth><Remote /></RequireAuth>} />
+
+        <Route path="/christmas" element={<RequireAuth><XmasTickets /></RequireAuth>} />
+        <Route path="/christmas/new" element={<RequireAuth><XmasTicketNew /></RequireAuth>} />
+        <Route path="/christmas/:id" element={<RequireAuth><XmasTicketDetail /></RequireAuth>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
