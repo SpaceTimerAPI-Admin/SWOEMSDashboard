@@ -277,11 +277,11 @@ export default function OfficeDashboard() {
             {schedule.length === 0
               ? <span style={{ fontSize: 10, color: "#374151" }}>No schedule uploaded</span>
               : schedule.map((s: any, i: number) => (
-                <div key={i} style={{ background: "rgba(129,140,248,0.12)", border: "1px solid rgba(129,140,248,0.22)", borderRadius: 6, padding: "2px 7px" }}>
+                <div key={i} style={{ background: "rgba(129,140,248,0.12)", border: "1px solid rgba(129,140,248,0.22)", borderRadius: 6, padding: "3px 8px" }}>
                   <div style={{ fontSize: 10, fontWeight: 600, color: "#c7d2fe" }}>{s.employee_name}</div>
-                  {!s.all_shifts && (s.shift_start || s.shift_end) && (
-                    <div style={{ fontSize: 9, color: "#6b7280" }}>{[fmtShift(s.shift_start), fmtShift(s.shift_end)].filter(Boolean).join("–")}</div>
-                  )}
+                  <div style={{ fontSize: 9, color: "#6b7280" }}>
+                    {s.all_shifts ? "All shifts" : [fmtShift(s.shift_start), fmtShift(s.shift_end)].filter(Boolean).join(" – ")}
+                  </div>
                 </div>
               ))}
           </div>
@@ -305,38 +305,43 @@ export default function OfficeDashboard() {
           {/* COL 1: BEO Events + Shift Log — PRIMARY */}
           <div style={{ display: "flex", flexDirection: "column", borderRight: "2px solid rgba(251,191,36,0.2)", overflow: "hidden", background: "rgba(251,191,36,0.02)" }}>
 
-            {/* BEO Events — above shift log */}
-            {beoEvents.length > 0 && (
-              <>
-                <div style={{ padding: "8px 14px 6px", borderBottom: "1px solid rgba(248,113,113,0.15)", flexShrink: 0, display: "flex", alignItems: "center", gap: 7, background: "rgba(248,113,113,0.05)" }}>
-                  <span style={{ fontSize: 14 }}>🎪</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fca5a5" }}>Events Today</span>
-                  <span style={{ fontSize: 10, color: "#4b5563", marginLeft: "auto" }}>{beoEvents.length} event{beoEvents.length !== 1 ? "s" : ""}</span>
-                </div>
-                <div style={{ flexShrink: 0, padding: "6px 12px 6px", borderBottom: "1px solid rgba(251,191,36,0.1)", display: "flex", flexDirection: "column", gap: 5 }}>
-                  {beoEvents.map((ev: any) => (
-                    <div key={ev.id} style={{ background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: 8, padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#fecaca", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.event_name}</div>
-                        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                          <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: 99, background: ev.setup_done ? "rgba(52,211,153,0.15)" : "rgba(251,191,36,0.15)", color: ev.setup_done ? "#6ee7b7" : "#fcd34d" }}>
-                            {ev.setup_done ? "✓ Setup" : "⏳ Setup needed"}
-                          </span>
-                          <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: 99, background: ev.strike_done ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.06)", color: ev.strike_done ? "#6ee7b7" : "#6b7280" }}>
-                            {ev.strike_done ? "✓ Strike" : "Strike pending"}
-                          </span>
-                        </div>
+            {/* BEO Events — always shown */}
+            <>
+              <div style={{ padding: "8px 14px 6px", borderBottom: "1px solid rgba(248,113,113,0.15)", flexShrink: 0, display: "flex", alignItems: "center", gap: 7, background: "rgba(248,113,113,0.05)" }}>
+                <span style={{ fontSize: 14 }}>🎪</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#fca5a5" }}>Events Today</span>
+                <span style={{ fontSize: 10, color: "#4b5563", marginLeft: "auto" }}>{beoEvents.length} event{beoEvents.length !== 1 ? "s" : ""}</span>
+              </div>
+              <div style={{ flexShrink: 0, padding: "6px 12px", borderBottom: "1px solid rgba(251,191,36,0.1)", display: "flex", flexDirection: "column", gap: 5 }}>
+                {beoEvents.length === 0 ? (
+                  <div style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.12)", borderRadius: 8, padding: "9px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>📋</span>
+                    <span style={{ fontSize: 12, color: "#fca5a5", lineHeight: 1.4 }}>
+                      No events logged — verify via <strong>Outlook</strong> and <strong>Event Binder</strong>
+                    </span>
+                  </div>
+                ) : beoEvents.map((ev: any) => (
+                  <div key={ev.id} style={{ background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: 8, padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#fecaca", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.event_name}</div>
+                      <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: 99, background: ev.setup_done ? "rgba(52,211,153,0.15)" : "rgba(251,191,36,0.15)", color: ev.setup_done ? "#6ee7b7" : "#fcd34d" }}>
+                          {ev.setup_done ? "✓ Setup" : "⏳ Setup needed"}
+                        </span>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: 99, background: ev.strike_done ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.06)", color: ev.strike_done ? "#6ee7b7" : "#6b7280" }}>
+                          {ev.strike_done ? "✓ Strike" : "Strike pending"}
+                        </span>
                       </div>
-                      {ev.pdf_url && (
-                        <a href={ev.pdf_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 600, color: "#818cf8", textDecoration: "none", background: "rgba(129,140,248,0.12)", padding: "3px 8px", borderRadius: 6, flexShrink: 0, whiteSpace: "nowrap" }}>
-                          📄 BEO PDF
-                        </a>
-                      )}
                     </div>
-                  ))}
-                </div>
-              </>
-            )}
+                    {ev.pdf_url && (
+                      <a href={ev.pdf_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 600, color: "#818cf8", textDecoration: "none", background: "rgba(129,140,248,0.12)", padding: "3px 8px", borderRadius: 6, flexShrink: 0, whiteSpace: "nowrap" }}>
+                        📄 BEO PDF
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
 
             {/* Shift Log header */}
             <div style={{ padding: "8px 14px 6px", borderBottom: "1px solid rgba(251,191,36,0.15)", flexShrink: 0, display: "flex", alignItems: "center", gap: 7 }}>
