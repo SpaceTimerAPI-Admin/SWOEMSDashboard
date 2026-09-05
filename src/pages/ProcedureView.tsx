@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { getProcedure } from "../lib/api";
 import { getRole } from "../lib/auth";
 
 export default function ProcedureView() {
   const { id } = useParams<{ id: string }>();
+  const nav = useNavigate();
   const [procedure, setProcedure] = useState<any>(null);
   const [steps, setSteps] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +32,7 @@ export default function ProcedureView() {
 
   if (loading) return (
     <div className="page fade-up">
-      <Link to="/procedures" className="back-link">← Procedures</Link>
+      <span className="back-link" style={{cursor:"pointer"}} onClick={()=>nav(-1)}>← Procedures</span>
       <div className="card" style={{ padding: "28px", textAlign: "center", marginTop: 16 }}>
         <span className="spinner" style={{ display: "block", margin: "0 auto" }} />
       </div>
@@ -40,7 +41,7 @@ export default function ProcedureView() {
 
   if (!procedure) return (
     <div className="page fade-up">
-      <Link to="/procedures" className="back-link">← Procedures</Link>
+      <span className="back-link" style={{cursor:"pointer"}} onClick={()=>nav(-1)}>← Procedures</span>
       <div className="card" style={{ padding: "24px", textAlign: "center", marginTop: 16 }}>
         <div style={{ color: "#FFB0B0" }}>Procedure not found.</div>
       </div>
@@ -55,7 +56,7 @@ export default function ProcedureView() {
     <div className="page fade-up" style={{ paddingBottom: 80 }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-        <Link to="/procedures" className="back-link" style={{ fontSize: 13, color: "var(--muted)", textDecoration: "none" }}>← Procedures</Link>
+        <span className="back-link" style={{cursor:"pointer",fontSize:13,color:"var(--muted)"}} onClick={()=>nav(-1)}>← Procedures</span>
         {canEdit && (
           <Link to={`/procedures/${id}/edit`} style={{
             fontSize: 12, fontWeight: 600, color: "var(--muted)", textDecoration: "none",

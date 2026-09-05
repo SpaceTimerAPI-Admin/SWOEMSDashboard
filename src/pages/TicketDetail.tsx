@@ -190,10 +190,10 @@ export default function TicketDetail() {
 
   return (
     <div className="page fade-up">
-      <Link to="/tickets" className="back-link">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      <span className="back-link" style={{cursor:"pointer"}} onClick={()=>nav(-1)}>
+        
         Work Orders
-      </Link>
+      </span>
 
       {loading && <div className="muted">Loading…</div>}
       {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}

@@ -116,10 +116,10 @@ export default function EventDetail() {
 
   if (loading) return (
     <div className="page fade-up">
-      <Link to="/events" className="back-link">
+      <span className="back-link" style={{cursor:"pointer"}} onClick={()=>nav(-1)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Events
-      </Link>
+      </span>
       <div className="card" style={{ padding: "28px", textAlign: "center", marginTop: 16 }}>
         <span className="spinner" style={{ display: "block", margin: "0 auto 10px" }} />
         <div className="muted" style={{ fontSize: 13 }}>Loading event…</div>
@@ -129,10 +129,10 @@ export default function EventDetail() {
 
   if (error || !event) return (
     <div className="page fade-up">
-      <Link to="/events" className="back-link">
+      <span className="back-link" style={{cursor:"pointer"}} onClick={()=>nav(-1)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Events
-      </Link>
+      </span>
       <div className="card" style={{ padding: "24px", textAlign: "center", marginTop: 16 }}>
         <div style={{ color: "#FFB0B0" }}>{error || "Event not found"}</div>
       </div>
@@ -149,10 +149,10 @@ export default function EventDetail() {
     <div className="page fade-up" style={{ paddingBottom: 90 }}>
       <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onPhotoFile} />
 
-      <Link to="/events" className="back-link">
+      <span className="back-link" style={{cursor:"pointer"}} onClick={()=>nav(-1)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Events
-      </Link>
+      </span>
 
       {/* Header */}
       <div style={{ marginBottom: 16 }}>

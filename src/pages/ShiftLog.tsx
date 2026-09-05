@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { addShiftLogEntry, listShiftLogEntries } from "../lib/api";
 import { getProfile } from "../lib/auth";
 
@@ -13,6 +13,7 @@ function fmtTime(iso: string): string {
 }
 
 export default function ShiftLog() {
+  const nav = useNavigate();
   const [entries, setEntries] = useState<any[]>([]);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
@@ -64,12 +65,12 @@ export default function ShiftLog() {
 
   return (
     <div className="page fade-up">
-      <Link to="/" className="back-link">
+      <span className="back-link" style={{cursor:"pointer"}} onClick={()=>nav(-1)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6"/>
         </svg>
         Home
-      </Link>
+      </span>
 
       <div className="page-title">Shift Log</div>
       <div className="page-subtitle">{today}</div>

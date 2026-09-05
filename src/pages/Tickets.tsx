@@ -37,6 +37,11 @@ export default function Tickets() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myOnly, setMyOnly] = useState(false);
+  const [filterTag, setFilterTag]       = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "open" | "closed">("all");
+  const [filterType, setFilterType]     = useState<"all" | "ticket" | "project">("all");
+  const [filterOverdue, setFilterOverdue] = useState(false);
+  const [showFilters, setShowFilters]   = useState(false);
   const profile = getProfile();
   const role = getRole();
   const isShowTech = role === "show_tech";
@@ -62,15 +67,20 @@ export default function Tickets() {
   useEffect(() => { void load(); }, []);
 
   const { openAll, closedAll } = useMemo(() => {
-    const source = myOnly ? items.filter(t => t.assigned_to === profile?.id) : items;
+    let source = myOnly ? items.filter(t => t.assigned_to === profile?.id) : items;
+    // Apply filters
+    if (filterTag)    source = source.filter(t => (t.tag || "Misc") === filterTag);
+    if (filterType !== "all") source = source.filter(t => t._type === filterType);
+    if (filterOverdue) source = source.filter(t => !isClosed(t) && parseDate(t.sla_due_at) > 0 && parseDate(t.sla_due_at) < Date.now());
+    if (filterStatus === "open")   source = source.filter(t => !isClosed(t));
+    if (filterStatus === "closed") source = source.filter(t => isClosed(t));
     const open: WorkOrder[] = [], closed: WorkOrder[] = [];
     for (const t of source) (isClosed(t) ? closed : open).push(t);
-    // Open: sort by SLA due (soonest first), closed: sort by closed_at (newest first)
     return {
       openAll: open.sort((a, b) => parseDate(a.sla_due_at) - parseDate(b.sla_due_at)),
       closedAll: closed.sort((a, b) => parseDate(b.closed_at || b.created_at) - parseDate(a.closed_at || a.created_at)),
     };
-  }, [items, myOnly, profile?.id]);
+  }, [items, myOnly, profile?.id, filterTag, filterType, filterOverdue, filterStatus]);
 
   const perPage = 10;
   const [openPage, setOpenPage] = useState(1);
@@ -130,7 +140,7 @@ export default function Tickets() {
     );
   }
 
-  const myCount = items.filter(t => t.assigned_to === profile?.id && !isClosed(t)).length;
+  const activeFilters = [filterTag, filterType !== "all" ? filterType : "", filterOverdue ? "overdue" : "", filterStatus !== "all" ? filterStatus : ""].filter(Boolean).length;
 
   return (
     <div className="page">
@@ -139,28 +149,101 @@ export default function Tickets() {
           <h1 className="page-title">Work Orders</h1>
           <div className="page-subtitle">All tickets and projects — sorted by due date.</div>
         </div>
+        <button onClick={() => setShowFilters(v => !v)} style={{
+          padding: "7px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
+          border: "1px solid", transition: "all 0.15s",
+          borderColor: activeFilters > 0 ? "rgba(92,107,255,0.5)" : "var(--border)",
+          background: activeFilters > 0 ? "rgba(92,107,255,0.15)" : "rgba(255,255,255,0.05)",
+          color: activeFilters > 0 ? "#B0B8FF" : "var(--muted)",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+          Filter{activeFilters > 0 ? ` (${activeFilters})` : ""}
+        </button>
       </div>
 
-      {!isShowTech && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, marginBottom: 4 }}>
-          <button onClick={() => setMyOnly(false)} style={{
-            padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
-            border: "1px solid", transition: "all 0.15s",
-            borderColor: !myOnly ? "rgba(92,107,255,0.4)" : "var(--border)",
-            background: !myOnly ? "rgba(92,107,255,0.14)" : "rgba(255,255,255,0.05)",
-            color: !myOnly ? "#B0B8FF" : "var(--muted)",
-          }}>All Work Orders</button>
-          <button onClick={() => setMyOnly(true)} style={{
-            padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
-            border: "1px solid", transition: "all 0.15s",
-            borderColor: myOnly ? "rgba(92,107,255,0.4)" : "var(--border)",
-            background: myOnly ? "rgba(92,107,255,0.14)" : "rgba(255,255,255,0.05)",
-            color: myOnly ? "#B0B8FF" : "var(--muted)",
-          }}>
-            My Work Orders {myCount > 0 ? <span style={{ marginLeft: 4, background: "rgba(92,107,255,0.3)", borderRadius: 99, padding: "0 6px", fontSize: 11 }}>{myCount}</span> : null}
-          </button>
+      {/* Filter panel */}
+      {showFilters && (
+        <div className="card" style={{ padding: "14px 16px", marginBottom: 12 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+            {/* Status */}
+            <div style={{ flex: 1, minWidth: 130 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 7 }}>Status</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                {(["all", "open", "closed"] as const).map(v => (
+                  <label key={v} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="radio" name="filterStatus" checked={filterStatus === v} onChange={() => setFilterStatus(v)} style={{ accentColor: "var(--primary)" }} />
+                    <span style={{ fontSize: 13, color: filterStatus === v ? "var(--text)" : "var(--muted)" }}>
+                      {v === "all" ? "All" : v === "open" ? "Open" : "Closed"}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Type */}
+            <div style={{ flex: 1, minWidth: 130 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 7 }}>Type</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                {(["all", "ticket", "project"] as const).map(v => (
+                  <label key={v} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="radio" name="filterType" checked={filterType === v} onChange={() => setFilterType(v)} style={{ accentColor: "var(--primary)" }} />
+                    <span style={{ fontSize: 13, color: filterType === v ? "var(--text)" : "var(--muted)" }}>
+                      {v === "all" ? "All" : v === "ticket" ? "Tickets" : "Projects"}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Category */}
+            <div style={{ flex: 1, minWidth: 130 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 7 }}>Category</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input type="radio" name="filterTag" checked={filterTag === ""} onChange={() => setFilterTag("")} style={{ accentColor: "var(--primary)" }} />
+                  <span style={{ fontSize: 13, color: filterTag === "" ? "var(--text)" : "var(--muted)" }}>All</span>
+                </label>
+                {["Lighting", "Sound", "Video", "Rides", "Misc"].map(tag => (
+                  <label key={tag} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="radio" name="filterTag" checked={filterTag === tag} onChange={() => setFilterTag(tag)} style={{ accentColor: "var(--primary)" }} />
+                    <span style={{ fontSize: 13, color: filterTag === tag ? "var(--text)" : "var(--muted)" }}>{tag}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Other */}
+            <div style={{ flex: 1, minWidth: 130 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 7 }}>Other</div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <input type="checkbox" checked={filterOverdue} onChange={e => setFilterOverdue(e.target.checked)} style={{ accentColor: "var(--primary)" }} />
+                <span style={{ fontSize: 13, color: filterOverdue ? "#f87171" : "var(--muted)" }}>Overdue only</span>
+              </label>
+            </div>
+          </div>
+
+          {activeFilters > 0 && (
+            <button onClick={() => { setFilterTag(""); setFilterStatus("all"); setFilterType("all"); setFilterOverdue(false); }}
+              style={{ marginTop: 12, fontSize: 12, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
+              Clear all filters
+            </button>
+          )}
         </div>
       )}
+
+      {/* My / All toggle */}
+      {!isShowTech && (() => {
+        const myCount = items.filter(t => t.assigned_to === profile?.id && !isClosed(t)).length;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: showFilters ? 0 : 10, marginBottom: 4 }}>
+            <button onClick={() => setMyOnly(false)} style={{ padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid", transition: "all 0.15s", borderColor: !myOnly ? "rgba(92,107,255,0.4)" : "var(--border)", background: !myOnly ? "rgba(92,107,255,0.14)" : "rgba(255,255,255,0.05)", color: !myOnly ? "#B0B8FF" : "var(--muted)" }}>All Work Orders</button>
+            <button onClick={() => setMyOnly(true)} style={{ padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid", transition: "all 0.15s", borderColor: myOnly ? "rgba(92,107,255,0.4)" : "var(--border)", background: myOnly ? "rgba(92,107,255,0.14)" : "rgba(255,255,255,0.05)", color: myOnly ? "#B0B8FF" : "var(--muted)" }}>
+              My Work Orders {myCount > 0 ? <span style={{ marginLeft: 4, background: "rgba(92,107,255,0.3)", borderRadius: 99, padding: "0 6px", fontSize: 11 }}>{myCount}</span> : null}
+            </button>
+          </div>
+        );
+      })()}
 
       {loading && <div className="muted" style={{ marginTop: 12 }}>Loading…</div>}
       {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
