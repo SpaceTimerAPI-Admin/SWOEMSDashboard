@@ -183,6 +183,41 @@ export default function OfficeDashboard() {
   const needsUpdate  = data?.needs_update || [];
   const tagBreakdown = stats.tag_breakdown || {};
   const totalOpen    = stats.open || 0;
+  const beoEvents    = data?.beo_events || [];
+
+  // Shift log add form state
+  const [logNote, setLogNote] = useState("");
+  const [logSaving, setLogSaving] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
+
+  async function submitShiftLog(e: React.FormEvent) {
+    e.preventDefault();
+    const note = logNote.trim();
+    if (!note) return;
+    setLogSaving(true);
+    setLogError(null);
+    try {
+      const res = await fetch("/api/dashboard-shift-log-add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "Failed to save");
+      setLogNote("");
+      // Optimistically prepend the new entry
+      if (json.entry) {
+        setData((prev: any) => prev ? {
+          ...prev,
+          shift_log: [json.entry, ...(prev.shift_log || [])],
+        } : prev);
+      }
+    } catch (err: any) {
+      setLogError(err?.message || "Failed to save");
+    } finally {
+      setLogSaving(false);
+    }
+  }
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#06080f", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: "#e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -267,27 +302,94 @@ export default function OfficeDashboard() {
         /* ── MAIN 4-COLUMN GRID ─────────────────────────────────────────── */
         <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr", gap: 0, minHeight: 0, overflow: "hidden" }}>
 
-          {/* COL 1: Shift Log — PRIMARY */}
+          {/* COL 1: BEO Events + Shift Log — PRIMARY */}
           <div style={{ display: "flex", flexDirection: "column", borderRight: "2px solid rgba(251,191,36,0.2)", overflow: "hidden", background: "rgba(251,191,36,0.02)" }}>
-            <div style={{ padding: "10px 16px 8px", borderBottom: "1px solid rgba(251,191,36,0.15)", flexShrink: 0, display: "flex", alignItems: "center", gap: 7 }}>
-              <span style={{ fontSize: 16 }}>📓</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#fde68a" }}>Shift Log</span>
+
+            {/* BEO Events — above shift log */}
+            {beoEvents.length > 0 && (
+              <>
+                <div style={{ padding: "8px 14px 6px", borderBottom: "1px solid rgba(248,113,113,0.15)", flexShrink: 0, display: "flex", alignItems: "center", gap: 7, background: "rgba(248,113,113,0.05)" }}>
+                  <span style={{ fontSize: 14 }}>🎪</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fca5a5" }}>Events Today</span>
+                  <span style={{ fontSize: 10, color: "#4b5563", marginLeft: "auto" }}>{beoEvents.length} event{beoEvents.length !== 1 ? "s" : ""}</span>
+                </div>
+                <div style={{ flexShrink: 0, padding: "6px 12px 6px", borderBottom: "1px solid rgba(251,191,36,0.1)", display: "flex", flexDirection: "column", gap: 5 }}>
+                  {beoEvents.map((ev: any) => (
+                    <div key={ev.id} style={{ background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: 8, padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#fecaca", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.event_name}</div>
+                        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: 99, background: ev.setup_done ? "rgba(52,211,153,0.15)" : "rgba(251,191,36,0.15)", color: ev.setup_done ? "#6ee7b7" : "#fcd34d" }}>
+                            {ev.setup_done ? "✓ Setup" : "⏳ Setup needed"}
+                          </span>
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: 99, background: ev.strike_done ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.06)", color: ev.strike_done ? "#6ee7b7" : "#6b7280" }}>
+                            {ev.strike_done ? "✓ Strike" : "Strike pending"}
+                          </span>
+                        </div>
+                      </div>
+                      {ev.pdf_url && (
+                        <a href={ev.pdf_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, fontWeight: 600, color: "#818cf8", textDecoration: "none", background: "rgba(129,140,248,0.12)", padding: "3px 8px", borderRadius: 6, flexShrink: 0, whiteSpace: "nowrap" }}>
+                          📄 BEO PDF
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Shift Log header */}
+            <div style={{ padding: "8px 14px 6px", borderBottom: "1px solid rgba(251,191,36,0.15)", flexShrink: 0, display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ fontSize: 14 }}>📓</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#fde68a" }}>Shift Log</span>
               <span style={{ fontSize: 10, color: "#4b5563", marginLeft: "auto" }}>{shiftLog.length} entries today</span>
             </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+
+            {/* Log entries */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
               {shiftLog.length === 0
-                ? <div style={{ fontSize: 12, color: "#4b5563", textAlign: "center", paddingTop: 24 }}>No shift notes yet today</div>
+                ? <div style={{ fontSize: 12, color: "#4b5563", textAlign: "center", paddingTop: 20 }}>No shift notes yet today</div>
                 : shiftLog.map((e: any) => (
-                  <div key={e.id} style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.12)", borderRadius: 10, padding: "10px 12px", borderLeft: "3px solid rgba(251,191,36,0.5)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#fde68a" }}>{e.employee_name}</span>
-                      <span style={{ fontSize: 10, color: "#6b7280" }}>{fmtTime(e.created_at)}</span>
+                  <div key={e.id} style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.12)", borderRadius: 9, padding: "9px 12px", borderLeft: "3px solid rgba(251,191,36,0.5)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#fde68a" }}>{e.employee_name}</span>
+                      <span style={{ fontSize: 9, color: "#6b7280" }}>{fmtTime(e.created_at)}</span>
                     </div>
                     <div style={{ fontSize: 13, color: "#d1d5db", lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                       {e.note}
                     </div>
                   </div>
                 ))}
+            </div>
+
+            {/* Add shift log entry */}
+            <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(251,191,36,0.15)", flexShrink: 0, background: "rgba(0,0,0,0.3)" }}>
+              <form onSubmit={submitShiftLog} style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                <textarea
+                  value={logNote}
+                  onChange={e => setLogNote(e.target.value)}
+                  placeholder="Add a shift note… (posts as EMS Shop Dashboard)"
+                  rows={2}
+                  style={{
+                    width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, color: "#e5e7eb",
+                    fontSize: 12, padding: "8px 10px", resize: "none", fontFamily: "inherit",
+                    outline: "none",
+                  }}
+                  onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { void submitShiftLog(e as any); } }}
+                />
+                {logError && <div style={{ fontSize: 10, color: "#f87171" }}>⚠ {logError}</div>}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 9, color: "#4b5563" }}>Cmd+Enter to submit · Posts as "EMS Shop Dashboard"</span>
+                  <button type="submit" disabled={logSaving || !logNote.trim()} style={{
+                    background: logSaving || !logNote.trim() ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.3)",
+                    border: "1px solid rgba(251,191,36,0.3)", borderRadius: 7, color: "#fde68a",
+                    fontSize: 11, fontWeight: 700, padding: "5px 14px", cursor: logSaving || !logNote.trim() ? "not-allowed" : "pointer",
+                  }}>
+                    {logSaving ? "Saving…" : "Log Note"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
 

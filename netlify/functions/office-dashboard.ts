@@ -59,6 +59,8 @@ export const handler: Handler = async () => {
       shiftLogRes,
       // Schedule
       scheduleRes,
+      // BEO events today
+      beoRes,
     ] = await Promise.all([
       supabase.from("tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
       supabase.from("projects").select("id", { count: "exact", head: true }).neq("status", "closed"),
@@ -97,6 +99,13 @@ export const handler: Handler = async () => {
         .select("employee_name, shift_start, shift_end, all_shifts")
         .eq("work_date", today)
         .order("shift_start", { ascending: true, nullsFirst: false }),
+
+      // BEO events today
+      supabase.from("beo_events")
+        .select("id, event_name, event_date, pdf_url, beo_actions(id, action_type, completed_at)")
+        .eq("event_date", today)
+        .is("deleted_at", null)
+        .order("event_name"),
     ]);
 
     const openTickets  = openTicketsCountRes.count || 0;
@@ -176,6 +185,19 @@ export const handler: Handler = async () => {
       all_shifts: e.all_shifts,
     }));
 
+    const beoEvents = (beoRes.data || []).map((ev: any) => {
+      const actions = ev.beo_actions || [];
+      const setup  = actions.find((a: any) => a.action_type === "setup");
+      const strike = actions.find((a: any) => a.action_type === "strike");
+      return {
+        id: ev.id,
+        event_name: ev.event_name,
+        pdf_url: ev.pdf_url || null,
+        setup_done:  !!setup?.completed_at,
+        strike_done: !!strike?.completed_at,
+      };
+    });
+
     return json({
       ok: true,
       generated_at: now.toISOString(),
@@ -194,6 +216,7 @@ export const handler: Handler = async () => {
       groupme,
       shift_log: shiftLog,
       schedule,
+      beo_events: beoEvents,
     });
   } catch (e: any) {
     return json({ ok: false, error: e?.message || "Server error" }, 500);
