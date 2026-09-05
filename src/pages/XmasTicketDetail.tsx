@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getProfile } from "../lib/auth";
+
+declare const L: any;
 
 async function apiFetch(path: string, opts: RequestInit = {}) {
   const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", ...(opts.headers || {}) } });
@@ -19,25 +21,54 @@ export default function XmasTicketDetail() {
   const navigate = useNavigate();
   const profile = getProfile();
 
-  const [ticket, setTicket] = useState<any>(null);
-  const [photos, setPhotos] = useState<any[]>([]);
+  const [ticket, setTicket]   = useState<any>(null);
+  const [photos, setPhotos]   = useState<any[]>([]);
   const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy]       = useState(false);
+  const [showMap, setShowMap] = useState(false);
 
-  // Comment form
   const [commentAuthor, setCommentAuthor] = useState(profile?.name || "");
-  const [commentBody, setCommentBody] = useState("");
-  const [commentError, setCommentError] = useState<string | null>(null);
+  const [commentBody, setCommentBody]     = useState("");
+  const [commentError, setCommentError]   = useState<string | null>(null);
 
-  // Additional photo
-  const [attachPhoto, setAttachPhoto] = useState<File | null>(null);
+  const [attachPhoto, setAttachPhoto]   = useState<File | null>(null);
   const [attachPreview, setAttachPreview] = useState<string | null>(null);
-  const [attachNote, setAttachNote] = useState("");
-  const [attachBusy, setAttachBusy] = useState(false);
-  const attachRef = React.useRef<HTMLInputElement>(null);
+  const [attachNote, setAttachNote]     = useState("");
+  const [attachBusy, setAttachBusy]     = useState(false);
+  const attachRef = useRef<HTMLInputElement>(null);
+
+  const mapRef = useRef<HTMLDivElement>(null);
+  const leafletMap = useRef<any>(null);
 
   useEffect(() => { if (id) void load(); }, [id]);
+
+  // Load Leaflet when map is shown
+  useEffect(() => {
+    if (!showMap || !ticket?.lat || !mapRef.current) return;
+    if (!document.getElementById("leaflet-css")) {
+      const css = document.createElement("link");
+      css.id = "leaflet-css"; css.rel = "stylesheet";
+      css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(css);
+    }
+    function initMap() {
+      if (leafletMap.current) { leafletMap.current.invalidateSize(); return; }
+      leafletMap.current = L.map(mapRef.current).setView([ticket.lat, ticket.lon], 18);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: "© OpenStreetMap contributors"
+      }).addTo(leafletMap.current);
+      L.marker([ticket.lat, ticket.lon])
+        .addTo(leafletMap.current)
+        .bindPopup(`Ticket #${ticket.id} — ${ticket.location_friendly}`)
+        .openPopup();
+    }
+    if (typeof L !== "undefined") { setTimeout(initMap, 100); return; }
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload = () => setTimeout(initMap, 100);
+    document.head.appendChild(script);
+  }, [showMap, ticket]);
 
   async function load() {
     setLoading(true);
@@ -66,17 +97,15 @@ export default function XmasTicketDetail() {
     e.preventDefault();
     setCommentError(null);
     if (!commentAuthor.trim()) return setCommentError("Name is required");
-    if (!commentBody.trim()) return setCommentError("Comment is required");
+    if (!commentBody.trim())   return setCommentError("Comment is required");
     setBusy(true);
     try {
       const res = await apiFetch("/api/xmas-add-comment", {
         method: "POST",
         body: JSON.stringify({ ticket_id: Number(id), author: commentAuthor.trim(), body: commentBody.trim() }),
       });
-      if (res.ok) {
-        setComments(prev => [...prev, res.comment]);
-        setCommentBody("");
-      } else throw new Error(res.error || "Failed");
+      if (res.ok) { setComments(prev => [...prev, res.comment]); setCommentBody(""); }
+      else throw new Error(res.error || "Failed");
     } catch (err: any) {
       setCommentError(err?.message || "Failed to add comment");
     } finally { setBusy(false); }
@@ -89,26 +118,19 @@ export default function XmasTicketDetail() {
     try {
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
+        reader.onload  = () => resolve(reader.result as string);
         reader.onerror = () => reject(new Error("Read failed"));
         reader.readAsDataURL(attachPhoto);
       });
       const res = await apiFetch("/api/xmas-attach-photo", {
         method: "POST",
         body: JSON.stringify({
-          ticket_id: Number(id),
-          photoBase64: base64,
-          photoFilename: attachPhoto.name,
-          note: attachNote.trim(),
+          ticket_id: Number(id), photoBase64: base64,
+          photoFilename: attachPhoto.name, note: attachNote.trim(),
           author: commentAuthor || profile?.name || "Staff",
         }),
       });
-      if (res.ok) {
-        setAttachPhoto(null);
-        setAttachPreview(null);
-        setAttachNote("");
-        await load();
-      }
+      if (res.ok) { setAttachPhoto(null); setAttachPreview(null); setAttachNote(""); await load(); }
     } finally { setAttachBusy(false); }
   }
 
@@ -127,6 +149,7 @@ export default function XmasTicketDetail() {
   );
 
   const isFixed = ticket.status === "fixed";
+  const hasCoords = ticket.lat != null && ticket.lon != null;
 
   return (
     <div className="page fade-up">
@@ -141,11 +164,10 @@ export default function XmasTicketDetail() {
           <div className="page-subtitle">By {ticket.tech_name} · {fmtDate(ticket.created_at)}</div>
         </div>
         <span style={{
-          fontSize: 12, fontWeight: 700, padding: "4px 12px", borderRadius: 99,
+          fontSize: 12, fontWeight: 700, padding: "4px 12px", borderRadius: 99, flexShrink: 0, alignSelf: "flex-start",
           background: isFixed ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)",
           color: isFixed ? "#34d399" : "#f87171",
           border: `1px solid ${isFixed ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"}`,
-          flexShrink: 0, alignSelf: "flex-start",
         }}>
           {isFixed ? "✓ Fixed" : "Open"}
         </span>
@@ -158,6 +180,33 @@ export default function XmasTicketDetail() {
           {ticket.description}
         </div>
       </div>
+
+      {/* Map */}
+      {hasCoords && (
+        <div className="card" style={{ padding: 16, marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showMap ? 12 : 0 }}>
+            <div className="detail-label" style={{ marginBottom: 0 }}>
+              📍 GPS Location — {ticket.lat.toFixed(5)}, {ticket.lon.toFixed(5)}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn small" onClick={() => setShowMap(v => !v)}>
+                {showMap ? "Hide Map" : "Show Map"}
+              </button>
+              <a
+                href={`https://www.google.com/maps?q=${ticket.lat},${ticket.lon}`}
+                target="_blank" rel="noreferrer"
+                className="btn small"
+                style={{ textDecoration: "none" }}
+              >
+                Google Maps ↗
+              </a>
+            </div>
+          </div>
+          {showMap && (
+            <div ref={mapRef} style={{ height: 300, width: "100%", borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }} />
+          )}
+        </div>
+      )}
 
       {/* Photos */}
       {photos.length > 0 && (
@@ -177,8 +226,7 @@ export default function XmasTicketDetail() {
       <div className="btn-row" style={{ marginBottom: 14 }}>
         <button
           className={`btn${isFixed ? "" : " primary"}`}
-          onClick={toggleStatus}
-          disabled={busy}
+          onClick={toggleStatus} disabled={busy}
           style={isFixed ? { borderColor: "rgba(248,113,113,0.3)", background: "rgba(248,113,113,0.1)", color: "#f87171" } : {}}
         >
           {busy ? <span className="spinner" /> : isFixed ? "↩ Reopen" : "✓ Mark Fixed"}
@@ -192,7 +240,8 @@ export default function XmasTicketDetail() {
           {attachPreview ? (
             <div style={{ position: "relative", marginBottom: 10 }}>
               <img src={attachPreview} alt="Preview" style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }} />
-              <button type="button" onClick={() => { setAttachPhoto(null); setAttachPreview(null); if (attachRef.current) attachRef.current.value = ""; }}
+              <button type="button"
+                onClick={() => { setAttachPhoto(null); setAttachPreview(null); if (attachRef.current) attachRef.current.value = ""; }}
                 style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.7)", border: "none", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", color: "#fff", fontSize: 14 }}>×</button>
             </div>
           ) : (
@@ -202,7 +251,6 @@ export default function XmasTicketDetail() {
           )}
           <input ref={attachRef} type="file" accept="image/*" style={{ display: "none" }}
             onChange={e => { const f = e.target.files?.[0]; if (!f) return; setAttachPhoto(f); const r = new FileReader(); r.onload = ev => setAttachPreview(ev.target?.result as string); r.readAsDataURL(f); }} />
-
           {attachPhoto && (
             <>
               <textarea className="textarea" value={attachNote} onChange={e => setAttachNote(e.target.value)}
@@ -220,9 +268,8 @@ export default function XmasTicketDetail() {
         <div className="detail-label" style={{ marginBottom: 10 }}>
           Updates {comments.length > 0 && `(${comments.length})`}
         </div>
-
         {comments.length === 0 ? (
-          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>No updates yet.</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>No updates yet.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
             {comments.map((c: any) => (
@@ -234,7 +281,6 @@ export default function XmasTicketDetail() {
             ))}
           </div>
         )}
-
         <form onSubmit={submitComment}>
           <div className="field-label">Add Update</div>
           <input className="input" value={commentAuthor} onChange={e => setCommentAuthor(e.target.value)}
