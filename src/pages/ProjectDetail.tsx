@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import {
   addProjectComment,
   assignProject,
@@ -24,6 +24,7 @@ function pickData(res: any) {
 
 export default function ProjectDetail() {
   const { id } = useParams();
+  const nav = useNavigate();
   const projectId = id || "";
 
   const [project, setProject] = useState<Project | null>(null);
