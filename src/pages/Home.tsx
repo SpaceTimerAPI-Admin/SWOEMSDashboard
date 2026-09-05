@@ -292,14 +292,9 @@ export default function Home() {
         <Tile to="/events"       icon="🎪" title="Events"          desc="BEO calendar & setup tracking"      accent="rgba(255,84,84,0.13)" />
         <Tile to="/shift-log"    icon="📓" title="Shift Log"       desc="Log notes throughout your shift"    accent="rgba(168,144,255,0.15)" />
         <Tile to="/eod"          icon="📝" title="EOD Report"      desc="Generate & email today's recap"     accent="rgba(255,84,84,0.12)" />
-        <Tile to="/procedures"   icon="📖" title="Procedures"      desc="Step-by-step guides & references"   accent="rgba(56,189,248,0.12)" />
         <Tile to="/christmas"    icon="🎄" title="Christmas"       desc="Holiday lights & decor tickets"     accent="rgba(46,232,160,0.15)" />
-        <DocsButton />
         {getRole() === "admin" && (
           <Tile to="/admin" icon="🛡️" title="Admin" desc="User management & settings" accent="rgba(255,182,39,0.15)" />
-        )}
-        {getRole() !== "show_tech" && (
-          <Tile to="/dashboard" icon="📺" title="Office Display" desc="Live ops dashboard for office screen" accent="rgba(99,102,241,0.15)" />
         )}
       </div>
     </div>

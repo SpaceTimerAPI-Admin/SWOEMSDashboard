@@ -26,9 +26,23 @@ function nowDisplay() {
 }
 function fmtShift(t: string | null) {
   if (!t) return "";
+  // If already formatted (e.g. "7:00 AM") return as-is
+  if (t.includes("AM") || t.includes("PM")) return t;
   const [h, m] = t.split(":").map(Number);
   const ampm = h >= 12 ? "PM" : "AM";
   return `${h % 12 || 12}:${String(m).padStart(2, "0")}${ampm}`;
+}
+
+function fmtShiftRange(s: any): string {
+  // all_shifts is stored as "HH:MM - HH:MM" or similar text
+  if (s.all_shifts) {
+    // Parse and reformat if it looks like "7:00 - 15:30"
+    const match = s.all_shifts.match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/);
+    if (match) return `${fmtShift(match[1])} – ${fmtShift(match[2])}`;
+    return s.all_shifts;
+  }
+  const parts = [fmtShift(s.shift_start), fmtShift(s.shift_end)].filter(Boolean);
+  return parts.join(" – ");
 }
 
 async function fetchDashboard() {
@@ -279,9 +293,7 @@ export default function OfficeDashboard() {
               : schedule.map((s: any, i: number) => (
                 <div key={i} style={{ background: "rgba(129,140,248,0.12)", border: "1px solid rgba(129,140,248,0.22)", borderRadius: 6, padding: "3px 8px" }}>
                   <div style={{ fontSize: 10, fontWeight: 600, color: "#c7d2fe" }}>{s.employee_name}</div>
-                  <div style={{ fontSize: 9, color: "#6b7280" }}>
-                    {s.all_shifts ? "All shifts" : [fmtShift(s.shift_start), fmtShift(s.shift_end)].filter(Boolean).join(" – ")}
-                  </div>
+                  <div style={{ fontSize: 9, color: "#6b7280" }}>{fmtShiftRange(s)}</div>
                 </div>
               ))}
           </div>
