@@ -1,6 +1,8 @@
 /**
- * GET /api/ticket-report?search=odyssey&since=2026-05-25
- * Admin/EMS only. Returns tickets + AI analysis of patterns.
+ * GET /api/ticket-report?search=odyssey&since=2026-05-25&mode=tickets|analysis
+ * Admin/EMS only.
+ * mode=tickets  — fast, returns just the ticket data (no AI)
+ * mode=analysis — slow, returns AI analysis only (called after tickets load)
  */
 import type { Handler } from "@netlify/functions";
 import { supabaseAdmin } from "./_supabase";
@@ -34,6 +36,7 @@ export const handler: Handler = async (event) => {
 
   const search = (event.queryStringParameters?.search || "odyssey").toLowerCase().trim();
   const since  = event.queryStringParameters?.since  || "2026-05-25";
+  const mode   = event.queryStringParameters?.mode   || "tickets";
 
   const supabase = supabaseAdmin();
 
@@ -56,7 +59,12 @@ export const handler: Handler = async (event) => {
   if (error) return json({ error: error.message }, 500);
   if (!tickets || tickets.length === 0) return json({ ok: true, tickets: [], analysis: null, search, since });
 
-  // ── Build context for AI analysis ────────────────────────────────────────
+  // Tickets-only mode — return immediately, no AI
+  if (mode === "tickets") {
+    return json({ ok: true, tickets, analysis: null, search, since });
+  }
+
+  // Analysis mode — build context and call Claude
   const ticketContext = tickets.map((t: any, i: number) => {
     const comments = (t.comments || [])
       .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -64,8 +72,7 @@ export const handler: Handler = async (event) => {
       .join("\n");
 
     const closed = t.status === "closed" && t.closed_at
-      ? `\n  Closed: ${fmtET(t.closed_at)}`
-      : "";
+      ? `\n  Closed: ${fmtET(t.closed_at)}` : "";
 
     const hour = hourET(t.created_at);
     const timeOfDay = hour < 6 ? "overnight" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "night";
@@ -80,8 +87,7 @@ export const handler: Handler = async (event) => {
 ${comments ? `  Comments:\n${comments}` : "  No comments"}`;
   }).join("\n\n");
 
-  // ── AI Analysis ──────────────────────────────────────────────────────────
-  let analysis: any = null;
+  let analysis: string | null = null;
   try {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (anthropicKey) {
@@ -104,7 +110,7 @@ Group tickets by the type of problem they describe. For each recurring issue typ
 
 3. FREQUENCY & TIMING ANALYSIS
 - How often are tickets being submitted (per week/month)?
-- What time of day do most issues occur (morning, afternoon, evening, overnight)?
+- What time of day do most issues occur?
 - What days of the week see the most issues?
 - Is there a trend — getting worse over time, clustered around certain periods?
 
@@ -119,7 +125,7 @@ Group tickets by the type of problem they describe. For each recurring issue typ
 6. RECOMMENDED ACTIONS
 What systemic fixes or investigations should management prioritize based on this data?
 
-Write in a professional tone appropriate for a management report. Be factual and data-driven. Use the actual ticket titles, dates, and details from the data above.`;
+Write in a professional tone appropriate for a management report. Be factual and data-driven.`;
 
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -144,5 +150,5 @@ Write in a professional tone appropriate for a management report. Be factual and
     console.error("[ticket-report] AI analysis error:", e);
   }
 
-  return json({ ok: true, tickets: tickets || [], analysis, search, since });
+  return json({ ok: true, tickets, analysis, search, since });
 };

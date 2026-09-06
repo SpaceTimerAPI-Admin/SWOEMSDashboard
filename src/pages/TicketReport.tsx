@@ -2,14 +2,21 @@ import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { getRole } from "../lib/auth";
 
-async function fetchReport(search: string, since: string) {
+async function fetchTickets(search: string, since: string) {
   const token = localStorage.getItem("md_session_token");
-  const res = await fetch(`/api/ticket-report?search=${encodeURIComponent(search)}&since=${since}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+  const res = await fetch(`/api/ticket-report?search=${encodeURIComponent(search)}&since=${since}&mode=tickets`, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function fetchAnalysis(search: string, since: string) {
+  const token = localStorage.getItem("md_session_token");
+  const res = await fetch(`/api/ticket-report?search=${encodeURIComponent(search)}&since=${since}&mode=analysis`, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
@@ -123,16 +130,30 @@ export default function TicketReport() {
     setAnalysisLoading(true);
     setError(null);
     setAnalysis(null);
+    setTickets([]);
+    setHasLoaded(false);
     try {
-      const res = await fetchReport(search.trim(), since);
-      if (!res.ok) throw new Error(res.error || "Failed to load");
-      setTickets(res.tickets || []);
-      setAnalysis(res.analysis || null);
+      // Phase 1 — tickets load fast (no AI), show them immediately
+      const ticketsRes = await fetchTickets(search.trim(), since);
+      if (!ticketsRes.ok) throw new Error(ticketsRes.error || "Failed to load tickets");
+      setTickets(ticketsRes.tickets || []);
       setHasLoaded(true);
+      setLoading(false);
+
+      // Phase 2 — AI analysis loads separately, doesn't block the ticket list
+      if ((ticketsRes.tickets || []).length > 0) {
+        try {
+          const analysisRes = await fetchAnalysis(search.trim(), since);
+          setAnalysis(analysisRes.analysis || null);
+        } catch {
+          // Analysis failure is non-fatal — tickets are already showing
+          setAnalysis(null);
+        }
+      }
     } catch (e: any) {
       setError(e?.message || "Failed to load report");
-    } finally {
       setLoading(false);
+    } finally {
       setAnalysisLoading(false);
     }
   }
