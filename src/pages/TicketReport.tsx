@@ -4,17 +4,19 @@ import { getRole } from "../lib/auth";
 
 async function fetchTickets(search: string, since: string) {
   const token = localStorage.getItem("md_session_token");
-  const res = await fetch(`/api/ticket-report?search=${encodeURIComponent(search)}&since=${since}&mode=tickets`, {
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  const res = await fetch(`/api/ticket-report?search=${encodeURIComponent(search)}&since=${since}`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
-async function fetchAnalysis(search: string, since: string) {
+async function fetchAnalysis(tickets: any[], search: string, since: string) {
   const token = localStorage.getItem("md_session_token");
-  const res = await fetch(`/api/ticket-report?search=${encodeURIComponent(search)}&since=${since}&mode=analysis`, {
+  const res = await fetch(`/api/ticket-report`, {
+    method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ tickets, search, since }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
@@ -142,10 +144,10 @@ export default function TicketReport() {
       setHasLoaded(true);
       setLoading(false);
 
-      // Phase 2 — AI analysis loads separately, doesn't block the ticket list
+      // Phase 2 — POST ticket data to backend, backend only runs AI (no DB re-query)
       if ((ticketsRes.tickets || []).length > 0) {
         try {
-          const analysisRes = await fetchAnalysis(search.trim(), since);
+          const analysisRes = await fetchAnalysis(ticketsRes.tickets, search.trim(), since);
           if (analysisRes.analysis) {
             setAnalysis(analysisRes.analysis);
           } else {

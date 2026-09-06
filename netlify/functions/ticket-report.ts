@@ -1,8 +1,6 @@
 /**
- * GET /api/ticket-report?search=odyssey&since=2026-05-25&mode=tickets|analysis
- * Admin/EMS only.
- * mode=tickets  — fast, returns just the ticket data (no AI)
- * mode=analysis — slow, returns AI analysis only (called after tickets load)
+ * GET  /api/ticket-report?search=x&since=x  — returns tickets only (fast)
+ * POST /api/ticket-report                    — body: { tickets, search, since } — returns AI analysis only
  */
 import type { Handler } from "@netlify/functions";
 import { supabaseAdmin } from "./_supabase";
@@ -28,18 +26,118 @@ function dayOfWeekET(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long" });
 }
 
+function buildContext(tickets: any[], search: string, since: string): string {
+  return tickets.map((t: any, i: number) => {
+    const comments = (t.comments || [])
+      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .map((c: any) => `    [${fmtET(c.created_at)}] ${c.commenter?.name || "Staff"}: ${c.comment}`)
+      .join("\n");
+    const closed = t.status === "closed" && t.closed_at ? `\n  Closed: ${fmtET(t.closed_at)}` : "";
+    const hour = hourET(t.created_at);
+    const timeOfDay = hour < 6 ? "overnight" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "night";
+    const day = dayOfWeekET(t.created_at);
+    return `TICKET ${i + 1}: ${t.title}
+  Status: ${t.status} | Tag: ${t.tag || "none"} | Location: ${t.location || "—"}
+  Opened: ${fmtET(t.created_at)} (${day}, ${timeOfDay})${closed}
+  Submitted by: ${t.created_by_emp?.name || "unknown"}
+  Assigned to: ${t.assigned_emp?.name || "unassigned"}
+  Details: ${(t.details || "").slice(0, 400)}
+${comments ? `  Comments:\n${comments}` : "  No comments"}`;
+  }).join("\n\n");
+}
+
 export const handler: Handler = async (event) => {
   const session = await requireSession(event);
   if (!session) return json({ error: "Unauthorized" }, 401);
   const emp = (session as any).employee as any;
   if (emp.role === "show_tech") return json({ error: "Forbidden" }, 403);
 
+  // ── POST: AI analysis only (tickets passed in body from frontend) ─────────
+  if (event.httpMethod === "POST") {
+    const body = event.body ? JSON.parse(event.body) : {};
+    const { tickets, search, since } = body;
+    if (!tickets || !Array.isArray(tickets)) return json({ error: "tickets array required" }, 400);
+
+    const ticketContext = buildContext(tickets, search, since);
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicKey) return json({ ok: false, analysis: null, analysis_error: "ANTHROPIC_API_KEY not set" });
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1500,
+          messages: [{
+            role: "user",
+            content: `You are analyzing maintenance ticket data for SeaWorld Entertainment to identify patterns and recurring issues. This report is being prepared for management.
+
+Search term: "${search}"
+Date range: ${since} to today
+Total tickets: ${tickets.length}
+
+TICKET DATA:
+${ticketContext}
+
+Please analyze this data and provide a structured report with these sections:
+
+1. EXECUTIVE SUMMARY
+A 2-3 sentence overview — how many tickets, over what timeframe, and the overall severity of the pattern.
+
+2. RECURRING ISSUES
+Group tickets by problem type. For each type, list how many times it appeared and what the pattern looks like.
+
+3. FREQUENCY & TIMING ANALYSIS
+- How often are tickets submitted (per week/month)?
+- What time of day do most issues occur?
+- Any trends over time?
+
+4. RESOLUTION ANALYSIS
+- Average resolution time?
+- Any tickets stayed open too long?
+- Same issues "resolved" repeatedly without a permanent fix?
+
+5. KEY FINDINGS FOR MANAGEMENT
+3-5 bullet points making the strongest case for systemic issues. Cite actual ticket counts, dates, and patterns.
+
+6. RECOMMENDED ACTIONS
+What should management prioritize based on this data?
+
+Write in a professional tone. Be factual and data-driven.`
+          }],
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("[ticket-report] Claude API error:", res.status, errText.slice(0, 500));
+        return json({ ok: false, analysis: null, analysis_error: `Claude API error ${res.status}: ${errText.slice(0, 200)}` });
+      }
+
+      const data = await res.json();
+      const analysis = data.content?.[0]?.text || null;
+      if (!analysis) {
+        console.error("[ticket-report] Claude returned no text:", JSON.stringify(data).slice(0, 500));
+        return json({ ok: false, analysis: null, analysis_error: "Claude returned no content" });
+      }
+
+      return json({ ok: true, analysis });
+    } catch (e: any) {
+      console.error("[ticket-report] AI error:", e?.message);
+      return json({ ok: false, analysis: null, analysis_error: e?.message || "AI call failed" });
+    }
+  }
+
+  // ── GET: fetch tickets from Supabase (fast, no AI) ────────────────────────
   const search = (event.queryStringParameters?.search || "odyssey").toLowerCase().trim();
   const since  = event.queryStringParameters?.since  || "2026-05-25";
-  const mode   = event.queryStringParameters?.mode   || "tickets";
 
   const supabase = supabaseAdmin();
-
   const { data: tickets, error } = await supabase
     .from("tickets")
     .select(`
@@ -57,105 +155,5 @@ export const handler: Handler = async (event) => {
     .order("created_at", { ascending: true });
 
   if (error) return json({ error: error.message }, 500);
-  if (!tickets || tickets.length === 0) return json({ ok: true, tickets: [], analysis: null, search, since });
-
-  // Tickets-only mode — return immediately, no AI
-  if (mode === "tickets") {
-    return json({ ok: true, tickets, analysis: null, search, since });
-  }
-
-  // Analysis mode — build context and call Claude
-  const ticketContext = tickets.map((t: any, i: number) => {
-    const comments = (t.comments || [])
-      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-      .map((c: any) => `    [${fmtET(c.created_at)}] ${c.commenter?.name || "Staff"}: ${c.comment}`)
-      .join("\n");
-
-    const closed = t.status === "closed" && t.closed_at
-      ? `\n  Closed: ${fmtET(t.closed_at)}` : "";
-
-    const hour = hourET(t.created_at);
-    const timeOfDay = hour < 6 ? "overnight" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "night";
-    const day = dayOfWeekET(t.created_at);
-
-    return `TICKET ${i + 1}: ${t.title}
-  Status: ${t.status} | Tag: ${t.tag || "none"} | Location: ${t.location || "—"}
-  Opened: ${fmtET(t.created_at)} (${day}, ${timeOfDay})${closed}
-  Submitted by: ${t.created_by_emp?.name || "unknown"}
-  Assigned to: ${t.assigned_emp?.name || "unassigned"}
-  Details: ${(t.details || "").slice(0, 400)}
-${comments ? `  Comments:\n${comments}` : "  No comments"}`;
-  }).join("\n\n");
-
-  let analysis: string | null = null;
-  try {
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (anthropicKey) {
-      const prompt = `You are analyzing maintenance ticket data for SeaWorld Entertainment to identify patterns and recurring issues. This report is being prepared for management to make the case that internal systemic issues need to be corrected.
-
-Search term: "${search}"
-Date range: ${since} to today
-Total tickets: ${tickets.length}
-
-TICKET DATA:
-${ticketContext}
-
-Please analyze this data and provide a structured report with these sections:
-
-1. EXECUTIVE SUMMARY
-A 2-3 sentence overview of the situation — how many tickets, over what timeframe, and the overall severity of the pattern.
-
-2. RECURRING ISSUES
-Group tickets by the type of problem they describe. For each recurring issue type, list how many times it appeared and what the pattern looks like. Be specific about what keeps breaking or failing.
-
-3. FREQUENCY & TIMING ANALYSIS
-- How often are tickets being submitted (per week/month)?
-- What time of day do most issues occur?
-- What days of the week see the most issues?
-- Is there a trend — getting worse over time, clustered around certain periods?
-
-4. RESOLUTION ANALYSIS
-- How quickly are issues being resolved on average?
-- Are there tickets that stayed open too long?
-- Are the same issues being "resolved" repeatedly without a permanent fix?
-
-5. KEY FINDINGS FOR MANAGEMENT
-3-5 bullet points that make the strongest case that these are systemic/internal issues rather than one-off events. Be direct and specific — cite actual ticket counts, dates, and patterns.
-
-6. RECOMMENDED ACTIONS
-What systemic fixes or investigations should management prioritize based on this data?
-
-Write in a professional tone appropriate for a management report. Be factual and data-driven.`;
-
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1500,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        analysis = data.content?.[0]?.text || null;
-        if (!analysis) {
-          console.error("[ticket-report] Claude returned no text. Full response:", JSON.stringify(data).slice(0, 500));
-        }
-      } else {
-        const errText = await res.text();
-        console.error("[ticket-report] Claude API error:", res.status, errText.slice(0, 500));
-      }
-    }
-  } catch (e: any) {
-    console.error("[ticket-report] AI analysis error:", e);
-    return json({ ok: true, tickets, analysis: null, analysis_error: e?.message || "AI call failed", search, since });
-  }
-
-  return json({ ok: true, tickets, analysis, analysis_error: analysis ? null : "Claude returned no content", search, since });
+  return json({ ok: true, tickets: tickets || [], search, since });
 };
