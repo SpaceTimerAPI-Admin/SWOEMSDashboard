@@ -130,7 +130,7 @@ Write in a professional tone appropriate for a management report. Be factual and
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 2000,
+          max_tokens: 1500,
           messages: [{ role: "user", content: prompt }],
         }),
       });
