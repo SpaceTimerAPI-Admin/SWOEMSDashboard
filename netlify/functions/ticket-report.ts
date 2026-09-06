@@ -144,11 +144,18 @@ Write in a professional tone appropriate for a management report. Be factual and
       if (res.ok) {
         const data = await res.json();
         analysis = data.content?.[0]?.text || null;
+        if (!analysis) {
+          console.error("[ticket-report] Claude returned no text. Full response:", JSON.stringify(data).slice(0, 500));
+        }
+      } else {
+        const errText = await res.text();
+        console.error("[ticket-report] Claude API error:", res.status, errText.slice(0, 500));
       }
     }
-  } catch (e) {
+  } catch (e: any) {
     console.error("[ticket-report] AI analysis error:", e);
+    return json({ ok: true, tickets, analysis: null, analysis_error: e?.message || "AI call failed", search, since });
   }
 
-  return json({ ok: true, tickets, analysis, search, since });
+  return json({ ok: true, tickets, analysis, analysis_error: analysis ? null : "Claude returned no content", search, since });
 };

@@ -110,6 +110,7 @@ export default function TicketReport() {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
 
@@ -130,6 +131,7 @@ export default function TicketReport() {
     setAnalysisLoading(true);
     setError(null);
     setAnalysis(null);
+    setAnalysisError(null);
     setTickets([]);
     setHasLoaded(false);
     try {
@@ -144,10 +146,14 @@ export default function TicketReport() {
       if ((ticketsRes.tickets || []).length > 0) {
         try {
           const analysisRes = await fetchAnalysis(search.trim(), since);
-          setAnalysis(analysisRes.analysis || null);
-        } catch {
-          // Analysis failure is non-fatal — tickets are already showing
-          setAnalysis(null);
+          if (analysisRes.analysis) {
+            setAnalysis(analysisRes.analysis);
+          } else {
+            const errMsg = analysisRes.analysis_error || "AI analysis returned empty";
+            setAnalysisError(`${errMsg} — try generating the report again.`);
+          }
+        } catch (e: any) {
+          setAnalysisError(`AI analysis failed: ${e?.message || "unknown error"}`);
         }
       }
     } catch (e: any) {
@@ -270,6 +276,10 @@ export default function TicketReport() {
                   </div>
                 ) : analysis ? (
                   <AnalysisSection text={analysis} />
+                ) : analysisError ? (
+                  <div style={{ fontSize: 13, color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, padding: "10px 12px" }}>
+                    ⚠ {analysisError}
+                  </div>
                 ) : (
                   <div style={{ fontSize: 13, color: "var(--muted)" }}>Analysis unavailable.</div>
                 )}
