@@ -37,11 +37,12 @@ export default function Tickets() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myOnly, setMyOnly] = useState(false);
-  const [filterTag, setFilterTag]       = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "open" | "closed">("all");
-  const [filterType, setFilterType]     = useState<"all" | "ticket" | "project">("all");
+  const [filterTag, setFilterTag]         = useState("");
+  const [filterStatus, setFilterStatus]   = useState<"all" | "open" | "closed">("all");
+  const [filterType, setFilterType]       = useState<"all" | "ticket" | "project">("all");
   const [filterOverdue, setFilterOverdue] = useState(false);
-  const [showFilters, setShowFilters]   = useState(false);
+  const [showFilters, setShowFilters]     = useState(false);
+  const [sortBy, setSortBy]               = useState<"newest" | "oldest" | "due_soon" | "due_late">("newest");
   const profile = getProfile();
   const role = getRole();
   const isShowTech = role === "show_tech";
@@ -68,19 +69,29 @@ export default function Tickets() {
 
   const { openAll, closedAll } = useMemo(() => {
     let source = myOnly ? items.filter(t => t.assigned_to === profile?.id) : items;
-    // Apply filters
-    if (filterTag)    source = source.filter(t => (t.tag || "Misc") === filterTag);
+    if (filterTag)          source = source.filter(t => (t.tag || "Misc") === filterTag);
     if (filterType !== "all") source = source.filter(t => t._type === filterType);
-    if (filterOverdue) source = source.filter(t => !isClosed(t) && parseDate(t.sla_due_at) > 0 && parseDate(t.sla_due_at) < Date.now());
+    if (filterOverdue)      source = source.filter(t => !isClosed(t) && parseDate(t.sla_due_at) > 0 && parseDate(t.sla_due_at) < Date.now());
     if (filterStatus === "open")   source = source.filter(t => !isClosed(t));
     if (filterStatus === "closed") source = source.filter(t => isClosed(t));
     const open: WorkOrder[] = [], closed: WorkOrder[] = [];
     for (const t of source) (isClosed(t) ? closed : open).push(t);
+
+    function applySort(arr: WorkOrder[]): WorkOrder[] {
+      switch (sortBy) {
+        case "newest":   return [...arr].sort((a, b) => parseDate(b.created_at) - parseDate(a.created_at));
+        case "oldest":   return [...arr].sort((a, b) => parseDate(a.created_at) - parseDate(b.created_at));
+        case "due_soon": return [...arr].sort((a, b) => parseDate(a.sla_due_at) - parseDate(b.sla_due_at));
+        case "due_late": return [...arr].sort((a, b) => parseDate(b.sla_due_at) - parseDate(a.sla_due_at));
+        default:         return arr;
+      }
+    }
+
     return {
-      openAll: open.sort((a, b) => parseDate(a.sla_due_at) - parseDate(b.sla_due_at)),
-      closedAll: closed.sort((a, b) => parseDate(b.closed_at || b.created_at) - parseDate(a.closed_at || a.created_at)),
+      openAll:   applySort(open),
+      closedAll: [...closed].sort((a, b) => parseDate(b.closed_at || b.created_at) - parseDate(a.closed_at || a.created_at)),
     };
-  }, [items, myOnly, profile?.id, filterTag, filterType, filterOverdue, filterStatus]);
+  }, [items, myOnly, profile?.id, filterTag, filterType, filterOverdue, filterStatus, sortBy]);
 
   const perPage = 10;
   const [openPage, setOpenPage] = useState(1);
@@ -142,6 +153,13 @@ export default function Tickets() {
 
   const activeFilters = [filterTag, filterType !== "all" ? filterType : "", filterOverdue ? "overdue" : "", filterStatus !== "all" ? filterStatus : ""].filter(Boolean).length;
 
+  const SORT_LABELS: Record<string, string> = {
+    newest: "Newest first",
+    oldest: "Oldest first",
+    due_soon: "Due soonest",
+    due_late: "Due latest",
+  };
+
   return (
     <div className="page">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
@@ -158,7 +176,7 @@ export default function Tickets() {
           display: "flex", alignItems: "center", gap: 6,
         }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
-          Filter{activeFilters > 0 ? ` (${activeFilters})` : ""}
+          Filter{activeFilters > 0 ? ` (${activeFilters})` : ""} · {SORT_LABELS[sortBy]}
         </button>
       </div>
 
@@ -166,6 +184,19 @@ export default function Tickets() {
       {showFilters && (
         <div className="card" style={{ padding: "14px 16px", marginBottom: 12 }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+            {/* Sort */}
+            <div style={{ flex: 1, minWidth: 130 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 7 }}>Sort By</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                {(["newest", "oldest", "due_soon", "due_late"] as const).map(v => (
+                  <label key={v} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="radio" name="sortBy" checked={sortBy === v} onChange={() => setSortBy(v)} style={{ accentColor: "var(--primary)" }} />
+                    <span style={{ fontSize: 13, color: sortBy === v ? "var(--text)" : "var(--muted)" }}>{SORT_LABELS[v]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             {/* Status */}
             <div style={{ flex: 1, minWidth: 130 }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 7 }}>Status</div>
