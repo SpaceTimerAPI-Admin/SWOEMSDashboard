@@ -76,6 +76,8 @@ export const handler: Handler = async (event) => {
 
     const body = event.body ? JSON.parse(event.body) : {};
     const question = String(body.question || "").trim();
+    const history: { role: string; text: string }[] = Array.isArray(body.history) ? body.history.slice(-16) : [];
+
     if (!question) return badRequest("question required");
     if (question.length > 600) return badRequest("Question too long (max 600 characters)");
 
@@ -425,6 +427,24 @@ ${shiftLogBlocks ? `═══ SHIFT LOG ═══\n${shiftLogBlocks}\n` : ""}
 ${beoBlocks ? `═══ BEO EVENTS ═══\n${beoBlocks}\n` : ""}
 Answer the question. Cite items as [TICKET #id] or [PROJECT #id].`;
 
+    // ── Build messages array with history ────────────────────────────────────
+    // Inject prior turns so Claude maintains context across the conversation.
+    // Format: [{role: "user", content: "..."}, {role: "assistant", content: "..."}]
+    // We send the full context prompt only on the first message; subsequent turns
+    // just pass the question so we don't repeat the entire data block every time.
+    const claudeMessages: { role: "user" | "assistant"; content: string }[] = [];
+
+    // Prior conversation turns (without the data context — Elijah has that from the first turn)
+    for (const h of history) {
+      claudeMessages.push({
+        role: h.role === "user" ? "user" : "assistant",
+        content: h.text,
+      });
+    }
+
+    // Current question with full context
+    claudeMessages.push({ role: "user", content: userPrompt });
+
     // ── Call Claude ───────────────────────────────────────────────────────────
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -437,7 +457,7 @@ Answer the question. Cite items as [TICKET #id] or [PROJECT #id].`;
         model: "claude-sonnet-4-6",
         max_tokens: 1000,
         system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+        messages: claudeMessages,
       }),
     });
 
