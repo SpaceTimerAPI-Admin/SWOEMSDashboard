@@ -38,7 +38,7 @@ import AskElijah from "./components/AskElijah";
 import { isAuthed, clearToken, clearProfile, getRole } from "./lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin", "/work-order", "/dashboard"];
-const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings"];
+const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings", "/christmas", "/christmas/new"];
 
 /**
  * Global session-expiry handler.

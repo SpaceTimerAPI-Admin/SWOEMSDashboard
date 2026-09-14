@@ -51,7 +51,7 @@ export const handler: Handler = async (event) => {
       const link = base ? `${base}/projects/${data.id}` : "";
       const tagLabel = tag ? ` [${tag}]` : "";
       const lines = [
-        `📐 New Project${tagLabel}`,
+        `🔧 New Work Order${tagLabel}`,
         `📌 ${title}`,
         `📍 ${location}`,
         `👤 Created by ${session.employee.name}`,

@@ -46,8 +46,6 @@ export const handler: Handler = async () => {
     const closedYesterday = (closedTickets.count || 0) + (closedProjects.count || 0);
     const openAllTime     = (allOpenTickets.count || 0) + (allOpenProjects.count || 0);
 
-    const reportUrl = `${base}/api/eod-report?date=${reportDay}`;
-
     const friendlyDate = new Date(`${reportDay}T12:00:00`).toLocaleDateString("en-US", {
       timeZone: TZ, weekday: "long", month: "long", day: "numeric",
     });
@@ -55,11 +53,9 @@ export const handler: Handler = async () => {
     const lines = [
       `📋 EOD Report — ${friendlyDate}`,
       ``,
-      `🎫 Logged: ${loggedYesterday}`,
+      `🔧 Logged: ${loggedYesterday}`,
       `✅ Closed: ${closedYesterday}`,
-      `⏳ Still open system-wide: ${openAllTime}`,
-      ``,
-      reportUrl,
+      `⏳ Still open: ${openAllTime}`,
     ];
 
     await postGroupMe(lines.join("\n"));

@@ -196,30 +196,48 @@ export const handler: Handler = async () => {
   const now = new Date();
 
   try {
-    // 1. Fetch all open overdue tickets with their comments (shared across all recipients)
-    const { data: overdueTickets, error: overdueErr } = await supabase
-      .from("tickets")
-      .select(`
-        id, title, location, tag, status, created_at, sla_due_at, sla_minutes,
-        created_by, assigned_to, assigned_to_show_tech,
-        assignee:employees!tickets_assigned_to_fkey(name),
-        comments:ticket_comments(id, comment, created_at, employees!ticket_comments_employee_id_fkey(name))
-      `)
-      .eq("status", "open")
-      .lt("sla_due_at", now.toISOString())
-      .order("sla_due_at", { ascending: true });
+    // 1. Fetch all open overdue tickets + overdue projects (combined = work orders)
+    const [overdueTicketsRes, overdueProjectsRes] = await Promise.all([
+      supabase
+        .from("tickets")
+        .select(`
+          id, title, location, tag, status, created_at, sla_due_at, sla_minutes,
+          created_by, assigned_to, assigned_to_show_tech,
+          assignee:employees!tickets_assigned_to_fkey(name),
+          comments:ticket_comments(id, comment, created_at, employees!ticket_comments_employee_id_fkey(name))
+        `)
+        .eq("status", "open")
+        .lt("sla_due_at", now.toISOString())
+        .order("sla_due_at", { ascending: true }),
+      supabase
+        .from("projects")
+        .select(`
+          id, title, location, tag, status, created_at, sla_due_at,
+          assignee:employees!projects_assigned_to_fkey(name),
+          comments:project_comments(id, comment, created_at, employees!project_comments_employee_id_fkey(name))
+        `)
+        .neq("status", "closed")
+        .lt("sla_due_at", now.toISOString())
+        .order("sla_due_at", { ascending: true }),
+    ]);
 
+    const overdueErr = overdueTicketsRes.error || overdueProjectsRes.error;
     if (overdueErr) {
-      console.error("[overdue-alert] Overdue tickets fetch error:", overdueErr.message);
+      console.error("[overdue-alert] Overdue fetch error:", overdueErr.message);
       return { statusCode: 500, body: overdueErr.message };
     }
 
-    if (!overdueTickets || overdueTickets.length === 0) {
-      console.log("[overdue-alert] No overdue tickets — skipping email entirely.");
-      return { statusCode: 200, body: "No overdue tickets." };
+    const allOverdue = [
+      ...(overdueTicketsRes.data || []).map((t: any) => ({ ...t, _type: "ticket" })),
+      ...(overdueProjectsRes.data || []).map((p: any) => ({ ...p, _type: "project", assigned_to_show_tech: false })),
+    ].sort((a, b) => new Date(a.sla_due_at).getTime() - new Date(b.sla_due_at).getTime());
+
+    if (allOverdue.length === 0) {
+      console.log("[overdue-alert] No overdue work orders — skipping email entirely.");
+      return { statusCode: 200, body: "No overdue work orders." };
     }
 
-    const shapedOverdue = overdueTickets.map((t: any) => ({
+    const shapedOverdue = allOverdue.map((t: any) => ({
       ...t,
       assignee_name: t.assignee?.name || null,
       comments: (t.comments || [])

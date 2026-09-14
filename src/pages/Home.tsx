@@ -31,26 +31,6 @@ function isClosed(t: any): boolean {
   return s === "closed" || s === "done" || !!t?.closed_at;
 }
 
-function DocsButton() {
-  const [busy, setBusy] = useState(false);
-  async function open() {
-    setBusy(true);
-    try {
-      const res: any = await getDocsUrl();
-      const url = res?.ok ? (res?.data?.url || res?.url) : null;
-      if (url) window.open(url, "_blank", "noopener,noreferrer");
-      else alert("Documents link not configured yet.");
-    } catch { alert("Could not load documents link."); }
-    finally { setBusy(false); }
-  }
-  return (
-    <button onClick={open} disabled={busy} className="home-tile" style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", width: "100%" }}>
-      <div className="tile-icon" style={{ background: "rgba(56,189,248,0.15)" }}>{busy ? <span className="spinner" style={{ width: 18, height: 18 }} /> : "📁"}</div>
-      <div className="tile-title">Documents</div>
-      <div className="tile-desc">Team files & resources</div>
-    </button>
-  );
-}
 
 export default function Home() {
   const profile = getProfile();

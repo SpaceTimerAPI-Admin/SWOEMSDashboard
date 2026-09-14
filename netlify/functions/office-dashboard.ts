@@ -14,10 +14,24 @@ function todayET(): string {
 }
 
 function todayRange() {
-  const dateStr = todayET();
   const now = new Date();
-  const cutoff = new Date(`${dateStr}T04:00:00`);
-  const start = cutoff > now ? new Date(cutoff.getTime() - 86400000) : cutoff;
+  const dateStr = todayET();
+  // Build 4 AM ET boundary correctly using the businessDayRange approach
+  // Netlify runs in UTC — we cannot use new Date(`${date}T04:00:00`) as that's 4 AM UTC not ET
+  const etOffset = (() => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: TZ, hour: "2-digit", hour12: false, timeZoneName: "shortOffset",
+    }).formatToParts(now);
+    const tzName = parts.find(p => p.type === "timeZoneName")?.value || "GMT-4";
+    const match = tzName.match(/GMT([+-]\d+)/);
+    return match ? parseInt(match[1]) * 60 : -240;
+  })();
+  const offsetMs = etOffset * 60 * 1000;
+  // 4 AM ET = 4 AM local ET time = 4*60 - etOffset minutes in UTC
+  const cutoffUtcMs = new Date(`${dateStr}T04:00:00Z`).getTime() - offsetMs;
+  const start = cutoffUtcMs > now.getTime()
+    ? new Date(cutoffUtcMs - 86400000)
+    : new Date(cutoffUtcMs);
   return { start: start.toISOString(), end: now.toISOString() };
 }
 
