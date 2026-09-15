@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { adminListUsers, adminCreateUser, adminUpdateUser } from "../lib/api";
+import { getProfile } from "../lib/auth";
 
 const ROLES = ["ems", "show_tech", "admin"] as const;
 const ROLE_LABELS: Record<string, string> = { ems: "EMS", show_tech: "Show Tech", admin: "Admin" };
@@ -95,10 +96,12 @@ export default function Admin() {
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
             📲 QR Code
           </Link>
-          <Link to="/admin/elijah"
-            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(92,107,255,0.3)", background: "rgba(92,107,255,0.08)", color: "#B0B8FF", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-            🤖 Elijah Logs
-          </Link>
+          {getProfile()?.name === "Anthony McHugh" && (
+            <Link to="/admin/elijah"
+              style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(92,107,255,0.3)", background: "rgba(92,107,255,0.08)", color: "#B0B8FF", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+              🤖 Elijah Logs
+            </Link>
+          )}
           <Link to="/admin/report"
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(52,211,153,0.3)", background: "rgba(52,211,153,0.08)", color: "#7EEFC4", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
             📊 Reports

@@ -12,7 +12,9 @@ export const handler: Handler = async (event) => {
     if (event.httpMethod !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
     const session = await requireSession(event);
     if (!session) return unauthorized();
-    if ((session.employee as any).role !== "admin") return json({ ok: false, error: "Forbidden" }, 403);
+    const emp = session.employee as any;
+    if (emp.role !== "admin") return json({ ok: false, error: "Forbidden" }, 403);
+    if (emp.name !== "Anthony McHugh") return json({ ok: false, error: "Forbidden" }, 403);
 
     const body = event.body ? JSON.parse(event.body) : {};
     const page        = Math.max(1, Number(body.page || 1));
