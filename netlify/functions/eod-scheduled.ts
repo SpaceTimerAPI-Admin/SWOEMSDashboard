@@ -50,7 +50,7 @@ export const handler: Handler = async () => {
       timeZone: TZ, weekday: "long", month: "long", day: "numeric",
     });
 
-    const reportUrl = `${base}/admin/report?date=${reportDay}`;
+    const reportUrl = `${base}/api/eod-report?date=${reportDay}`;
 
     const lines = [
       `📋 EOD Report — ${friendlyDate}`,
@@ -59,7 +59,7 @@ export const handler: Handler = async () => {
       `✅ Closed: ${closedYesterday}`,
       `⏳ Still open: ${openAllTime}`,
       ``,
-      `📊 Full report: ${reportUrl}`,
+      reportUrl,
     ];
 
     await postGroupMe(lines.join("\n"));
