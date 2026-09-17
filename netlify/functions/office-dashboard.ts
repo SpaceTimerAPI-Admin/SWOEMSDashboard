@@ -105,7 +105,7 @@ export const handler: Handler = async () => {
         .order("created_at", { ascending: false }).limit(40),
 
       supabase.from("shift_log_entries")
-        .select("id, note, created_at, employees!shift_log_entries_employee_id_fkey(name, role)")
+        .select("id, note, created_at, display_name, employees!shift_log_entries_employee_id_fkey(name, role)")
         .gte("created_at", start).lte("created_at", end)
         .order("created_at", { ascending: false }).limit(30),
 
@@ -188,7 +188,7 @@ export const handler: Handler = async () => {
 
     const shiftLog = (shiftLogRes.data || []).map((e: any) => ({
       id: e.id, note: e.note, created_at: e.created_at,
-      employee_name: e.employees?.name || "Unknown",
+      employee_name: e.display_name || e.employees?.name || "Unknown",
       employee_role: e.employees?.role || "ems",
     }));
 

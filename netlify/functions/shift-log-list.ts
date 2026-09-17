@@ -38,7 +38,7 @@ export const handler: Handler = async (event) => {
     const supabase = supabaseAdmin();
     let q = supabase
       .from("shift_log_entries")
-      .select("id, note, created_at, employee_id, employees!shift_log_entries_employee_id_fkey(name, role)")
+      .select("id, note, created_at, employee_id, display_name, employees!shift_log_entries_employee_id_fkey(name, role)")
       .gte("created_at", start)
       .lte("created_at", end)
       .order("created_at", { ascending: false });
@@ -51,7 +51,7 @@ export const handler: Handler = async (event) => {
       note: e.note,
       created_at: e.created_at,
       employee_id: e.employee_id,
-      employee_name: e.employees?.name || "Unknown",
+      employee_name: e.display_name || e.employees?.name || "Unknown",
       employee_role: e.employees?.role || "ems",
     }));
 
