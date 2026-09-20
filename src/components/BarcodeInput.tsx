@@ -19,31 +19,57 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint]   = useState("Point camera at barcode or serial number label");
+  const [videoReady, setVideoReady] = useState(false);
 
   useEffect(() => {
     let active = true;
+
     async function start() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
         });
+
+        if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+
+        // Wait for the video element to be in the DOM
+        let attempts = 0;
+        while (!videoRef.current && attempts < 20) {
+          await new Promise(r => setTimeout(r, 50));
+          attempts++;
         }
+
+        if (!videoRef.current || !active) return;
+
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute("playsinline", "true");
+        videoRef.current.setAttribute("autoplay", "true");
+        videoRef.current.muted = true;
+
+        try {
+          await videoRef.current.play();
+        } catch {
+          // Some browsers need a user gesture — already have one since user tapped the button
+        }
+
+        setVideoReady(true);
+        setHint("Hold steady — scanning…");
+
         if (!("BarcodeDetector" in window)) {
-          setError("Automatic scanning not supported — type the serial number manually, or use Chrome on Android / Safari on iOS 17.4+");
+          setError("Automatic scanning not supported on this browser. Use Chrome on Android or Safari 17.4+ on iPhone.");
           return;
         }
+
         const detector = new (window as any).BarcodeDetector({
           formats: ["code_128","code_39","code_93","ean_13","ean_8","qr_code","data_matrix","upc_a","upc_e","itf","aztec"],
         });
-        setHint("Hold steady — scanning…");
+
         async function tick() {
           if (!active) return;
           try {
-            if (videoRef.current && videoRef.current.readyState >= 2) {
+            if (videoRef.current && videoRef.current.readyState >= 2 && !videoRef.current.paused) {
               const codes = await detector.detect(videoRef.current);
               if (codes.length > 0 && active) {
                 active = false;
@@ -56,13 +82,31 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
           if (active) rafRef.current = requestAnimationFrame(tick);
         }
         rafRef.current = requestAnimationFrame(tick);
+
       } catch (e: any) {
-        if (e?.name === "NotAllowedError") setError("Camera permission denied. Allow camera access and try again.");
+        if (!active) return;
+        if (e?.name === "NotAllowedError") setError("Camera permission denied. Tap Allow when prompted, then try again.");
         else if (e?.name === "NotFoundError") setError("No camera found on this device.");
+        else if (e?.name === "OverconstrainedError") {
+          // Retry without environment constraint
+          try {
+            const stream2 = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            if (!active) { stream2.getTracks().forEach(t => t.stop()); return; }
+            streamRef.current = stream2;
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream2;
+              videoRef.current.muted = true;
+              await videoRef.current.play();
+              setVideoReady(true);
+            }
+          } catch { setError("Could not access camera."); }
+        }
         else setError(`Camera error: ${e?.message || "unknown"}`);
       }
     }
+
     void start();
+
     return () => {
       active = false;
       cancelAnimationFrame(rafRef.current);
@@ -73,31 +117,40 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "#000", display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: "rgba(0,0,0,0.8)", flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: "rgba(0,0,0,0.9)", flexShrink: 0, zIndex: 1 }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>📷 Scan Barcode</div>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{hint}</div>
         </div>
         <button onClick={onClose}
-          style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 18px" }}>
+          style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 18px" }}>
           Cancel
         </button>
       </div>
 
-      {/* Camera view */}
-      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-        <video ref={videoRef} playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      {/* Video fills remaining space */}
+      <div style={{ flex: 1, position: "relative", background: "#111" }}>
+        <video
+          ref={videoRef}
+          playsInline
+          autoPlay
+          muted
+          style={{
+            position: "absolute", inset: 0,
+            width: "100%", height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
 
-        {/* Viewfinder overlay */}
-        {!error && (
+        {/* Viewfinder — only show when video is running */}
+        {videoReady && !error && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-            <div style={{ width: "80%", maxWidth: 320, height: 140, position: "relative" }}>
-              {/* Dark mask */}
-              <div style={{ position: "absolute", inset: "-9999px", boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)" }} />
-              {/* Corner brackets */}
+            <div style={{ width: "75%", maxWidth: 300, height: 130, position: "relative" }}>
+              <div style={{ position: "absolute", inset: "-100vh -100vw", background: "rgba(0,0,0,0.45)" }} />
               {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h]) => (
                 <div key={`${v}${h}`} style={{
-                  position: "absolute", width: 32, height: 32,
+                  position: "absolute", width: 28, height: 28, zIndex: 2,
                   [v]: 0, [h]: 0,
                   borderTop:    v === "top"    ? "3px solid #818cf8" : "none",
                   borderBottom: v === "bottom" ? "3px solid #818cf8" : "none",
@@ -105,17 +158,23 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
                   borderRight:  h === "right"  ? "3px solid #818cf8" : "none",
                 }} />
               ))}
-              {/* Scan line */}
-              <div style={{ position: "absolute", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, #818cf8, transparent)", animation: "scan 2s ease-in-out infinite" }} />
+              <div style={{ position: "absolute", left: 8, right: 8, height: 2, background: "linear-gradient(90deg,transparent,#818cf8,transparent)", zIndex: 2, animation: "scan 2s ease-in-out infinite" }} />
             </div>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {!videoReady && !error && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>Starting camera…</div>
           </div>
         )}
 
         {/* Error state */}
         {error && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.85)" }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.9)" }}>
             <div style={{ fontSize: 36, marginBottom: 14 }}>📷</div>
-            <div style={{ fontSize: 14, color: "#f87171", textAlign: "center", lineHeight: 1.6, marginBottom: 20 }}>{error}</div>
+            <div style={{ fontSize: 14, color: "#f87171", textAlign: "center", lineHeight: 1.7, marginBottom: 24 }}>{error}</div>
             <button onClick={onClose}
               style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "10px 24px" }}>
               Type manually instead
@@ -124,7 +183,7 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
         )}
       </div>
 
-      <style>{`@keyframes scan { 0%,100%{top:10%} 50%{top:85%} }`}</style>
+      <style>{`@keyframes scan { 0%,100%{top:8%} 50%{top:80%} }`}</style>
     </div>
   );
 }
