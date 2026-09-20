@@ -40,6 +40,15 @@ export default function TicketDetail() {
   const [commentError, setCommentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Hardware deployment tracking on close
+  const [hwInvolved, setHwInvolved]       = useState<"yes" | "no" | null>(null);
+  const [hwSerial, setHwSerial]           = useState("");
+  const [hwLookupResult, setHwLookupResult] = useState<any>(null);  // null=not looked up, false=not found, obj=found
+  const [hwLooking, setHwLooking]         = useState(false);
+  const [hwName, setHwName]               = useState("");
+  const [hwModel, setHwModel]             = useState("");
+  const [hwManuf, setHwManuf]             = useState("");
+
   // Due date editing
   const [editingDue, setEditingDue] = useState(false);
   const [newDueDate, setNewDueDate] = useState("");
@@ -129,18 +138,69 @@ export default function TicketDetail() {
     } finally { setBusy(false); }
   }
 
+  async function lookupHwSerial() {
+    if (!hwSerial.trim()) return;
+    setHwLooking(true);
+    try {
+      const token = localStorage.getItem("md_session_token") || "";
+      const res = await fetch(`/api/inventory-lookup?serial=${encodeURIComponent(hwSerial.trim())}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setHwLookupResult(data.found ? data.item : false);
+      if (data.found && data.item?.name) setHwName(data.item.name);
+    } finally { setHwLooking(false); }
+  }
+
   async function confirmClose() {
     const trimmed = resolution.trim();
     if (!trimmed) { setResolutionError("Please enter a resolution note."); return; }
-    setBusy(true);
+    if (hwInvolved === null) { setResolutionError("Please answer whether hardware was deployed."); return; }
+    if (hwInvolved === "yes" && !hwSerial.trim()) { setResolutionError("Please enter the hardware serial number."); return; }
+    if (hwInvolved === "yes" && hwLookupResult === null) { setResolutionError("Please look up the serial number first."); return; }
+    if (hwInvolved === "yes" && hwLookupResult === false && !hwName.trim()) { setResolutionError("Please enter the hardware name."); return; }
+    setBusy(true); setResolutionError(null);
     try {
-      await addTicketComment({ id: ticketId, comment: `Resolution: ${trimmed}` });
+      // Build resolution comment
+      let resolutionComment = `Resolution: ${trimmed}`;
+      if (hwInvolved === "yes") {
+        resolutionComment += `\n\nHardware deployed: ${hwSerial.trim()}`;
+        if (hwName) resolutionComment += ` (${hwName})`;
+      }
+      await addTicketComment({ id: ticketId, comment: resolutionComment });
       const res: any = await closeTicket(ticketId);
-      if (!res?.ok) throw new Error(res?.error || "Failed to close ticket");
+      if (!res?.ok) throw new Error(res?.error || "Failed to close work order");
+
+      // If hardware was involved, log inventory event
+      if (hwInvolved === "yes" && hwSerial.trim()) {
+        const token = localStorage.getItem("md_session_token") || "";
+        await fetch("/api/inventory-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            // If existing item found, use its id; otherwise create first
+            item_id: hwLookupResult && hwLookupResult !== false ? hwLookupResult.id : null,
+            event_type: "deployed",
+            location: ticket?.location || "",
+            note: `Deployed via work order: ${ticket?.title || ticketId}`,
+            linked_ticket_id: ticketId,
+            // New item fields (backend handles creation if item_id is null)
+            create_if_missing: hwLookupResult === false,
+            new_item_serial: hwSerial.trim(),
+            new_item_name: hwName.trim(),
+            new_item_model: hwModel.trim() || undefined,
+            new_item_manufacturer: hwManuf.trim() || undefined,
+          }),
+        });
+      }
+
       setShowCloseModal(false);
+      // Reset hardware state
+      setHwInvolved(null); setHwSerial(""); setHwLookupResult(null);
+      setHwName(""); setHwModel(""); setHwManuf("");
       await load();
     } catch (e: any) {
-      setError(e?.message || String(e));
+      setResolutionError(e?.message || String(e));
     } finally { setBusy(false); }
   }
 
@@ -427,9 +487,61 @@ export default function TicketDetail() {
                 placeholder="What was done? Any follow-up needed?"
                 style={{ minHeight: 80 }}
               />
+
+              {/* Hardware question */}
+              <div style={{ marginTop: 14, padding: "12px 14px", background: "rgba(129,140,248,0.08)", border: "1px solid rgba(129,140,248,0.2)", borderRadius: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#c7d2fe", marginBottom: 10 }}>
+                  📦 Was hardware deployed or installed?
+                </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: hwInvolved === "yes" ? 12 : 0 }}>
+                  {([["yes", "✓ Yes"], ["no", "✗ No"]] as const).map(([v, label]) => (
+                    <button key={v} type="button" onClick={() => { setHwInvolved(v); setResolutionError(null); }}
+                      style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1px solid", transition: "all 0.15s",
+                        background: hwInvolved === v ? (v === "yes" ? "rgba(129,140,248,0.2)" : "rgba(255,255,255,0.06)") : "rgba(255,255,255,0.04)",
+                        borderColor: hwInvolved === v ? (v === "yes" ? "rgba(129,140,248,0.4)" : "rgba(255,255,255,0.15)") : "rgba(255,255,255,0.08)",
+                        color: hwInvolved === v ? (v === "yes" ? "#c7d2fe" : "#e5e7eb") : "#6b7280" }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {hwInvolved === "yes" && (
+                  <div>
+                    <div className="field-label" style={{ marginBottom: 6 }}>Serial Number / Asset Tag</div>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                      <input className="input" value={hwSerial} onChange={e => { setHwSerial(e.target.value); setHwLookupResult(null); setHwName(""); }}
+                        placeholder="Scan or type serial…" style={{ flex: 1, fontFamily: hwSerial ? "monospace" : undefined }} />
+                      <button type="button" onClick={lookupHwSerial} disabled={hwLooking || !hwSerial.trim()} className="btn small">
+                        {hwLooking ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Look up"}
+                      </button>
+                    </div>
+
+                    {/* Found */}
+                    {hwLookupResult && hwLookupResult !== false && (
+                      <div style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "#6ee7b7" }}>
+                        ✓ Found: <strong>{hwLookupResult.name}</strong> — {hwLookupResult.status?.replace("_"," ")} · {hwLookupResult.location}
+                      </div>
+                    )}
+
+                    {/* Not found — show new item form */}
+                    {hwLookupResult === false && (
+                      <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, padding: "10px 12px" }}>
+                        <div style={{ fontSize: 12, color: "#fcd34d", marginBottom: 8 }}>⚠ Not in inventory — add it:</div>
+                        <input className="input" value={hwName} onChange={e => setHwName(e.target.value)}
+                          placeholder="Item name (required)" style={{ marginBottom: 6 }} />
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <input className="input" value={hwManuf} onChange={e => setHwManuf(e.target.value)} placeholder="Manufacturer" style={{ flex: 1 }} />
+                          <input className="input" value={hwModel} onChange={e => setHwModel(e.target.value)} placeholder="Model" style={{ flex: 1 }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {resolutionError && <div className="error" style={{ marginTop: 8 }}>{resolutionError}</div>}
               <div className="btn-row" style={{ marginTop: 14 }}>
-                <button className="btn small" type="button" onClick={() => setShowCloseModal(false)} disabled={busy}>Cancel</button>
+                <button className="btn small" type="button" onClick={() => { setShowCloseModal(false); setHwInvolved(null); setHwSerial(""); setHwLookupResult(null); setResolutionError(null); }} disabled={busy}>Cancel</button>
                 <button className="btn primary small" type="button" onClick={confirmClose} disabled={busy}>
                   {busy ? <span className="spinner" /> : "Confirm close"}
                 </button>

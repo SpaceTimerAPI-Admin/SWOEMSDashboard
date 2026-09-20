@@ -32,6 +32,10 @@ import OfficeDashboard from "./pages/OfficeDashboard";
 import XmasTickets from "./pages/XmasTickets";
 import XmasTicketNew from "./pages/XmasTicketNew";
 import XmasTicketDetail from "./pages/XmasTicketDetail";
+import Inventory from "./pages/Inventory";
+import InventoryNew from "./pages/InventoryNew";
+import InventoryDetail from "./pages/InventoryDetail";
+import InventoryImport from "./pages/InventoryImport";
 import BottomNav from "./components/BottomNav";
 import ShowTechNav from "./components/ShowTechNav";
 import AskElijah from "./components/AskElijah";
@@ -149,6 +153,11 @@ export default function App() {
         <Route path="/christmas" element={<RequireAuth><XmasTickets /></RequireAuth>} />
         <Route path="/christmas/new" element={<RequireAuth><XmasTicketNew /></RequireAuth>} />
         <Route path="/christmas/:id" element={<RequireAuth><XmasTicketDetail /></RequireAuth>} />
+
+        <Route path="/inventory" element={<RequireAuth><Inventory /></RequireAuth>} />
+        <Route path="/inventory/new" element={<RequireAuth><InventoryNew /></RequireAuth>} />
+        <Route path="/inventory/import" element={<RequireAuth><InventoryImport /></RequireAuth>} />
+        <Route path="/inventory/:id" element={<RequireAuth><InventoryDetail /></RequireAuth>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
