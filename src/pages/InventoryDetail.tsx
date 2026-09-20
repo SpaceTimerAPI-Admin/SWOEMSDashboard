@@ -39,15 +39,15 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
   return res.json();
 }
 
-const EVENT_ACTIONS: { event_type: string; label: string; icon: string; needsLocation?: boolean; needsTakenBy?: boolean; needsVendor?: boolean; needsCondition?: boolean; statusFilter?: string[] }[] = [
-  { event_type: "checked_out",          label: "Check Out",         icon: "👤", needsTakenBy: true, needsLocation: true, statusFilter: ["in_storage"] },
-  { event_type: "checked_in",           label: "Check In",          icon: "↩️", needsCondition: true, statusFilter: ["checked_out"] },
-  { event_type: "deployed",             label: "Deploy",            icon: "🔧", needsLocation: true, statusFilter: ["in_storage", "checked_out"] },
-  { event_type: "pulled",               label: "Pull from Service", icon: "⬆️", needsCondition: true, statusFilter: ["deployed"] },
-  { event_type: "sent_to_repair",       label: "Send to Repair",    icon: "🔨", needsVendor: true, needsLocation: true, statusFilter: ["in_storage", "checked_out", "deployed"] },
-  { event_type: "returned_from_repair", label: "Return from Repair",icon: "✅", needsCondition: true, statusFilter: ["in_repair"] },
-  { event_type: "retired",              label: "Retire",            icon: "🗃️" },
-  { event_type: "note",                 label: "Add Note",          icon: "📝" },
+const EVENT_ACTIONS: { event_type: string; label: string; icon: string; locationLabel: string; locationPlaceholder: string; locationRequired: boolean; needsTakenBy?: boolean; needsVendor?: boolean; needsCondition?: boolean; statusFilter?: string[] }[] = [
+  { event_type: "checked_out",          label: "Check Out",          icon: "👤", locationLabel: "Where is it going?",       locationPlaceholder: "e.g. Main Gate, Backstage",      locationRequired: true,  needsTakenBy: true,  statusFilter: ["in_storage"] },
+  { event_type: "checked_in",           label: "Check In",           icon: "↩️", locationLabel: "Returned to",              locationPlaceholder: "e.g. Shop, Storage Room",        locationRequired: true,  needsCondition: true, statusFilter: ["checked_out"] },
+  { event_type: "deployed",             label: "Deploy",             icon: "🔧", locationLabel: "Deploy location",           locationPlaceholder: "e.g. Mako Lift Tower, Stage L",  locationRequired: true,  statusFilter: ["in_storage", "checked_out"] },
+  { event_type: "pulled",               label: "Pull from Service",  icon: "⬆️", locationLabel: "Returning to",             locationPlaceholder: "e.g. Shop, EMS Storage",         locationRequired: true,  needsCondition: true, statusFilter: ["deployed"] },
+  { event_type: "sent_to_repair",       label: "Send to Repair",     icon: "🔨", locationLabel: "Repair location / vendor", locationPlaceholder: "e.g. Shop bench, B&H Service",   locationRequired: true,  needsVendor: true,    statusFilter: ["in_storage", "checked_out", "deployed"] },
+  { event_type: "returned_from_repair", label: "Return from Repair", icon: "✅", locationLabel: "Returned to",              locationPlaceholder: "e.g. Shop, EMS Storage",         locationRequired: true,  needsCondition: true, statusFilter: ["in_repair"] },
+  { event_type: "retired",              label: "Retire",             icon: "🗃️", locationLabel: "Final location / reason",  locationPlaceholder: "e.g. Dead stock, Written off",   locationRequired: false },
+  { event_type: "note",                 label: "Add Note",           icon: "📝", locationLabel: "Current location",         locationPlaceholder: "Where is this item right now?",  locationRequired: false },
 ];
 
 export default function InventoryDetail() {
@@ -91,7 +91,7 @@ export default function InventoryDetail() {
     e.preventDefault();
     setActionError(null);
     const meta = EVENT_ACTIONS.find(a => a.event_type === actionType);
-    if (meta?.needsLocation && !location.trim()) return setActionError("Location is required");
+    if (meta?.locationRequired && !location.trim()) return setActionError("Location is required");
     if (meta?.needsTakenBy && !takenBy.trim()) return setActionError("Person name is required");
 
     setActionSaving(true);
@@ -191,15 +191,14 @@ export default function InventoryDetail() {
                 <input className="input" value={takenBy} onChange={e => setTakenBy(e.target.value)} placeholder="Who is taking this?" />
               </label>
             )}
-            {selectedAction?.needsLocation && (
-              <label>
-                <div className="field-label">
-                  {actionType === "deployed" ? "Deploy Location" : actionType === "sent_to_repair" ? "Repair Location" : "Destination"} <span style={{ color: "var(--danger)" }}>*</span>
-                </div>
-                <input className="input" value={location} onChange={e => setLocation(e.target.value)}
-                  placeholder={actionType === "deployed" ? "e.g. Main Stage Left, Entrance Arch" : actionType === "sent_to_repair" ? "e.g. Shop bench, B&H Service" : "Location"} />
-              </label>
-            )}
+            <label>
+              <div className="field-label">
+                {selectedAction?.locationLabel || "Location"}
+                {selectedAction?.locationRequired && <span style={{ color: "var(--danger)" }}> *</span>}
+              </div>
+              <input className="input" value={location} onChange={e => setLocation(e.target.value)}
+                placeholder={selectedAction?.locationPlaceholder || "Location…"} />
+            </label>
             {selectedAction?.needsVendor && (
               <label>
                 <div className="field-label">Vendor / Who's Doing the Repair</div>

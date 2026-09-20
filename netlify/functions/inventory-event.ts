@@ -96,7 +96,10 @@ export const handler: Handler = async (event) => {
       updates.status = "retired";
       updates.location = location || "Retired";
       break;
-    case "note": break;
+    case "note":
+      // Update location if provided with a note
+      if (location) updates.location = location;
+      break;
     default: return badRequest(`Unknown event_type: ${event_type}`);
   }
 
