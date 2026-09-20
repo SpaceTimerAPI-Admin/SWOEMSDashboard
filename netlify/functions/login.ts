@@ -74,7 +74,7 @@ export const handler: Handler = async (event) => {
     // Create a session token (bearer); store only hash in DB
     const token = randomToken(32);
     const tokenHash = sha256Hex(token);
-    const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(); // 12h
+    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year
 
     // Optional: prune old sessions for this employee
     await supabase.from("sessions").delete().eq("employee_id", emp.id).lt("expires_at", new Date().toISOString());

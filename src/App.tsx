@@ -32,10 +32,6 @@ import OfficeDashboard from "./pages/OfficeDashboard";
 import XmasTickets from "./pages/XmasTickets";
 import XmasTicketNew from "./pages/XmasTicketNew";
 import XmasTicketDetail from "./pages/XmasTicketDetail";
-import Inventory from "./pages/Inventory";
-import InventoryNew from "./pages/InventoryNew";
-import InventoryDetail from "./pages/InventoryDetail";
-import InventoryImport from "./pages/InventoryImport";
 import BottomNav from "./components/BottomNav";
 import ShowTechNav from "./components/ShowTechNav";
 import AskElijah from "./components/AskElijah";
@@ -45,30 +41,13 @@ const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin", "/work-order", "/dashbo
 const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings", "/christmas", "/christmas/new"];
 
 /**
- * Global session-expiry handler.
- * Installed exactly once at module load — patches window.fetch so that ANY
- * 401 response from ANY API call, on ANY page (including admin pages,
- * background calls, etc.), immediately clears the session and hard-redirects
- * to /login. This runs independently of React render/mount timing, so a user
- * never sees a half-loaded page or an "Unauthorized" error string — they're
- * bounced to login the instant the server rejects their session.
+ * Session handler — passes through all responses without auto-logout.
+ * Users stay logged in permanently (sessions expire after 1 year).
  */
 let _redirecting = false;
 const _origFetch = window.fetch.bind(window);
 window.fetch = async (...args) => {
   const res = await _origFetch(...args);
-  if (res.status === 401 && !_redirecting) {
-    const path = window.location.pathname;
-    // Don't loop if we're already on a public/auth page
-    if (!PUBLIC_PATHS.includes(path) && !path.startsWith("/register/")) {
-      _redirecting = true;
-      clearToken();
-      clearProfile();
-      // Hard redirect (not client-side nav) guarantees a clean reload of
-      // app state — no stale component state, no half-mounted guarded routes.
-      window.location.href = `/login?from=${encodeURIComponent(path)}`;
-    }
-  }
   return res;
 };
 
@@ -153,11 +132,6 @@ export default function App() {
         <Route path="/christmas" element={<RequireAuth><XmasTickets /></RequireAuth>} />
         <Route path="/christmas/new" element={<RequireAuth><XmasTicketNew /></RequireAuth>} />
         <Route path="/christmas/:id" element={<RequireAuth><XmasTicketDetail /></RequireAuth>} />
-
-        <Route path="/inventory" element={<RequireAuth><Inventory /></RequireAuth>} />
-        <Route path="/inventory/new" element={<RequireAuth><InventoryNew /></RequireAuth>} />
-        <Route path="/inventory/import" element={<RequireAuth><InventoryImport /></RequireAuth>} />
-        <Route path="/inventory/:id" element={<RequireAuth><InventoryDetail /></RequireAuth>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
