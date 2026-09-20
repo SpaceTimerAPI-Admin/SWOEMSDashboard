@@ -41,7 +41,8 @@ function ManualEntry({ onScan }: { onScan: (val: string) => void }) {
 }
 
 function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onClose: () => void }) {
-  const videoRef  = useRef<HTMLVideoElement>(null);
+  const videoRef   = useRef<HTMLVideoElement>(null);
+  const canvasRef  = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -115,22 +116,55 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
           return;
         }
 
+        let scanInterval: any = null;
+        let lastScan = 0;
+        let useCanvas = false; // Try video first, fall back to canvas
+
         async function tick() {
           if (!active) return;
+          const video = videoRef.current;
+          if (!video || video.paused || video.ended || video.readyState < 3) return;
+
+          const now = Date.now();
+          if (now - lastScan < 400) return;
+          lastScan = now;
+
           try {
-            if (videoRef.current && videoRef.current.readyState >= 2 && !videoRef.current.paused) {
-              const codes = await detector.detect(videoRef.current);
-              if (codes.length > 0 && active) {
-                active = false;
-                streamRef.current?.getTracks().forEach(t => t.stop());
-                onScan(codes[0].rawValue);
-                return;
+            let source: HTMLVideoElement | ImageBitmap | HTMLCanvasElement = video;
+
+            // On iOS, BarcodeDetector works better with a canvas snapshot
+            if (useCanvas || canvasRef.current) {
+              const canvas = canvasRef.current;
+              if (canvas) {
+                canvas.width  = video.videoWidth  || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext("2d");
+                if (ctx) {
+                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                  source = canvas;
+                }
               }
             }
-          } catch {}
-          if (active) rafRef.current = requestAnimationFrame(tick);
+
+            const codes = await detector.detect(source);
+            if (codes && codes.length > 0 && active) {
+              console.log("[BarcodeInput] Detected:", codes[0].rawValue);
+              active = false;
+              clearInterval(scanInterval);
+              streamRef.current?.getTracks().forEach(t => t.stop());
+              onScan(codes[0].rawValue);
+            }
+          } catch (e: any) {
+            // If direct video fails, switch to canvas mode
+            if (!useCanvas) {
+              console.log("[BarcodeInput] Switching to canvas mode");
+              useCanvas = true;
+            }
+          }
         }
-        rafRef.current = requestAnimationFrame(tick);
+
+        scanInterval = setInterval(tick, 400);
+        rafRef.current = scanInterval;
 
       } catch (e: any) {
         if (!active) return;
@@ -144,7 +178,7 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
 
     return () => {
       active = false;
-      cancelAnimationFrame(rafRef.current);
+      clearInterval(rafRef.current);
       streamRef.current?.getTracks().forEach(t => t.stop());
     };
   }, []);
@@ -180,6 +214,7 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
             transform: "translateZ(0)",
           }}
         />
+        <canvas ref={canvasRef} style={{ display: "none" }} />
 
         {/* Viewfinder */}
         {videoReady && !error && (
