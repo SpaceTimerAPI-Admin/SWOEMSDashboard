@@ -35,6 +35,106 @@ async function createItem(payload: any) {
   return res.json();
 }
 
+// Camera barcode scanner using BarcodeDetector API (supported on mobile Chrome/Safari)
+function CameraScanner({ onScan, onClose }: { onScan: (val: string) => void; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
+  const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(true);
+
+  useEffect(() => {
+    let detector: any;
+    let active = true;
+
+    async function start() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        // BarcodeDetector — available in Chrome 88+ and Safari 17.4+
+        if ("BarcodeDetector" in window) {
+          detector = new (window as any).BarcodeDetector({
+            formats: ["code_128", "code_39", "ean_13", "ean_8", "qr_code", "data_matrix", "upc_a", "upc_e"],
+          });
+
+          async function detect() {
+            if (!active || !videoRef.current || videoRef.current.readyState < 2) {
+              if (active) rafRef.current = requestAnimationFrame(detect);
+              return;
+            }
+            try {
+              const barcodes = await detector.detect(videoRef.current);
+              if (barcodes.length > 0 && active) {
+                const val = barcodes[0].rawValue;
+                active = false;
+                setScanning(false);
+                onScan(val);
+              }
+            } catch {}
+            if (active) rafRef.current = requestAnimationFrame(detect);
+          }
+          rafRef.current = requestAnimationFrame(detect);
+        } else {
+          setError("Camera scanning not supported on this browser. Use Chrome or Safari 17.4+.");
+        }
+      } catch (e: any) {
+        setError(e?.message?.includes("Permission") ? "Camera permission denied." : `Camera error: ${e?.message}`);
+      }
+    }
+
+    void start();
+    return () => {
+      active = false;
+      cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach(t => t.stop());
+    };
+  }, []);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "#000", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(0,0,0,0.7)" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>📷 Point at barcode</div>
+        <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 14px" }}>Cancel</button>
+      </div>
+
+      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <video ref={videoRef} playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        {/* Targeting reticle */}
+        {scanning && !error && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+            <div style={{ width: 260, height: 160, position: "relative" }}>
+              {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h]) => (
+                <div key={`${v}${h}`} style={{
+                  position: "absolute", width: 28, height: 28,
+                  [v]: 0, [h]: 0,
+                  borderTop: v === "top" ? "3px solid #818cf8" : "none",
+                  borderBottom: v === "bottom" ? "3px solid #818cf8" : "none",
+                  borderLeft: h === "left" ? "3px solid #818cf8" : "none",
+                  borderRight: h === "right" ? "3px solid #818cf8" : "none",
+                }} />
+              ))}
+              <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 2, background: "rgba(129,140,248,0.6)", animation: "scan-line 2s ease-in-out infinite" }} />
+            </div>
+          </div>
+        )}
+        {error && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+            <div style={{ background: "rgba(0,0,0,0.85)", borderRadius: 12, padding: 20, textAlign: "center", color: "#f87171", fontSize: 13 }}>{error}</div>
+          </div>
+        )}
+      </div>
+      <style>{`@keyframes scan-line { 0%,100%{top:10%} 50%{top:85%} }`}</style>
+    </div>
+  );
+}
+
 export default function InventoryScanner({ onClose }: Props) {
   const [mode, setMode] = useState<"scan" | "search" | "result" | "new">("scan");
   const [serialInput, setSerialInput] = useState("");
@@ -45,6 +145,7 @@ export default function InventoryScanner({ onClose }: Props) {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [scannedSerial, setScannedSerial] = useState("");
+  const [showCamera, setShowCamera] = useState(false);
 
   // New item form
   const [newName, setNewName] = useState("");
@@ -76,6 +177,23 @@ export default function InventoryScanner({ onClose }: Props) {
       } finally { setSearching(false); }
     }, 300);
   }, [searchInput]);
+
+  async function handleCameraScan(val: string) {
+    setShowCamera(false);
+    setSerialInput(val);
+    setLooking(true);
+    setNotFound(false);
+    try {
+      const res = await lookupSerial(val);
+      if (res.found && res.item) {
+        setItem(res.item);
+        setMode("result");
+      } else {
+        setScannedSerial(val);
+        setMode("new");
+      }
+    } finally { setLooking(false); }
+  }
 
   async function handleSerialSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -170,8 +288,13 @@ export default function InventoryScanner({ onClose }: Props) {
           {(mode === "scan") && (
             <form onSubmit={handleSerialSubmit}>
               <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 10 }}>
-                Scan a barcode or type a serial number / asset tag
+                Scan a barcode with your camera, or type a serial number manually
               </div>
+              <button type="button" onClick={() => setShowCamera(true)}
+                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "2px dashed rgba(129,140,248,0.35)", background: "rgba(129,140,248,0.06)", color: "#c7d2fe", fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <span style={{ fontSize: 22 }}>📷</span> Scan Barcode with Camera
+              </button>
+              <div style={{ fontSize: 11, color: "#4b5563", textAlign: "center", marginBottom: 10 }}>— or type manually —</div>
               <div style={{ display: "flex", gap: 8 }}>
                 <input ref={serialRef} className="input" value={serialInput}
                   onChange={e => setSerialInput(e.target.value)}
@@ -326,5 +449,8 @@ export default function InventoryScanner({ onClose }: Props) {
         </div>
       </div>
     </div>
+
+    {showCamera && <CameraScanner onScan={handleCameraScan} onClose={() => setShowCamera(false)} />}
+  </>
   );
 }

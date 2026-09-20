@@ -12,6 +12,82 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
   return res.json();
 }
 
+// Inline camera scanner for serial field
+function CameraButton({ onScan }: { onScan: (val: string) => void }) {
+  const videoRef  = useRef<HTMLVideoElement>(null);
+  const rafRef    = useRef<number>(0);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [open, setOpen]     = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+
+  async function startCamera() {
+    setError(null);
+    setOpen(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      await new Promise(r => setTimeout(r, 100));
+      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
+
+      if (!("BarcodeDetector" in window)) { setError("Camera scanning requires Chrome or Safari 17.4+"); return; }
+      const detector = new (window as any).BarcodeDetector({ formats: ["code_128","code_39","ean_13","ean_8","qr_code","upc_a","upc_e"] });
+      let active = true;
+      async function detect() {
+        if (!active) return;
+        if (videoRef.current && videoRef.current.readyState >= 2) {
+          const codes = await detector.detect(videoRef.current).catch(() => []);
+          if (codes.length > 0) {
+            active = false;
+            stop();
+            onScan(codes[0].rawValue);
+            return;
+          }
+        }
+        rafRef.current = requestAnimationFrame(detect);
+      }
+      rafRef.current = requestAnimationFrame(detect);
+    } catch (e: any) {
+      setError(e?.message?.includes("Permission") ? "Camera permission denied." : `Camera error: ${e?.message}`);
+    }
+  }
+
+  function stop() {
+    cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    setOpen(false);
+  }
+
+  return (
+    <>
+      <button type="button" onClick={startCamera}
+        style={{ background: "rgba(129,140,248,0.12)", border: "1px solid rgba(129,140,248,0.3)", borderRadius: 8, color: "#c7d2fe", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 12px", display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+        📷 Scan
+      </button>
+      {open && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 999, background: "#000", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(0,0,0,0.7)" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>📷 Point at barcode</div>
+            <button onClick={stop} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 14px" }}>Cancel</button>
+          </div>
+          <div style={{ flex: 1, position: "relative" }}>
+            <video ref={videoRef} playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            {error && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+                <div style={{ background: "rgba(0,0,0,0.85)", borderRadius: 12, padding: 20, textAlign: "center", color: "#f87171", fontSize: 13 }}>{error}</div>
+              </div>
+            )}
+            {!error && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                <div style={{ width: 260, height: 140, border: "2px solid rgba(129,140,248,0.6)", borderRadius: 8, boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)" }} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function InventoryNew() {
   const nav = useNavigate();
   const [name, setName]             = useState("");
@@ -68,10 +144,13 @@ export default function InventoryNew() {
           </div>
           <label>
             <div className="field-label">Serial Number / Barcode</div>
-            <input ref={serialRef} className="input" value={serial} onChange={e => setSerial(e.target.value)}
-              onKeyDown={onSerialKeyDown}
-              placeholder="Scan barcode or type serial — leave blank to auto-generate"
-              style={{ fontFamily: serial ? "monospace" : undefined }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <input ref={serialRef} className="input" value={serial} onChange={e => setSerial(e.target.value)}
+                onKeyDown={onSerialKeyDown}
+                placeholder="Scan barcode or type serial — leave blank to auto-generate"
+                style={{ flex: 1, fontFamily: serial ? "monospace" : undefined }} />
+              <CameraButton onScan={val => { setSerial(val); document.getElementById("inv-name")?.focus(); }} />
+            </div>
             <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 5 }}>
               {serial ? `Will use: ${serial}` : "No serial? An asset tag (SWO-2026-XXXX) will be generated automatically"}
             </div>
