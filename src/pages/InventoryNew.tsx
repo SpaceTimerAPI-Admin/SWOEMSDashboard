@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import BarcodeInput from "../components/BarcodeInput";
 
 const CATEGORIES = ["Lighting", "Sound", "Video", "Rides", "Other"];
 
@@ -144,13 +145,13 @@ export default function InventoryNew() {
           </div>
           <label>
             <div className="field-label">Serial Number / Barcode</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input ref={serialRef} className="input" value={serial} onChange={e => setSerial(e.target.value)}
-                onKeyDown={onSerialKeyDown}
-                placeholder="Scan barcode or type serial — leave blank to auto-generate"
-                style={{ flex: 1, fontFamily: serial ? "monospace" : undefined }} />
-              <CameraButton onScan={val => { setSerial(val); document.getElementById("inv-name")?.focus(); }} />
-            </div>
+            <BarcodeInput
+              value={serial}
+              onChange={setSerial}
+              placeholder="Type serial, or tap Scan to use camera"
+              autoFocus
+              onEnter={() => document.getElementById("inv-name")?.focus()}
+            />
             <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 5 }}>
               {serial ? `Will use: ${serial}` : "No serial? An asset tag (SWO-2026-XXXX) will be generated automatically"}
             </div>

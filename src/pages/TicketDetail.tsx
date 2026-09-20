@@ -13,6 +13,7 @@ import {
   updateTicketDue,
 } from "../lib/api";
 import { getProfile, getRole } from "../lib/auth";
+import BarcodeInput from "../components/BarcodeInput";
 import ScheduleReviewButton from "../components/ScheduleReviewButton";
 
 type Ticket = any;
@@ -536,14 +537,13 @@ export default function TicketDetail() {
                               style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px" }}>×</button>
                           )}
                         </div>
-                        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                          <input className="input" value={hw.serial}
-                            onChange={e => updateHwItem(idx, { serial: e.target.value, lookupResult: null, name: "" })}
-                            placeholder="Scan or type serial…"
-                            style={{ flex: 1, fontFamily: hw.serial ? "monospace" : undefined }} />
-                          <button type="button" onClick={() => lookupHwSerial(idx)} disabled={hw.looking || !hw.serial.trim()} className="btn small">
-                            {hw.looking ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Look up"}
-                          </button>
+                        <div style={{ marginBottom: 8 }}>
+                          <BarcodeInput
+                            value={hw.serial}
+                            onChange={val => updateHwItem(idx, { serial: val, lookupResult: null, name: "" })}
+                            placeholder="Type serial or tap Scan…"
+                            onEnter={() => lookupHwSerial(idx)}
+                          />
                         </div>
                         {hw.lookupResult && hw.lookupResult !== false && (
                           <div style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 7, padding: "7px 10px", fontSize: 12, color: "#6ee7b7" }}>
