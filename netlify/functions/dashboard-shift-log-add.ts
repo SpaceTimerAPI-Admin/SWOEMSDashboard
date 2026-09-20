@@ -52,7 +52,7 @@ export const handler: Handler = async (event) => {
       error = fallback.error;
     }
 
-    if (error) return json({ ok: false, error: error.message }, 500);
+    if (error || !data) return json({ ok: false, error: error?.message || "No data returned" }, 500);
 
     return json({
       ok: true,
