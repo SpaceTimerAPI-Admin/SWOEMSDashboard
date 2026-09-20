@@ -7,7 +7,7 @@
  */
 import React, { useRef, useState, useEffect } from "react";
 
-async function extractSerialFromImage(file: File): Promise<{ serial: string | null; candidates: string[]; raw: string }> {
+async function extractSerialFromImage(file: File): Promise<{ serial: string | null; candidates: string[]; raw: string; note: string }> {
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve((reader.result as string).split(",")[1]);
@@ -32,6 +32,7 @@ async function extractSerialFromImage(file: File): Promise<{ serial: string | nu
     serial: data.serial || null,
     candidates: data.candidates || [],
     raw: data.note || "",
+    note: data.note || "",
   };
 }
 
