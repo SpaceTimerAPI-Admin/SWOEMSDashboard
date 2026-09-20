@@ -13,6 +13,33 @@ type Props = {
   onEnter?: () => void;
 };
 
+// Shown at bottom of camera view when BarcodeDetector not available
+function ManualEntry({ onScan }: { onScan: (val: string) => void }) {
+  const [val, setVal] = useState("");
+  return (
+    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px", background: "rgba(0,0,0,0.92)", borderTop: "1px solid rgba(255,255,255,0.1)", zIndex: 3 }}>
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>
+        Auto-scan unavailable on this browser — type the serial number:
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && val.trim()) onScan(val.trim()); }}
+          placeholder="Type serial number…"
+          autoFocus
+          style={{ flex: 1, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, color: "#fff", fontSize: 14, padding: "10px 14px", outline: "none", fontFamily: val ? "monospace" : undefined }}
+        />
+        <button
+          onClick={() => val.trim() && onScan(val.trim())}
+          style={{ background: "#4338ca", border: "none", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", padding: "10px 18px" }}>
+          Go
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onClose: () => void }) {
   const videoRef  = useRef<HTMLVideoElement>(null);
   const rafRef    = useRef<number>(0);
@@ -66,13 +93,27 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
         setHint("Hold steady — scanning…");
 
         if (!("BarcodeDetector" in window)) {
-          setError("Automatic scanning not supported on this browser. Use Chrome on Android or Safari 17.4+ on iPhone.");
+          setHint("Auto-scan not supported — type serial below");
           return;
         }
 
-        const detector = new (window as any).BarcodeDetector({
-          formats: ["code_128","code_39","code_93","ean_13","ean_8","qr_code","data_matrix","upc_a","upc_e","itf","aztec"],
-        });
+        // Try to create detector — iOS may throw if formats aren't supported
+        let detector: any = null;
+        try {
+          // Get supported formats first
+          const supported: string[] = await (window as any).BarcodeDetector.getSupportedFormats();
+          console.log("[BarcodeInput] Supported formats:", supported);
+          // Use intersection of what we want and what's supported
+          const wanted = ["code_128","code_39","code_93","ean_13","ean_8","qr_code","data_matrix","upc_a","upc_e","itf","aztec"];
+          const formats = supported.length > 0
+            ? wanted.filter(f => supported.includes(f))
+            : wanted;
+          detector = new (window as any).BarcodeDetector({ formats: formats.length > 0 ? formats : wanted });
+        } catch (detErr) {
+          console.warn("[BarcodeInput] BarcodeDetector init failed:", detErr);
+          setHint("Auto-scan not available — type serial below");
+          return;
+        }
 
         async function tick() {
           if (!active) return;
@@ -184,6 +225,11 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
           </div>
         )}
       </div>
+
+      {/* Manual entry fallback when BarcodeDetector not available */}
+      {videoReady && !error && !("BarcodeDetector" in window) && (
+        <ManualEntry onScan={onScan} />
+      )}
 
       <style>{`@keyframes bscan { 0%,100%{top:8%} 50%{top:78%} }`}</style>
     </div>
