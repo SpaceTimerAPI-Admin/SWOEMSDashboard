@@ -256,6 +256,7 @@ export default function InventoryScanner({ onClose }: Props) {
   const sm = item ? (STATUS_META[item.status] || { label: item.status, color: "#9ca3af", bg: "rgba(156,163,175,0.15)" }) : null;
 
   return (
+    <>
     <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ width: "100%", maxWidth: 500, background: "#0f1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,0.7)", display: "flex", flexDirection: "column", maxHeight: "90vh" }}>
@@ -451,6 +452,6 @@ export default function InventoryScanner({ onClose }: Props) {
     </div>
 
     {showCamera && <CameraScanner onScan={handleCameraScan} onClose={() => setShowCamera(false)} />}
-  </>
+    </>
   );
 }
