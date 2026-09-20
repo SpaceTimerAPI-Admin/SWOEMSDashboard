@@ -8,70 +8,31 @@
 import React, { useRef, useState, useEffect } from "react";
 
 async function extractSerialFromImage(file: File): Promise<{ serial: string | null; candidates: string[]; raw: string }> {
-  // Convert image to base64
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(",")[1]); // strip data:image/...;base64,
-    };
+    reader.onload = () => resolve((reader.result as string).split(",")[1]);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 
-  const mediaType = (file.type || "image/jpeg") as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/inventory-read-label", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 256,
-      messages: [{
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType, data: base64 },
-          },
-          {
-            type: "text",
-            text: `This is an equipment label from a lighting/audio/video fixture. 
-Extract the serial number from this label.
-
-Rules:
-- Look for text labeled "Serial No", "S/N", "Serial Number", "SN", or similar
-- Also look for barcodes — the number printed under the barcode is often the serial
-- Return ONLY the serial number value, nothing else
-- If you see multiple candidates, return the most likely serial number first
-- If you cannot find a serial number, return "NOT_FOUND"
-- Do not include the label text like "Serial No:" — just the value itself
-
-Reply with JSON only: {"serial": "VALUE_OR_NULL", "candidates": ["list", "of", "all", "possible", "serials"], "note": "brief explanation"}`
-          }
-        ]
-      }]
-    })
+      image: base64,
+      mediaType: file.type || "image/jpeg",
+    }),
   });
 
-  if (!res.ok) throw new Error(`Claude API error: ${res.status}`);
+  if (!res.ok) throw new Error(`Server error ${res.status}`);
   const data = await res.json();
-  const text = data.content?.[0]?.text || "";
+  if (!data.ok) throw new Error(data.error || "Failed to read label");
 
-  try {
-    // Strip markdown fences if present
-    const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const parsed = JSON.parse(clean);
-    return {
-      serial: parsed.serial === "NOT_FOUND" ? null : parsed.serial || null,
-      candidates: parsed.candidates || [],
-      raw: parsed.note || "",
-    };
-  } catch {
-    // Claude returned plain text — try to extract
-    const match = text.match(/[A-Z0-9]{6,}/);
-    return { serial: match ? match[0] : null, candidates: [], raw: text };
-  }
+  return {
+    serial: data.serial || null,
+    candidates: data.candidates || [],
+    raw: data.note || "",
+  };
 }
 
 type Props = {
