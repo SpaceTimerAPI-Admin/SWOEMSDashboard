@@ -27,7 +27,7 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
     async function start() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: { ideal: "environment" } },
           audio: false,
         });
 
