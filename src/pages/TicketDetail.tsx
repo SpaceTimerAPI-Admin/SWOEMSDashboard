@@ -753,19 +753,6 @@ export default function TicketDetail() {
 
                   </div>
                 )}
-              </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: hwInvolved === "yes" ? 12 : 0 }}>
-                  {([["yes", "✓ Yes"], ["no", "✗ No"]] as const).map(([v, label]) => (
-                    <button key={v} type="button" onClick={() => { setHwInvolved(v); setResolutionError(null); if (v === "yes") setHwItems([emptyHw()]); }}
-                      style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1px solid", transition: "all 0.15s",
-                        background: hwInvolved === v ? (v === "yes" ? "rgba(129,140,248,0.2)" : "rgba(255,255,255,0.06)") : "rgba(255,255,255,0.04)",
-                        borderColor: hwInvolved === v ? (v === "yes" ? "rgba(129,140,248,0.4)" : "rgba(255,255,255,0.15)") : "rgba(255,255,255,0.08)",
-                        color: hwInvolved === v ? (v === "yes" ? "#c7d2fe" : "#e5e7eb") : "#6b7280" }}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
               {resolutionError && <div className="error" style={{ marginTop: 8 }}>{resolutionError}</div>}
               <div className="btn-row" style={{ marginTop: 14 }}>
                 <button className="btn small" type="button" onClick={() => { setShowCloseModal(false); setHwInvolved(null); setHwItems([emptyHw()]); setRemovedItems([emptyHw()]); setResolutionError(null); setResolution(""); }} disabled={busy}>Cancel</button>
