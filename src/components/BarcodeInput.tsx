@@ -26,32 +26,40 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
 
     async function start() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
+        // Simple constraints work best across iOS and Android
+        const constraints: MediaStreamConstraints = {
+          video: { facingMode: "environment" },
           audio: false,
-        });
+        };
 
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
 
-        // Wait for the video element to be in the DOM
+        // Wait for video element
         let attempts = 0;
-        while (!videoRef.current && attempts < 20) {
+        while (!videoRef.current && attempts < 30) {
           await new Promise(r => setTimeout(r, 50));
           attempts++;
         }
-
         if (!videoRef.current || !active) return;
 
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true");
-        videoRef.current.setAttribute("autoplay", "true");
-        videoRef.current.muted = true;
+        const video = videoRef.current;
 
-        try {
-          await videoRef.current.play();
-        } catch {
-          // Some browsers need a user gesture — already have one since user tapped the button
+        // Set srcObject before any other operation
+        video.srcObject = stream;
+
+        // Wait for metadata to load before playing (required on iOS)
+        await new Promise<void>((resolve) => {
+          video.onloadedmetadata = () => resolve();
+          // Fallback timeout
+          setTimeout(resolve, 2000);
+        });
+
+        if (!active) return;
+
+        try { await video.play(); } catch (playErr) {
+          console.warn("video.play() failed:", playErr);
         }
 
         setVideoReady(true);
@@ -87,21 +95,7 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
         if (!active) return;
         if (e?.name === "NotAllowedError") setError("Camera permission denied. Tap Allow when prompted, then try again.");
         else if (e?.name === "NotFoundError") setError("No camera found on this device.");
-        else if (e?.name === "OverconstrainedError") {
-          // Retry without environment constraint
-          try {
-            const stream2 = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            if (!active) { stream2.getTracks().forEach(t => t.stop()); return; }
-            streamRef.current = stream2;
-            if (videoRef.current) {
-              videoRef.current.srcObject = stream2;
-              videoRef.current.muted = true;
-              await videoRef.current.play();
-              setVideoReady(true);
-            }
-          } catch { setError("Could not access camera."); }
-        }
-        else setError(`Camera error: ${e?.message || "unknown"}`);
+        else setError(`Could not start camera: ${e?.message || "unknown error"}`);
       }
     }
 
@@ -115,7 +109,7 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
   }, []);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "#000", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: 9000, background: "#000", display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: "rgba(0,0,0,0.9)", flexShrink: 0, zIndex: 1 }}>
         <div>
@@ -128,29 +122,36 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
         </button>
       </div>
 
-      {/* Video fills remaining space */}
-      <div style={{ flex: 1, position: "relative", background: "#111" }}>
+      {/* Video container */}
+      <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
         <video
           ref={videoRef}
           playsInline
           autoPlay
           muted
           style={{
-            position: "absolute", inset: 0,
-            width: "100%", height: "100%",
+            width: "100%",
+            height: "100%",
             objectFit: "cover",
             display: "block",
+            // iOS Safari needs these
+            WebkitTransform: "translateZ(0)",
+            transform: "translateZ(0)",
           }}
         />
 
-        {/* Viewfinder — only show when video is running */}
+        {/* Viewfinder */}
         {videoReady && !error && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-            <div style={{ width: "75%", maxWidth: 300, height: 130, position: "relative" }}>
-              <div style={{ position: "absolute", inset: "-100vh -100vw", background: "rgba(0,0,0,0.45)" }} />
-              {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h]) => (
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+            <div style={{ width: 280, height: 120, position: "relative" }}>
+              {/* Semi-transparent mask around target area */}
+              <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.45)", zIndex: 0 }} />
+              {/* Clear window */}
+              <div style={{ position: "absolute", inset: 0, background: "transparent", zIndex: 1, boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }} />
+              {/* Corner brackets */}
+              {([["top","left"],["top","right"],["bottom","left"],["bottom","right"]] as const).map(([v,h]) => (
                 <div key={`${v}${h}`} style={{
-                  position: "absolute", width: 28, height: 28, zIndex: 2,
+                  position: "absolute", width: 24, height: 24, zIndex: 2,
                   [v]: 0, [h]: 0,
                   borderTop:    v === "top"    ? "3px solid #818cf8" : "none",
                   borderBottom: v === "bottom" ? "3px solid #818cf8" : "none",
@@ -158,21 +159,22 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
                   borderRight:  h === "right"  ? "3px solid #818cf8" : "none",
                 }} />
               ))}
-              <div style={{ position: "absolute", left: 8, right: 8, height: 2, background: "linear-gradient(90deg,transparent,#818cf8,transparent)", zIndex: 2, animation: "scan 2s ease-in-out infinite" }} />
+              {/* Scan line */}
+              <div style={{ position: "absolute", left: 8, right: 8, height: 2, background: "linear-gradient(90deg,transparent,#818cf8,transparent)", zIndex: 2, animation: "bscan 2s ease-in-out infinite" }} />
             </div>
           </div>
         )}
 
-        {/* Loading state */}
+        {/* Loading */}
         {!videoReady && !error && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>Starting camera…</div>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 14 }}>Starting camera…</div>
           </div>
         )}
 
-        {/* Error state */}
+        {/* Error */}
         {error && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.9)" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, background: "rgba(0,0,0,0.92)" }}>
             <div style={{ fontSize: 36, marginBottom: 14 }}>📷</div>
             <div style={{ fontSize: 14, color: "#f87171", textAlign: "center", lineHeight: 1.7, marginBottom: 24 }}>{error}</div>
             <button onClick={onClose}
@@ -183,7 +185,7 @@ function CameraOverlay({ onScan, onClose }: { onScan: (val: string) => void; onC
         )}
       </div>
 
-      <style>{`@keyframes scan { 0%,100%{top:8%} 50%{top:80%} }`}</style>
+      <style>{`@keyframes bscan { 0%,100%{top:8%} 50%{top:78%} }`}</style>
     </div>
   );
 }
