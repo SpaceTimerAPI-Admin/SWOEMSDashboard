@@ -193,6 +193,7 @@ export default function TicketDetail() {
         const hw = removedItems[i];
         if (!hw.serial.trim()) { setResolutionError(`Removed item ${i + 1}: Serial number required.`); return; }
         if (hw.lookupResult === null) { setResolutionError(`Removed item ${i + 1}: Please look up the serial number first.`); return; }
+        if (hw.lookupResult === false && !hw.name.trim()) { setResolutionError(`Removed item ${i + 1}: Name required — item not in inventory yet.`); return; }
       }
     }
     setBusy(true); setResolutionError(null);
@@ -232,19 +233,24 @@ export default function TicketDetail() {
             }),
           });
         }
-        // Log pulled event for removed hardware (replacements only)
+        // Log pulled event for removed hardware — create if missing
         if (hwInvolved === "replaced") {
           for (const hw of removedItems) {
-            if (!hw.serial.trim() || !hw.lookupResult || hw.lookupResult === false) continue;
+            if (!hw.serial.trim()) continue;
             await fetch("/api/inventory-event", {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
               body: JSON.stringify({
-                item_id: hw.lookupResult.id,
+                item_id: hw.lookupResult && hw.lookupResult !== false ? hw.lookupResult.id : null,
                 event_type: "pulled",
                 location: "Shop",
                 note: `Replaced via work order: ${ticket?.title || ticketId}`,
                 linked_ticket_id: ticketId,
+                create_if_missing: hw.lookupResult === false,
+                new_item_serial: hw.serial.trim(),
+                new_item_name: hw.name.trim(),
+                new_item_model: hw.model.trim() || undefined,
+                new_item_manufacturer: hw.manufacturer.trim() || undefined,
               }),
             });
           }
@@ -586,7 +592,16 @@ export default function TicketDetail() {
                               </button>
                             )}
                             {hw.lookupResult && hw.lookupResult !== false && <div style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 7, padding: "7px 10px", fontSize: 12, color: "#fca5a5", marginTop: 6 }}>✓ Found: <strong>{hw.lookupResult.name}</strong> — will be marked pulled from {hw.lookupResult.location}</div>}
-                            {hw.lookupResult === false && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>⚠ Not in inventory — serial noted in resolution only</div>}
+                            {hw.lookupResult === false && (
+                              <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 7, padding: "9px 10px", marginTop: 6 }}>
+                                <div style={{ fontSize: 11, color: "#fcd34d", marginBottom: 6 }}>⚠ Not in inventory — add it so we can track it:</div>
+                                <input className="input" value={hw.name} onChange={e => updateRemovedItem(idx, { name: e.target.value })} placeholder="Item name (required)" style={{ marginBottom: 6 }} />
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <input className="input" value={hw.manufacturer} onChange={e => updateRemovedItem(idx, { manufacturer: e.target.value })} placeholder="Manufacturer" style={{ flex: 1 }} />
+                                  <input className="input" value={hw.model} onChange={e => updateRemovedItem(idx, { model: e.target.value })} placeholder="Model" style={{ flex: 1 }} />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                         <button type="button" onClick={() => setRemovedItems(prev => [...prev, emptyHw()])} style={{ background: "rgba(248,113,113,0.06)", border: "1px dashed rgba(248,113,113,0.3)", borderRadius: 8, color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px", width: "100%" }}>+ Add Another</button>
