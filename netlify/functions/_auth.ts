@@ -23,8 +23,12 @@ export async function requireSession(event: any) {
   const expiresAt = new Date(data.expires_at).getTime();
   if (Date.now() > expiresAt) return null;
 
-  // touch last_seen_at (best effort)
-  await supabase.from("sessions").update({ last_seen_at: new Date().toISOString() }).eq("id", data.id);
+  // Extend session by 1 year from now on every use (sliding expiry)
+  // and touch last_seen_at — both best effort
+  const newExpiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from("sessions")
+    .update({ last_seen_at: new Date().toISOString(), expires_at: newExpiry })
+    .eq("id", data.id);
 
   // fetch employee profile
   const { data: emp } = await supabase
