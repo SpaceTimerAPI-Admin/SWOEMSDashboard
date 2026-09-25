@@ -41,6 +41,47 @@ export default function TicketDetail() {
   const [commentError, setCommentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Inventory attachment
+  const [showInvAttach, setShowInvAttach]     = useState(false);
+  const [invSerial, setInvSerial]             = useState("");
+  const [invLookup, setInvLookup]             = useState<any>(null); // null=none, false=not found, obj=found
+  const [invLooking, setInvLooking]           = useState(false);
+  const [invNote, setInvNote]                 = useState("");
+  const [invSaving, setInvSaving]             = useState(false);
+  const [invError, setInvError]               = useState<string | null>(null);
+  const [attachedItems, setAttachedItems]     = useState<any[]>([]);
+
+  async function lookupInvSerial() {
+    if (!invSerial.trim()) return;
+    setInvLooking(true); setInvLookup(null); setInvError(null);
+    try {
+      const token = localStorage.getItem("md_session_token") || "";
+      const res = await fetch(`/api/inventory-lookup?serial=${encodeURIComponent(invSerial.trim())}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setInvLookup(data.found ? data.item : false);
+    } finally { setInvLooking(false); }
+  }
+
+  async function attachInventoryItem() {
+    if (!invLookup || invLookup === false) return;
+    setInvSaving(true); setInvError(null);
+    try {
+      const token = localStorage.getItem("md_session_token") || "";
+      await fetch("/api/inventory-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          item_id: invLookup.id,
+          event_type: "note",
+          note: invNote.trim() || `Referenced on work order: ${ticket?.title || ticketId}`,
+          linked_ticket_id: ticketId,
+        }),
+      });
+      setAttachedItems(prev => [...prev, { ...invLookup, note: invNote }]);
+      setInvSerial(""); setInvLookup(null); setInvNote(""); setShowInvAttach(false);
+    } catch (e: any) { setInvError(e?.message || "Failed to attach"); } finally { setInvSaving(false); }
+  }
+
   // Hardware replacement tracking on close
   type HwItem = {
     serial: string;
@@ -473,6 +514,72 @@ export default function TicketDetail() {
               <div className="prewrap detail-value" style={{ marginTop: 4 }}>{ticket.details}</div>
             </div>
           )}
+
+          {/* Inventory attachment */}
+          <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: attachedItems.length > 0 || showInvAttach ? 10 : 0 }}>
+              <div className="detail-label">📦 Inventory</div>
+              {!showInvAttach && (
+                <button className="btn small" onClick={() => { setShowInvAttach(true); setInvSerial(""); setInvLookup(null); setInvNote(""); setInvError(null); }}>
+                  + Attach Item
+                </button>
+              )}
+            </div>
+
+            {/* Already attached this session */}
+            {attachedItems.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: showInvAttach ? 10 : 0 }}>
+                {attachedItems.map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(129,140,248,0.08)", border: "1px solid rgba(129,140,248,0.2)" }}>
+                    <span style={{ fontSize: 14 }}>📦</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                      <div style={{ fontSize: 10, color: "var(--muted2)", fontFamily: "monospace" }}>{item.asset_tag}</div>
+                    </div>
+                    <Link to={`/inventory/${item.id}`} style={{ fontSize: 11, color: "#818cf8", textDecoration: "none", flexShrink: 0 }}>View →</Link>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Attach form */}
+            {showInvAttach && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <BarcodeInput value={invSerial} onChange={val => { setInvSerial(val); setInvLookup(null); }} placeholder="Scan or type serial number…" onEnter={lookupInvSerial} />
+                {invSerial.trim() && (
+                  <button type="button" className="btn small" onClick={lookupInvSerial} disabled={invLooking} style={{ width: "100%" }}>
+                    {invLooking ? <><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Looking up…</> : "Look up"}
+                  </button>
+                )}
+                {invLookup && invLookup !== false && (
+                  <div style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 8, padding: "9px 12px" }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#6ee7b7" }}>✓ {invLookup.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2 }}>{invLookup.status?.replace("_"," ")} · {invLookup.location}</div>
+                    <input className="input" style={{ marginTop: 8 }} value={invNote} onChange={e => setInvNote(e.target.value)} placeholder="Optional note (e.g. fixture that failed, spare used)…" />
+                    {invError && <div style={{ fontSize: 12, color: "#FFB0B0", marginTop: 6 }}>⚠ {invError}</div>}
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <button type="button" className="btn primary small" onClick={attachInventoryItem} disabled={invSaving}>
+                        {invSaving ? <span className="spinner" /> : "Attach to Ticket"}
+                      </button>
+                      <button type="button" className="btn small" onClick={() => setShowInvAttach(false)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+                {invLookup === false && (
+                  <div style={{ fontSize: 12, color: "#fcd34d" }}>
+                    ⚠ Serial not found. <Link to="/inventory/new" style={{ color: "#c7d2fe" }}>Add to inventory first →</Link>
+                  </div>
+                )}
+                {invLookup === null && !invSerial.trim() && (
+                  <button type="button" className="btn small" style={{ alignSelf: "flex-start" }} onClick={() => setShowInvAttach(false)}>Cancel</button>
+                )}
+              </div>
+            )}
+
+            {attachedItems.length === 0 && !showInvAttach && (
+              <div style={{ fontSize: 12, color: "var(--muted2)" }}>No inventory items attached to this work order.</div>
+            )}
+          </div>
 
           <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
             <div className="detail-label" style={{ marginBottom: 8 }}>Add Update</div>

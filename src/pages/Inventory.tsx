@@ -1,6 +1,33 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import BarcodeInput from "../components/BarcodeInput";
+
+function exportToExcel(items: any[]) {
+  // Build CSV content (opens in Excel natively)
+  const headers = ["Asset Tag","Serial Number","Name","Manufacturer","Model","Category","Status","Location","Notes"];
+  const rows = items.map(i => [
+    i.asset_tag || "",
+    i.serial_number || "",
+    i.name || "",
+    i.manufacturer || "",
+    i.model || "",
+    i.category_name || "",
+    (i.status || "").replace(/_/g, " "),
+    i.location || "",
+    (i.notes || "").replace(/\n/g, " ").replace(/,/g, ";"),
+  ]);
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `swoems-inventory-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const CATEGORIES = ["Lighting", "Sound", "Video", "Rides", "Other"];
 const STATUSES = [
@@ -37,29 +64,6 @@ export default function Inventory() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterCat, setFilterCat] = useState("");
   const [showFilter, setShowFilter] = useState(false);
-
-  // Scan to find
-  const [scanSerial, setScanSerial] = useState("");
-  const [scanLooking, setScanLooking] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-
-  async function handleScanLookup() {
-    const serial = scanSerial.trim();
-    if (!serial) return;
-    setScanLooking(true); setScanError(null);
-    try {
-      const token = localStorage.getItem("md_session_token") || "";
-      const res = await fetch(`/api/inventory-lookup?serial=${encodeURIComponent(serial)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.found && data.item) {
-        nav(`/inventory/${data.item.id}`);
-      } else {
-        setScanError(`Serial "${serial}" not found — add it as a new item?`);
-      }
-    } finally { setScanLooking(false); }
-  }
 
   useEffect(() => { void load(); }, [filterStatus, filterCat]);
 
@@ -99,30 +103,10 @@ export default function Inventory() {
         <div style={{ display: "flex", gap: 7 }}>
           <Link to="/inventory/new" className="btn primary small">+ Add Item</Link>
           <Link to="/inventory/import" className="btn small">Import</Link>
-        </div>
-      </div>
-
-      {/* Scan to find — prominent at the top */}
-      <div style={{ marginBottom: 14, background: "rgba(129,140,248,0.08)", border: "1px solid rgba(129,140,248,0.2)", borderRadius: 12, padding: "12px 14px" }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "#c7d2fe", marginBottom: 8 }}>
-          📦 Find by Serial / Barcode
-        </div>
-        <BarcodeInput
-          value={scanSerial}
-          onChange={val => { setScanSerial(val); setScanError(null); }}
-          placeholder="Scan or type a serial number…"
-          onEnter={handleScanLookup}
-        />
-        {scanSerial.trim() && (
-          <button onClick={handleScanLookup} disabled={scanLooking} className="btn primary small" style={{ marginTop: 8, width: "100%" }}>
-            {scanLooking ? <><span className="spinner" style={{ marginRight: 6 }} />Looking up…</> : "Find Item"}
+          <button className="btn small" onClick={() => exportToExcel(items)} title="Export to Excel">
+            ⬇ Export
           </button>
-        )}
-        {scanError && (
-          <div style={{ marginTop: 8, fontSize: 12, color: "#fcd34d" }}>
-            ⚠ {scanError} <Link to="/inventory/new" style={{ color: "#c7d2fe", marginLeft: 6 }}>+ Add new item →</Link>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Status summary chips */}

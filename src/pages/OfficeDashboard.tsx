@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import InventoryScanner from "../components/InventoryScanner";
 
 const REFRESH_MS = 60_000;
 const TZ = "America/New_York";
@@ -163,7 +162,6 @@ export default function OfficeDashboard() {
   const [loading, setLoading] = useState(true);
   const [clock, setClock]     = useState(nowDisplay());
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [showInventory, setShowInventory] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [selectedIsClosed, setSelectedIsClosed] = useState(false);
   const timerRef = useRef<any>(null);
@@ -301,17 +299,10 @@ export default function OfficeDashboard() {
           </div>
         </div>
 
-        {/* Clock + Inventory button */}
-        <div style={{ padding: "8px 16px", textAlign: "right", flexShrink: 0, display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setShowInventory(true)}
-            style={{ background: "rgba(129,140,248,0.15)", border: "1px solid rgba(129,140,248,0.3)", borderRadius: 10, color: "#c7d2fe", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: "8px 14px", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            <span style={{ fontSize: 16 }}>📦</span>
-            Inventory
-          </button>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em" }}>{clock}</div>
-            {lastUpdated && <div style={{ fontSize: 9, color: "#374151" }}>Updated {lastUpdated}</div>}
-          </div>
+        {/* Clock */}
+        <div style={{ padding: "8px 16px", textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em" }}>{clock}</div>
+          {lastUpdated && <div style={{ fontSize: 9, color: "#374151" }}>Updated {lastUpdated}</div>}
         </div>
       </div>
 
@@ -537,7 +528,6 @@ export default function OfficeDashboard() {
       </div>
 
       {/* ── MODAL ─────────────────────────────────────────────────────────── */}
-      {showInventory && <InventoryScanner onClose={() => setShowInventory(false)} />}
       {selectedTicket && (
         <TicketModal ticket={selectedTicket} isClosed={selectedIsClosed} onClose={() => setSelectedTicket(null)} />
       )}

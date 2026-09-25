@@ -79,6 +79,25 @@ export default function InventoryDetail() {
   const [actionSaving, setActionSaving] = useState(false);
   const [actionError, setActionError]   = useState<string | null>(null);
 
+  // Quick location edit
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [locationDraft, setLocationDraft]     = useState("");
+  const [locationSaving, setLocationSaving]   = useState(false);
+
+  async function saveLocation() {
+    if (!locationDraft.trim()) return;
+    setLocationSaving(true);
+    try {
+      const res = await apiFetch("/api/inventory-event", {
+        method: "POST",
+        body: JSON.stringify({ item_id: id, event_type: "note", location: locationDraft.trim(), note: `Location updated to: ${locationDraft.trim()}` }),
+      });
+      if (!res.ok) throw new Error(res.error || "Failed");
+      await load();
+      setEditingLocation(false);
+    } catch { } finally { setLocationSaving(false); }
+  }
+
   useEffect(() => { if (id) void load(); }, [id]);
 
   async function load() {
@@ -185,7 +204,6 @@ export default function InventoryDetail() {
                 { label: "Manufacturer", value: item.manufacturer },
                 { label: "Model",        value: item.model },
                 { label: "Serial #",     value: item.serial_number },
-                { label: "Location",     value: item.location },
                 { label: "Added",        value: item.created_at ? fmtDateShort(item.created_at) : null },
               ].filter(f => f.value).map(f => (
                 <div key={f.label}>
@@ -193,6 +211,33 @@ export default function InventoryDetail() {
                   <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2, fontFamily: f.label === "Serial #" ? "monospace" : undefined }}>{f.value}</div>
                 </div>
               ))}
+              {/* Location — inline editable */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Location</div>
+                  {!editingLocation && (
+                    <button type="button" onClick={() => { setLocationDraft(item.location || ""); setEditingLocation(true); }}
+                      style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "1px 5px", borderRadius: 4, textDecoration: "underline" }}>
+                      edit
+                    </button>
+                  )}
+                </div>
+                {editingLocation ? (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input className="input" value={locationDraft} onChange={e => setLocationDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") void saveLocation(); if (e.key === "Escape") setEditingLocation(false); }}
+                      placeholder="Enter new location…" autoFocus style={{ flex: 1, fontSize: 13 }} />
+                    <button type="button" className="btn primary small" onClick={saveLocation} disabled={locationSaving || !locationDraft.trim()}>
+                      {locationSaving ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Save"}
+                    </button>
+                    <button type="button" className="btn small" onClick={() => setEditingLocation(false)}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
+                    {item.location || <span style={{ color: "var(--muted2)" }}>Not set</span>}
+                  </div>
+                )}
+              </div>
             </div>
             {item.status === "checked_out" && (
               <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: 8, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
