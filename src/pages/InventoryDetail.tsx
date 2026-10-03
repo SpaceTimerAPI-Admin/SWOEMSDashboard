@@ -17,7 +17,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   in_storage:    { label: "In Storage",    color: "#6ee7b7", bg: "rgba(52,211,153,0.15)" },
   checked_out:   { label: "Checked Out",   color: "#fcd34d", bg: "rgba(251,191,36,0.15)" },
   deployed:      { label: "Deployed",      color: "#818cf8", bg: "rgba(129,140,248,0.15)" },
-  needs_repair:  { label: "Needs Repair",  color: "#fb923c", bg: "rgba(251,146,60,0.15)"  },
+  needs_repair:  { label: "Needs Repair",  color: "#fb923c", bg: "rgba(251,146,60,0.15)" },
   in_repair:     { label: "In Repair",     color: "#f87171", bg: "rgba(248,113,113,0.15)" },
   retired:       { label: "Retired",       color: "#6b7280", bg: "rgba(107,114,128,0.15)" },
 };
@@ -27,11 +27,11 @@ const EVENT_META: Record<string, { label: string; icon: string; color: string }>
   checked_out:           { label: "Checked Out",          icon: "👤", color: "#fcd34d" },
   checked_in:            { label: "Checked In",           icon: "↩️", color: "#6ee7b7" },
   deployed:              { label: "Deployed",             icon: "🔧", color: "#818cf8" },
-  replaced:              { label: "Replaced",             icon: "🔄", color: "#fcd34d" },
-  needs_repair:          { label: "Needs Repair",         icon: "⚠️", color: "#fb923c" },
   pulled:                { label: "Pulled from Service",  icon: "⬆️", color: "#9ca3af" },
+  needs_repair:          { label: "Flagged for Repair",   icon: "⚠️", color: "#fb923c" },
   sent_to_repair:        { label: "Sent to Repair",       icon: "🔨", color: "#f87171" },
   returned_from_repair:  { label: "Returned from Repair", icon: "✅", color: "#6ee7b7" },
+  replaced:              { label: "Hardware Replaced",    icon: "🔄", color: "#6ee7b7" },
   retired:               { label: "Retired",              icon: "🗃️", color: "#6b7280" },
   note:                  { label: "Note",                 icon: "📝", color: "#9ca3af" },
 };
@@ -40,14 +40,21 @@ const TICKET_STATUS_COLORS: Record<string, string> = {
   open: "#fcd34d", in_progress: "#818cf8", closed: "#6ee7b7", cancelled: "#6b7280",
 };
 
-const CATEGORIES = ["Lighting", "Sound", "Video", "Rides", "Other"];
+const CATEGORIES = [
+  "Moving Lights", "Conventional Fixtures", "LED Fixtures", "Haze / Fog Machines",
+  "Follow Spots", "Dimmer Racks / Power", "Cable & Connectors", "Lighting Controllers",
+  "Audio Speakers", "Amplifiers", "Microphones", "Audio Mixers / Consoles",
+  "Signal Processors", "Wireless Systems", "Video Projectors", "LED Screens / Panels",
+  "Video Cameras", "Video Switchers", "Playback Systems", "Rigging / Hardware",
+  "Misc / Other",
+];
 
 const EVENT_ACTIONS: { event_type: string; label: string; icon: string; locationLabel: string; locationPlaceholder: string; locationRequired: boolean; needsTakenBy?: boolean; needsVendor?: boolean; needsCondition?: boolean; statusFilter?: string[] }[] = [
   { event_type: "checked_out",          label: "Check Out",          icon: "👤", locationLabel: "Where is it going?",       locationPlaceholder: "e.g. Main Gate, Backstage",      locationRequired: true,  needsTakenBy: true,  statusFilter: ["in_storage"] },
   { event_type: "checked_in",           label: "Check In",           icon: "↩️", locationLabel: "Returned to",              locationPlaceholder: "e.g. Shop, Storage Room",        locationRequired: true,  needsCondition: true, statusFilter: ["checked_out"] },
   { event_type: "deployed",             label: "Deploy",             icon: "🔧", locationLabel: "Deploy location",           locationPlaceholder: "e.g. Mako Lift Tower, Stage L",  locationRequired: true,  statusFilter: ["in_storage", "checked_out"] },
   { event_type: "pulled",               label: "Pull from Service",  icon: "⬆️", locationLabel: "Returning to",             locationPlaceholder: "e.g. Shop, EMS Storage",         locationRequired: true,  needsCondition: true, statusFilter: ["deployed"] },
-  { event_type: "needs_repair",         label: "Flag: Needs Repair", icon: "⚠️", locationLabel: "Current location",         locationPlaceholder: "Where is the item now?",         locationRequired: false, statusFilter: ["in_storage", "checked_out", "deployed"] },
+  { event_type: "needs_repair",         label: "Flag for Repair",    icon: "⚠️", locationLabel: "Current location",         locationPlaceholder: "Where is this item now?",        locationRequired: false, statusFilter: ["in_storage", "checked_out", "deployed"] },
   { event_type: "sent_to_repair",       label: "Send to Repair",     icon: "🔨", locationLabel: "Repair location / vendor", locationPlaceholder: "e.g. Shop bench, B&H Service",   locationRequired: true,  needsVendor: true,    statusFilter: ["in_storage", "checked_out", "deployed", "needs_repair"] },
   { event_type: "returned_from_repair", label: "Return from Repair", icon: "✅", locationLabel: "Returned to",              locationPlaceholder: "e.g. Shop, EMS Storage",         locationRequired: true,  needsCondition: true, statusFilter: ["in_repair"] },
   { event_type: "retired",              label: "Retire",             icon: "🗃️", locationLabel: "Final location / reason",  locationPlaceholder: "e.g. Dead stock, Written off",   locationRequired: false },
@@ -63,18 +70,27 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
   return res.json();
 }
 
-// Inline editable field — click the value to edit
-function InlineField({ label, value, onSave, monospace, multiline }: {
-  label: string; value: string; onSave: (v: string) => Promise<void>; monospace?: boolean; multiline?: boolean;
+// ── Inline editable field ─────────────────────────────────────────────────────
+function InlineField({
+  label,
+  value,
+  mono,
+  onSave,
+}: {
+  label: string;
+  value: string | null | undefined;
+  mono?: boolean;
+  onSave: (val: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState("");
   const [saving, setSaving]   = useState(false);
 
-  function start() { setDraft(value || ""); setEditing(true); }
+  function startEdit() { setDraft(value || ""); setEditing(true); }
+
   async function save() {
     setSaving(true);
-    try { await onSave(draft); setEditing(false); } finally { setSaving(false); }
+    try { await onSave(draft.trim()); setEditing(false); } finally { setSaving(false); }
   }
 
   return (
@@ -82,30 +98,29 @@ function InlineField({ label, value, onSave, monospace, multiline }: {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
         <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>{label}</div>
         {!editing && (
-          <button type="button" onClick={start}
+          <button type="button" onClick={startEdit}
             style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "1px 5px", borderRadius: 4, textDecoration: "underline" }}>
             edit
           </button>
         )}
       </div>
       {editing ? (
-        <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-          {multiline ? (
-            <textarea className="textarea" value={draft} onChange={e => setDraft(e.target.value)}
-              autoFocus style={{ flex: 1, fontSize: 13, minHeight: 50 }} />
-          ) : (
-            <input className="input" value={draft} onChange={e => setDraft(e.target.value)}
-              autoFocus onKeyDown={e => { if (e.key === "Enter") void save(); if (e.key === "Escape") setEditing(false); }}
-              style={{ flex: 1, fontSize: 13, fontFamily: monospace ? "monospace" : undefined }} />
-          )}
+        <div style={{ display: "flex", gap: 6 }}>
+          <input
+            className="input"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") void save(); if (e.key === "Escape") setEditing(false); }}
+            autoFocus
+            style={{ flex: 1, fontSize: 13, fontFamily: mono ? "monospace" : undefined }}
+          />
           <button type="button" className="btn primary small" onClick={save} disabled={saving}>
             {saving ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Save"}
           </button>
           <button type="button" className="btn small" onClick={() => setEditing(false)}>✕</button>
         </div>
       ) : (
-        <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2, fontFamily: monospace ? "monospace" : undefined, cursor: "pointer" }}
-          onClick={start}>
+        <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2, fontFamily: mono ? "monospace" : undefined }}>
           {value || <span style={{ color: "var(--muted2)" }}>Not set</span>}
         </div>
       )}
@@ -113,15 +128,23 @@ function InlineField({ label, value, onSave, monospace, multiline }: {
   );
 }
 
-// Category picker — inline
-function InlineCategoryField({ value, onSave }: { value: string; onSave: (v: string) => Promise<void> }) {
+// ── Inline category field ─────────────────────────────────────────────────────
+function InlineCategoryField({
+  value,
+  onSave,
+}: {
+  value: string | null | undefined;
+  onSave: (val: string) => Promise<void>;
+}) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft]     = useState(value || "");
+  const [draft, setDraft]     = useState("");
   const [saving, setSaving]   = useState(false);
 
-  async function save(cat: string) {
+  function startEdit() { setDraft(value || ""); setEditing(true); }
+
+  async function save() {
     setSaving(true);
-    try { await onSave(cat); setEditing(false); } finally { setSaving(false); }
+    try { await onSave(draft.trim()); setEditing(false); } finally { setSaving(false); }
   }
 
   return (
@@ -129,33 +152,32 @@ function InlineCategoryField({ value, onSave }: { value: string; onSave: (v: str
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
         <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Category</div>
         {!editing && (
-          <button type="button" onClick={() => { setDraft(value || ""); setEditing(true); }}
+          <button type="button" onClick={startEdit}
             style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "1px 5px", borderRadius: 4, textDecoration: "underline" }}>
             edit
           </button>
         )}
       </div>
       {editing ? (
-        <div>
-          <div className="tag-row" style={{ flexWrap: "wrap" }}>
-            {CATEGORIES.map(c => (
-              <button key={c} type="button"
-                className={`tag-btn${draft === c ? " active" : ""}`}
-                disabled={saving}
-                onClick={() => { setDraft(c); void save(c); }}>
-                {saving && draft === c ? <span className="spinner" style={{ width: 10, height: 10, marginRight: 4 }} /> : null}
-                {c}
-              </button>
-            ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <select
+            className="input"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            style={{ fontSize: 13 }}
+          >
+            <option value="">Select category…</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button type="button" className="btn primary small" onClick={save} disabled={saving || !draft}>
+              {saving ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Save"}
+            </button>
+            <button type="button" className="btn small" onClick={() => setEditing(false)}>Cancel</button>
           </div>
-          <button type="button" onClick={() => setEditing(false)}
-            style={{ fontSize: 11, color: "var(--muted2)", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>
-            Cancel
-          </button>
         </div>
       ) : (
-        <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2, cursor: "pointer" }}
-          onClick={() => { setDraft(value || ""); setEditing(true); }}>
+        <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
           {value || <span style={{ color: "var(--muted2)" }}>Not set</span>}
         </div>
       )}
@@ -163,28 +185,17 @@ function InlineCategoryField({ value, onSave }: { value: string; onSave: (v: str
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function InventoryDetail() {
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
   const profile = getProfile();
 
-  const [item, setItem]           = useState<any>(null);
-  const [events, setEvents]       = useState<any[]>([]);
-  const [stats, setStats]         = useState<any>(null);
-  const [loading, setLoading]     = useState(true);
+  const [item, setItem]     = useState<any>(null);
+  const [events, setEvents] = useState<any[]>([]);
+  const [stats, setStats]   = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "audit" | "tickets">("overview");
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  // Linked work orders — fetched separately so they're always accurate
-  const [linkedTickets, setLinkedTickets] = useState<any[]>([]);
-
-  async function loadLinkedTickets() {
-    if (!id) return;
-    try {
-      const res = await apiFetch(`/api/ticket-inventory?item_id=${id}`);
-      if (res.ok) setLinkedTickets(res.tickets || []);
-    } catch { /* silent */ }
-  }
 
   // Action form
   const [showAction, setShowAction]     = useState(false);
@@ -203,8 +214,21 @@ export default function InventoryDetail() {
   const [locationSaving, setLocationSaving]   = useState(false);
 
   // Quick status update
-  const [statusSaving, setStatusSaving]   = useState(false);
-  const [statusError, setStatusError]     = useState<string | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError]   = useState<string | null>(null);
+
+  // Field patch errors
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => { if (id) void load(); }, [id]);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await apiFetch(`/api/inventory-get?id=${id}`);
+      if (res.ok) { setItem(res.item); setEvents(res.events || []); setStats(res.stats || null); }
+    } finally { setLoading(false); }
+  }
 
   async function patchItem(fields: Record<string, string>) {
     setSaveError(null);
@@ -212,8 +236,12 @@ export default function InventoryDetail() {
       method: "POST",
       body: JSON.stringify({ id, ...fields }),
     });
-    if (!res.ok) throw new Error(res.error || "Failed to save");
-    setItem((prev: any) => ({ ...prev, ...res.item }));
+    if (!res.ok) {
+      const msg = res.error || "Failed to save";
+      setSaveError(msg);
+      throw new Error(msg);
+    }
+    setItem((prev: any) => ({ ...prev, ...fields }));
   }
 
   async function quickSetStatus(newStatus: string) {
@@ -221,18 +249,19 @@ export default function InventoryDetail() {
     setStatusError(null);
     try {
       const eventTypeMap: Record<string, string> = {
-        in_storage:   "pulled",
-        deployed:     "deployed",
-        needs_repair: "needs_repair",
-        in_repair:    "sent_to_repair",
-        retired:      "retired",
-        checked_out:  "checked_out",
+        in_storage:    "pulled",
+        deployed:      "deployed",
+        needs_repair:  "needs_repair",
+        in_repair:     "sent_to_repair",
+        retired:       "retired",
+        checked_out:   "checked_out",
       };
       const event_type = eventTypeMap[newStatus] || "note";
       const res = await apiFetch("/api/inventory-event", {
         method: "POST",
         body: JSON.stringify({
-          item_id: id, event_type,
+          item_id: id,
+          event_type,
           note: `Status manually set to "${STATUS_META[newStatus]?.label || newStatus}" via quick update`,
           _force_status: newStatus,
         }),
@@ -258,16 +287,6 @@ export default function InventoryDetail() {
       await load();
       setEditingLocation(false);
     } catch { } finally { setLocationSaving(false); }
-  }
-
-  useEffect(() => { if (id) { void load(); void loadLinkedTickets(); } }, [id]);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const res = await apiFetch(`/api/inventory-get?id=${id}`);
-      if (res.ok) { setItem(res.item); setEvents(res.events || []); setStats(res.stats || null); }
-    } finally { setLoading(false); }
   }
 
   function openAction(type: string) {
@@ -298,8 +317,18 @@ export default function InventoryDetail() {
   const availableActions = EVENT_ACTIONS.filter(a => !a.statusFilter || a.statusFilter.includes(item.status));
   const selectedAction = EVENT_ACTIONS.find(a => a.event_type === actionType);
 
-  // Primary display ID: serial_number if set, otherwise asset_tag
+  // Primary display ID: serial number if set, otherwise asset tag
   const displayId = item.serial_number || item.asset_tag;
+
+  // Linked tickets — derived from events[].linked_ticket (already enriched by inventory-get.ts)
+  const linkedTickets: any[] = [];
+  const seenIds = new Set<string>();
+  for (const ev of events) {
+    if (ev.linked_ticket && !seenIds.has(ev.linked_ticket.id)) {
+      seenIds.add(ev.linked_ticket.id);
+      linkedTickets.push(ev.linked_ticket);
+    }
+  }
 
   return (
     <div className="page fade-up">
@@ -309,10 +338,9 @@ export default function InventoryDetail() {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
         <div>
           <div className="page-title">{item.name}</div>
-          {/* Show serial # as primary sub-ID; show asset tag underneath if different */}
           <div style={{ fontFamily: "monospace", fontSize: 12, color: "var(--muted2)", marginTop: 2 }}>{displayId}</div>
           {item.serial_number && item.asset_tag && item.serial_number !== item.asset_tag && (
-            <div style={{ fontFamily: "monospace", fontSize: 10, color: "var(--muted2)", opacity: 0.6, marginTop: 1 }}>Tag: {item.asset_tag}</div>
+            <div style={{ fontFamily: "monospace", fontSize: 11, color: "var(--muted2)", opacity: 0.6 }}>{item.asset_tag}</div>
           )}
         </div>
         <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 12px", borderRadius: 99, flexShrink: 0, alignSelf: "flex-start", color: sm.color, background: sm.bg, border: `1px solid ${sm.color}44` }}>
@@ -324,10 +352,10 @@ export default function InventoryDetail() {
       {stats && (
         <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
           {[
-            { label: "Events", value: stats.totalEvents },
+            { label: "Events",         value: stats.totalEvents },
             { label: "Times Repaired", value: stats.timesInRepair },
             { label: "Times Deployed", value: stats.timesDeployed },
-            { label: "Work Orders", value: stats.linkedTicketCount },
+            { label: "Work Orders",    value: stats.linkedTicketCount },
           ].map(s => (
             <div key={s.label} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "6px 12px", textAlign: "center", flex: "1 1 auto" }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{s.value}</div>
@@ -353,72 +381,90 @@ export default function InventoryDetail() {
         ))}
       </div>
 
-      {saveError && (
-        <div style={{ marginBottom: 10, padding: "8px 12px", background: "var(--danger-bg)", border: "1px solid rgba(255,84,84,0.3)", borderRadius: 8, fontSize: 12, color: "#FFB0B0" }}>
-          ⚠ {saveError}
-        </div>
-      )}
-
       {/* ── OVERVIEW TAB ── */}
       {activeTab === "overview" && (
         <>
           <div className="card" style={{ padding: 16, marginBottom: 10 }}>
-            {/* Editable fields grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 16px" }}>
+            {saveError && (
+              <div style={{ fontSize: 12, color: "#FFB0B0", marginBottom: 10, padding: "7px 10px", background: "rgba(248,113,113,0.1)", borderRadius: 6, border: "1px solid rgba(248,113,113,0.2)" }}>
+                ⚠ {saveError}
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 16px" }}>
+
+              {/* Serial # — inline editable, shown prominently */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <InlineField
+                  label="Serial #"
+                  value={item.serial_number}
+                  mono
+                  onSave={val => patchItem({ serial_number: val })}
+                />
+              </div>
+
+              {/* Category — dropdown */}
               <InlineCategoryField
-                value={item.category_name || ""}
-                onSave={async v => { await patchItem({ category_name: v }); }}
+                value={item.category_name}
+                onSave={val => patchItem({ category_name: val })}
               />
+
+              {/* Manufacturer */}
               <InlineField
                 label="Manufacturer"
-                value={item.manufacturer || ""}
-                onSave={async v => { await patchItem({ manufacturer: v }); }}
+                value={item.manufacturer}
+                onSave={val => patchItem({ manufacturer: val })}
               />
-              <InlineField
-                label="Model"
-                value={item.model || ""}
-                onSave={async v => { await patchItem({ model: v }); }}
-              />
-              <InlineField
-                label="Serial #"
-                value={item.serial_number || ""}
-                monospace
-                onSave={async v => { await patchItem({ serial_number: v }); }}
-              />
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)", marginBottom: 2 }}>Added</div>
-                <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
-                  {item.created_at ? fmtDateShort(item.created_at) : <span style={{ color: "var(--muted2)" }}>Unknown</span>}
-                </div>
-              </div>
-            </div>
 
-            {/* Location — inline editable */}
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Location</div>
-                {!editingLocation && (
-                  <button type="button" onClick={() => { setLocationDraft(item.location || ""); setEditingLocation(true); }}
-                    style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "1px 5px", borderRadius: 4, textDecoration: "underline" }}>
-                    edit
-                  </button>
-                )}
+              {/* Model */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <InlineField
+                  label="Model"
+                  value={item.model}
+                  onSave={val => patchItem({ model: val })}
+                />
               </div>
-              {editingLocation ? (
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input className="input" value={locationDraft} onChange={e => setLocationDraft(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") void saveLocation(); if (e.key === "Escape") setEditingLocation(false); }}
-                    placeholder="Enter new location…" autoFocus style={{ flex: 1, fontSize: 13 }} />
-                  <button type="button" className="btn primary small" onClick={saveLocation} disabled={locationSaving || !locationDraft.trim()}>
-                    {locationSaving ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Save"}
-                  </button>
-                  <button type="button" className="btn small" onClick={() => setEditingLocation(false)}>✕</button>
-                </div>
-              ) : (
-                <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
-                  {item.location || <span style={{ color: "var(--muted2)" }}>Not set</span>}
+
+              {/* Added date — read only */}
+              {item.created_at && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Added</div>
+                  <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>{fmtDateShort(item.created_at)}</div>
                 </div>
               )}
+
+              {/* Asset tag — read only */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Asset Tag</div>
+                <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2, fontFamily: "monospace" }}>{item.asset_tag}</div>
+              </div>
+
+              {/* Location — inline editable */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Location</div>
+                  {!editingLocation && (
+                    <button type="button" onClick={() => { setLocationDraft(item.location || ""); setEditingLocation(true); }}
+                      style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "1px 5px", borderRadius: 4, textDecoration: "underline" }}>
+                      edit
+                    </button>
+                  )}
+                </div>
+                {editingLocation ? (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input className="input" value={locationDraft} onChange={e => setLocationDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") void saveLocation(); if (e.key === "Escape") setEditingLocation(false); }}
+                      placeholder="Enter new location…" autoFocus style={{ flex: 1, fontSize: 13 }} />
+                    <button type="button" className="btn primary small" onClick={saveLocation} disabled={locationSaving || !locationDraft.trim()}>
+                      {locationSaving ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Save"}
+                    </button>
+                    <button type="button" className="btn small" onClick={() => setEditingLocation(false)}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
+                    {item.location || <span style={{ color: "var(--muted2)" }}>Not set</span>}
+                  </div>
+                )}
+              </div>
             </div>
 
             {item.status === "checked_out" && (
@@ -431,6 +477,12 @@ export default function InventoryDetail() {
               <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: 8, background: "rgba(129,140,248,0.08)", border: "1px solid rgba(129,140,248,0.2)" }}>
                 <div style={{ fontSize: 12, color: "#c7d2fe", fontWeight: 600 }}>🔧 Deployed to {item.deployed_to}</div>
                 {item.deployed_by_name && <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2 }}>By {item.deployed_by_name} · {item.deployed_at ? fmtDate(item.deployed_at) : ""}{item.deployed_at ? ` · ${daysSince(item.deployed_at)} days in field` : ""}</div>}
+              </div>
+            )}
+            {item.status === "needs_repair" && (
+              <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: 8, background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.2)" }}>
+                <div style={{ fontSize: 12, color: "#fb923c", fontWeight: 600 }}>⚠️ Flagged — needs repair</div>
+                <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2 }}>Use "Send to Repair" when it's ready to hand off.</div>
               </div>
             )}
             {item.notes && <div style={{ marginTop: 10, fontSize: 12, color: "var(--muted)", borderTop: "1px solid var(--border)", paddingTop: 10, lineHeight: 1.5 }}>{item.notes}</div>}
@@ -533,6 +585,7 @@ export default function InventoryDetail() {
                 const em = EVENT_META[ev.event_type] || { label: ev.event_type, icon: "•", color: "#9ca3af" };
                 return (
                   <div key={ev.id} style={{ display: "flex", gap: 12, paddingBottom: i < events.length - 1 ? 14 : 0, marginBottom: i < events.length - 1 ? 14 : 0, borderBottom: i < events.length - 1 ? "1px solid var(--border)" : "none" }}>
+                    {/* Timeline dot */}
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
                       <div style={{ width: 28, height: 28, borderRadius: "50%", background: `${em.color}22`, border: `1px solid ${em.color}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>{em.icon}</div>
                       {i < events.length - 1 && <div style={{ width: 1, flex: 1, background: "rgba(255,255,255,0.06)", marginTop: 4 }} />}
@@ -583,6 +636,8 @@ export default function InventoryDetail() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {linkedTickets.map((t: any) => {
                 const statusColor = TICKET_STATUS_COLORS[t.status] || "#6b7280";
+                // Find which events reference this ticket
+                const relatedEvents = events.filter(e => e.linked_ticket_id === t.id);
                 return (
                   <Link key={t.id} to={`/tickets/${t.id}`} style={{ textDecoration: "none" }}>
                     <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer" }}
@@ -599,9 +654,9 @@ export default function InventoryDetail() {
                         {t.category && <span style={{ marginLeft: 8 }}>· {t.category}</span>}
                         {t.created_at && <span style={{ marginLeft: 8 }}>· {fmtDateShort(t.created_at)}</span>}
                       </div>
-                      {t.events?.length > 0 && (
+                      {relatedEvents.length > 0 && (
                         <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                          {t.events.map((ev: any) => {
+                          {relatedEvents.map(ev => {
                             const em = EVENT_META[ev.event_type] || { label: ev.event_type, icon: "•", color: "#9ca3af" };
                             return (
                               <span key={ev.id} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 99, background: `${em.color}18`, color: em.color, border: `1px solid ${em.color}33` }}>
