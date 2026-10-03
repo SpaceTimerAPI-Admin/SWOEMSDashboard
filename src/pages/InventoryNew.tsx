@@ -1,5 +1,5 @@
-import React, { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import BarcodeInput from "../components/BarcodeInput";
 
 const CATEGORIES = ["Lighting", "Sound", "Video", "Rides", "Other"];
@@ -91,8 +91,12 @@ function CameraButton({ onScan }: { onScan: (val: string) => void }) {
 
 export default function InventoryNew() {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromTicket = searchParams.get("from") || null; // e.g. "/tickets/abc123"
+  const prefillSerial = searchParams.get("serial") || "";
+
   const [name, setName]             = useState("");
-  const [serial, setSerial]         = useState("");
+  const [serial, setSerial]         = useState(prefillSerial);
   const [category, setCategory]     = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel]           = useState("");
@@ -103,14 +107,12 @@ export default function InventoryNew() {
   const [error, setError]           = useState<string | null>(null);
   const serialRef = useRef<HTMLInputElement>(null);
 
-  // Barcode scanner — many scanners act as keyboard input followed by Enter
-  function onSerialKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      // Move focus to name if empty
-      if (!name) document.getElementById("inv-name")?.focus();
+  // Focus name field when arriving from a ticket (serial already pre-filled)
+  useEffect(() => {
+    if (prefillSerial) {
+      setTimeout(() => document.getElementById("inv-name")?.focus(), 100);
     }
-  }
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,17 +127,31 @@ export default function InventoryNew() {
         body: JSON.stringify({ name, serial_number: serial, category_name: category, manufacturer, model, location, vendor, notes }),
       });
       if (!res.ok) throw new Error(res.error || "Failed to create");
-      nav(`/inventory/${res.item.id}`);
+      const newItemId = res.item?.id;
+      if (fromTicket && newItemId) {
+        // Return to the originating work order with the new item ID so it can be auto-attached
+        nav(`${fromTicket}?linked_item=${newItemId}`);
+      } else {
+        nav(`/inventory/${newItemId}`);
+      }
     } catch (err: any) {
       setError(err?.message || "Failed to create item");
     } finally { setSaving(false); }
   }
 
+  const backLabel = fromTicket ? "← Work Order" : "← Inventory";
+
   return (
     <div className="page fade-up">
-      <div className="back-link" style={{ cursor: "pointer" }} onClick={() => nav(-1)}>← Inventory</div>
+      <div className="back-link" style={{ cursor: "pointer" }} onClick={() => nav(fromTicket || -1 as any)}>{backLabel}</div>
       <div className="page-title">Add Inventory Item</div>
-      <div className="page-subtitle">Leave serial number blank to auto-generate an asset tag.</div>
+      {fromTicket ? (
+        <div className="page-subtitle" style={{ color: "#818cf8" }}>
+          Adding item from work order — you'll be returned automatically once saved.
+        </div>
+      ) : (
+        <div className="page-subtitle">Leave serial number blank to auto-generate an asset tag.</div>
+      )}
 
       <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {/* Serial / barcode — first so scanner workflow works */}
@@ -152,8 +168,12 @@ export default function InventoryNew() {
               autoFocus
               onEnter={() => document.getElementById("inv-name")?.focus()}
             />
-            <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 5 }}>
-              {serial ? `Will use: ${serial}` : "No serial? An asset tag (SWO-2026-XXXX) will be generated automatically"}
+            <div style={{ fontSize: 11, color: prefillSerial && serial === prefillSerial ? "#818cf8" : "var(--muted2)", marginTop: 5 }}>
+              {serial
+                ? (prefillSerial && serial === prefillSerial
+                    ? `✓ Pre-filled from work order scan: ${serial}`
+                    : `Will use: ${serial}`)
+                : "No serial? An asset tag (SWO-2026-XXXX) will be generated automatically"}
             </div>
           </label>
         </div>

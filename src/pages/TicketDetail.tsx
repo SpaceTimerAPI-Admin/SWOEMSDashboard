@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   addTicketComment,
   assignTicket,
@@ -27,6 +27,7 @@ function pickData(res: any) {
 export default function TicketDetail() {
   const { id } = useParams();
   const nav = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const ticketId = id || "";
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
@@ -41,48 +42,7 @@ export default function TicketDetail() {
   const [commentError, setCommentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Inventory attachment
-  const [showInvAttach, setShowInvAttach]     = useState(false);
-  const [invSerial, setInvSerial]             = useState("");
-  const [invLookup, setInvLookup]             = useState<any>(null); // null=none, false=not found, obj=found
-  const [invLooking, setInvLooking]           = useState(false);
-  const [invNote, setInvNote]                 = useState("");
-  const [invSaving, setInvSaving]             = useState(false);
-  const [invError, setInvError]               = useState<string | null>(null);
-  const [attachedItems, setAttachedItems]     = useState<any[]>([]);
-
-  async function lookupInvSerial() {
-    if (!invSerial.trim()) return;
-    setInvLooking(true); setInvLookup(null); setInvError(null);
-    try {
-      const token = localStorage.getItem("md_session_token") || "";
-      const res = await fetch(`/api/inventory-lookup?serial=${encodeURIComponent(invSerial.trim())}`, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      setInvLookup(data.found ? data.item : false);
-    } finally { setInvLooking(false); }
-  }
-
-  async function attachInventoryItem() {
-    if (!invLookup || invLookup === false) return;
-    setInvSaving(true); setInvError(null);
-    try {
-      const token = localStorage.getItem("md_session_token") || "";
-      await fetch("/api/inventory-event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          item_id: invLookup.id,
-          event_type: "note",
-          note: invNote.trim() || `Referenced on work order: ${ticket?.title || ticketId}`,
-          linked_ticket_id: ticketId,
-        }),
-      });
-      setAttachedItems(prev => [...prev, { ...invLookup, note: invNote }]);
-      setInvSerial(""); setInvLookup(null); setInvNote(""); setShowInvAttach(false);
-    } catch (e: any) { setInvError(e?.message || "Failed to attach"); } finally { setInvSaving(false); }
-  }
-
-  // Hardware replacement tracking on close
+  // Hardware deployment tracking on close
   type HwItem = {
     serial: string;
     lookupResult: any;   // null=not looked up, false=not found, object=found
@@ -92,9 +52,8 @@ export default function TicketDetail() {
     looking: boolean;
   };
   const emptyHw = (): HwItem => ({ serial: "", lookupResult: null, name: "", model: "", manufacturer: "", looking: false });
-  const [hwInvolved, setHwInvolved]   = useState<"replaced" | "new_install" | "no_change" | null>(null);
-  const [hwItems, setHwItems]         = useState<HwItem[]>([emptyHw()]); // new hardware installed
-  const [removedItems, setRemovedItems] = useState<HwItem[]>([emptyHw()]); // old hardware taken out
+  const [hwInvolved, setHwInvolved] = useState<"yes" | "no" | null>(null);
+  const [hwItems, setHwItems]       = useState<HwItem[]>([emptyHw()]);
 
   // Due date editing
   const [editingDue, setEditingDue] = useState(false);
@@ -155,6 +114,8 @@ export default function TicketDetail() {
     }
   }
 
+  const [linkedItemBanner, setLinkedItemBanner] = useState<string | null>(null);
+
   useEffect(() => {
     if (ticketId) {
       void load();
@@ -164,6 +125,34 @@ export default function TicketDetail() {
       });
     }
   }, [ticketId]);
+
+  // Auto-attach inventory item returned from /inventory/new
+  useEffect(() => {
+    const linkedItem = searchParams.get("linked_item");
+    if (!linkedItem || !ticketId) return;
+    // Clear the param from the URL immediately so a refresh doesn't re-trigger
+    setSearchParams(prev => { const n = new URLSearchParams(prev); n.delete("linked_item"); return n; }, { replace: true });
+
+    const token = localStorage.getItem("md_session_token") || localStorage.getItem("swoems_token") || "";
+    fetch("/api/inventory-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        item_id: linkedItem,
+        event_type: "note",
+        linked_ticket_id: ticketId,
+        note: "Linked from work order",
+      }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res.ok) {
+          setLinkedItemBanner(`✓ Inventory item linked to this work order.`);
+          setTimeout(() => setLinkedItemBanner(null), 5000);
+        }
+      })
+      .catch(() => {});
+  }, [ticketId, searchParams]);
 
   const photos = useMemo(() => {
     const arr = ticket?.photos || [];
@@ -189,72 +178,52 @@ export default function TicketDetail() {
     setHwItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
   }
 
-  function updateRemovedItem(idx: number, patch: Partial<HwItem>) {
-    setRemovedItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
-  }
-
   async function lookupHwSerial(idx: number) {
     const serial = hwItems[idx]?.serial.trim();
     if (!serial) return;
     updateHwItem(idx, { looking: true });
     try {
       const token = localStorage.getItem("md_session_token") || "";
-      const res = await fetch(`/api/inventory-lookup?serial=${encodeURIComponent(serial)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/inventory-lookup?serial=${encodeURIComponent(serial)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
-      updateHwItem(idx, { looking: false, lookupResult: data.found ? data.item : false, name: data.found ? (data.item?.name || "") : "" });
-    } catch { updateHwItem(idx, { looking: false, lookupResult: false }); }
-  }
-
-  async function lookupRemovedSerial(idx: number) {
-    const serial = removedItems[idx]?.serial.trim();
-    if (!serial) return;
-    updateRemovedItem(idx, { looking: true });
-    try {
-      const token = localStorage.getItem("md_session_token") || "";
-      const res = await fetch(`/api/inventory-lookup?serial=${encodeURIComponent(serial)}`, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      updateRemovedItem(idx, { looking: false, lookupResult: data.found ? data.item : false, name: data.found ? (data.item?.name || "") : "" });
-    } catch { updateRemovedItem(idx, { looking: false, lookupResult: false }); }
+      updateHwItem(idx, {
+        looking: false,
+        lookupResult: data.found ? data.item : false,
+        name: data.found ? (data.item?.name || "") : "",
+      });
+    } catch {
+      updateHwItem(idx, { looking: false, lookupResult: false });
+    }
   }
 
   async function confirmClose() {
     const trimmed = resolution.trim();
     if (!trimmed) { setResolutionError("Please enter a resolution note."); return; }
-    if (hwInvolved === null) { setResolutionError("Please answer whether hardware was changed."); return; }
-    if (hwInvolved === "replaced" || hwInvolved === "new_install") {
+    if (hwInvolved === null) { setResolutionError("Please answer whether hardware was deployed."); return; }
+    if (hwInvolved === "yes") {
       for (let i = 0; i < hwItems.length; i++) {
         const hw = hwItems[i];
-        if (!hw.serial.trim()) { setResolutionError(`New item ${i + 1}: Serial number required.`); return; }
-        if (hw.lookupResult === null) { setResolutionError(`New item ${i + 1}: Please look up the serial number first.`); return; }
-        if (hw.lookupResult === false && !hw.name.trim()) { setResolutionError(`New item ${i + 1}: Name required for new item.`); return; }
-      }
-    }
-    if (hwInvolved === "replaced") {
-      for (let i = 0; i < removedItems.length; i++) {
-        const hw = removedItems[i];
-        if (!hw.serial.trim()) { setResolutionError(`Removed item ${i + 1}: Serial number required.`); return; }
-        if (hw.lookupResult === null) { setResolutionError(`Removed item ${i + 1}: Please look up the serial number first.`); return; }
-        if (hw.lookupResult === false && !hw.name.trim()) { setResolutionError(`Removed item ${i + 1}: Name required — item not in inventory yet.`); return; }
+        if (!hw.serial.trim()) { setResolutionError(`Item ${i + 1}: Serial number required.`); return; }
+        if (hw.lookupResult === null) { setResolutionError(`Item ${i + 1}: Please look up the serial number first.`); return; }
+        if (hw.lookupResult === false && !hw.name.trim()) { setResolutionError(`Item ${i + 1}: Name required for new item.`); return; }
       }
     }
     setBusy(true); setResolutionError(null);
     try {
       let resolutionComment = `Resolution: ${trimmed}`;
-      if (hwInvolved === "replaced") {
-        resolutionComment += `\n\nHardware replaced:`;
-        resolutionComment += `\n  Removed: ` + removedItems.map(hw => `${hw.serial.trim()}${hw.name ? ` — ${hw.name}` : ""}`).join(", ");
-        resolutionComment += `\n  Installed: ` + hwItems.map(hw => `${hw.serial.trim()}${hw.name ? ` — ${hw.name}` : ""}`).join(", ");
-      } else if (hwInvolved === "new_install") {
-        resolutionComment += `\n\nNew hardware installed:\n` +
+      if (hwInvolved === "yes" && hwItems.length > 0) {
+        resolutionComment += `\n\nHardware deployed (${hwItems.length}):\n` +
           hwItems.map((hw, i) => `  ${i + 1}. ${hw.serial.trim()}${hw.name ? ` — ${hw.name}` : ""}`).join("\n");
       }
       await addTicketComment({ id: ticketId, comment: resolutionComment });
       const res: any = await closeTicket(ticketId);
       if (!res?.ok) throw new Error(res?.error || "Failed to close work order");
 
-      if (hwInvolved === "replaced" || hwInvolved === "new_install") {
+      // Log inventory event for each hardware item
+      if (hwInvolved === "yes") {
         const token = localStorage.getItem("md_session_token") || "";
-        // Log deployed event for new hardware
         for (const hw of hwItems) {
           if (!hw.serial.trim()) continue;
           await fetch("/api/inventory-event", {
@@ -264,7 +233,7 @@ export default function TicketDetail() {
               item_id: hw.lookupResult && hw.lookupResult !== false ? hw.lookupResult.id : null,
               event_type: "deployed",
               location: ticket?.location || "",
-              note: `${hwInvolved === "replaced" ? "Replacement install" : "New install"} via work order: ${ticket?.title || ticketId}`,
+              note: `Deployed via work order: ${ticket?.title || ticketId}`,
               linked_ticket_id: ticketId,
               create_if_missing: hw.lookupResult === false,
               new_item_serial: hw.serial.trim(),
@@ -274,34 +243,11 @@ export default function TicketDetail() {
             }),
           });
         }
-        // Log pulled event for removed hardware — create if missing
-        if (hwInvolved === "replaced") {
-          for (const hw of removedItems) {
-            if (!hw.serial.trim()) continue;
-            await fetch("/api/inventory-event", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-              body: JSON.stringify({
-                item_id: hw.lookupResult && hw.lookupResult !== false ? hw.lookupResult.id : null,
-                event_type: "pulled",
-                location: "Shop",
-                note: `Replaced via work order: ${ticket?.title || ticketId}`,
-                linked_ticket_id: ticketId,
-                create_if_missing: hw.lookupResult === false,
-                new_item_serial: hw.serial.trim(),
-                new_item_name: hw.name.trim(),
-                new_item_model: hw.model.trim() || undefined,
-                new_item_manufacturer: hw.manufacturer.trim() || undefined,
-              }),
-            });
-          }
-        }
       }
 
       setShowCloseModal(false);
       setHwInvolved(null);
       setHwItems([emptyHw()]);
-      setRemovedItems([emptyHw()]);
       await load();
     } catch (e: any) {
       setResolutionError(e?.message || String(e));
@@ -361,6 +307,12 @@ export default function TicketDetail() {
 
       {loading && <div className="muted">Loading…</div>}
       {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
+
+      {linkedItemBanner && (
+        <div style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.3)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#6ee7b7", fontWeight: 600 }}>
+          {linkedItemBanner}
+        </div>
+      )}
 
       {!loading && ticket && (
         <>
@@ -515,72 +467,6 @@ export default function TicketDetail() {
             </div>
           )}
 
-          {/* Inventory attachment */}
-          <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: attachedItems.length > 0 || showInvAttach ? 10 : 0 }}>
-              <div className="detail-label">📦 Inventory</div>
-              {!showInvAttach && (
-                <button className="btn small" onClick={() => { setShowInvAttach(true); setInvSerial(""); setInvLookup(null); setInvNote(""); setInvError(null); }}>
-                  + Attach Item
-                </button>
-              )}
-            </div>
-
-            {/* Already attached this session */}
-            {attachedItems.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: showInvAttach ? 10 : 0 }}>
-                {attachedItems.map((item, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(129,140,248,0.08)", border: "1px solid rgba(129,140,248,0.2)" }}>
-                    <span style={{ fontSize: 14 }}>📦</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                      <div style={{ fontSize: 10, color: "var(--muted2)", fontFamily: "monospace" }}>{item.asset_tag}</div>
-                    </div>
-                    <Link to={`/inventory/${item.id}`} style={{ fontSize: 11, color: "#818cf8", textDecoration: "none", flexShrink: 0 }}>View →</Link>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Attach form */}
-            {showInvAttach && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <BarcodeInput value={invSerial} onChange={val => { setInvSerial(val); setInvLookup(null); }} placeholder="Scan or type serial number…" onEnter={lookupInvSerial} />
-                {invSerial.trim() && (
-                  <button type="button" className="btn small" onClick={lookupInvSerial} disabled={invLooking} style={{ width: "100%" }}>
-                    {invLooking ? <><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Looking up…</> : "Look up"}
-                  </button>
-                )}
-                {invLookup && invLookup !== false && (
-                  <div style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 8, padding: "9px 12px" }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#6ee7b7" }}>✓ {invLookup.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2 }}>{invLookup.status?.replace("_"," ")} · {invLookup.location}</div>
-                    <input className="input" style={{ marginTop: 8 }} value={invNote} onChange={e => setInvNote(e.target.value)} placeholder="Optional note (e.g. fixture that failed, spare used)…" />
-                    {invError && <div style={{ fontSize: 12, color: "#FFB0B0", marginTop: 6 }}>⚠ {invError}</div>}
-                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                      <button type="button" className="btn primary small" onClick={attachInventoryItem} disabled={invSaving}>
-                        {invSaving ? <span className="spinner" /> : "Attach to Ticket"}
-                      </button>
-                      <button type="button" className="btn small" onClick={() => setShowInvAttach(false)}>Cancel</button>
-                    </div>
-                  </div>
-                )}
-                {invLookup === false && (
-                  <div style={{ fontSize: 12, color: "#fcd34d" }}>
-                    ⚠ Serial not found. <Link to="/inventory/new" style={{ color: "#c7d2fe" }}>Add to inventory first →</Link>
-                  </div>
-                )}
-                {invLookup === null && !invSerial.trim() && (
-                  <button type="button" className="btn small" style={{ alignSelf: "flex-start" }} onClick={() => setShowInvAttach(false)}>Cancel</button>
-                )}
-              </div>
-            )}
-
-            {attachedItems.length === 0 && !showInvAttach && (
-              <div style={{ fontSize: 12, color: "var(--muted2)" }}>No inventory items attached to this work order.</div>
-            )}
-          </div>
-
           <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
             <div className="detail-label" style={{ marginBottom: 8 }}>Add Update</div>
             <textarea
@@ -661,127 +547,79 @@ export default function TicketDetail() {
               {/* Hardware question */}
               <div style={{ marginTop: 14, padding: "12px 14px", background: "rgba(129,140,248,0.08)", border: "1px solid rgba(129,140,248,0.2)", borderRadius: 10 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#c7d2fe", marginBottom: 10 }}>
-                  📦 Did hardware get replaced or installed?
+                  📦 Was hardware deployed or installed?
                 </div>
-                <div style={{ display: "flex", gap: 6, marginBottom: hwInvolved && hwInvolved !== "no_change" ? 14 : 0 }}>
-                  {([
-                    ["replaced",   "🔄 Replaced"],
-                    ["new_install","✚ New Install"],
-                    ["no_change",  "✗ No Change"],
-                  ] as const).map(([v, label]) => (
-                    <button key={v} type="button"
-                      onClick={() => { setHwInvolved(v); setResolutionError(null); setHwItems([emptyHw()]); setRemovedItems([emptyHw()]); }}
-                      style={{ flex: 1, padding: "7px 4px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid", transition: "all 0.15s",
-                        background: hwInvolved === v ? (v === "no_change" ? "rgba(255,255,255,0.06)" : "rgba(129,140,248,0.2)") : "rgba(255,255,255,0.04)",
-                        borderColor: hwInvolved === v ? (v === "no_change" ? "rgba(255,255,255,0.15)" : "rgba(129,140,248,0.4)") : "rgba(255,255,255,0.08)",
-                        color: hwInvolved === v ? (v === "no_change" ? "#e5e7eb" : "#c7d2fe") : "#6b7280" }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: hwInvolved === "yes" ? 12 : 0 }}>
+                  {([["yes", "✓ Yes"], ["no", "✗ No"]] as const).map(([v, label]) => (
+                    <button key={v} type="button" onClick={() => { setHwInvolved(v); setResolutionError(null); if (v === "yes") setHwItems([emptyHw()]); }}
+                      style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1px solid", transition: "all 0.15s",
+                        background: hwInvolved === v ? (v === "yes" ? "rgba(129,140,248,0.2)" : "rgba(255,255,255,0.06)") : "rgba(255,255,255,0.04)",
+                        borderColor: hwInvolved === v ? (v === "yes" ? "rgba(129,140,248,0.4)" : "rgba(255,255,255,0.15)") : "rgba(255,255,255,0.08)",
+                        color: hwInvolved === v ? (v === "yes" ? "#c7d2fe" : "#e5e7eb") : "#6b7280" }}>
                       {label}
                     </button>
                   ))}
                 </div>
 
-                {/* REPLACED — show both removed and new */}
-                {hwInvolved === "replaced" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#f87171", marginBottom: 8 }}>✖ Old Hardware (Being Removed)</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {removedItems.map((hw, idx) => (
-                          <div key={idx} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "10px 12px", border: "1px solid rgba(248,113,113,0.15)" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>Item {idx + 1}</div>
-                              {removedItems.length > 1 && <button type="button" onClick={() => setRemovedItems(prev => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>}
-                            </div>
-                            <BarcodeInput value={hw.serial} onChange={val => updateRemovedItem(idx, { serial: val, lookupResult: null, name: "" })} placeholder="Scan or type old item serial…" onEnter={() => lookupRemovedSerial(idx)} />
-                            {hw.serial.trim() && (
-                              <button type="button" onClick={() => lookupRemovedSerial(idx)} disabled={hw.looking || !hw.serial.trim()} className="btn small" style={{ marginTop: 8, width: "100%" }}>
-                                {hw.looking ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Look up"}
-                              </button>
-                            )}
-                            {hw.lookupResult && hw.lookupResult !== false && <div style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 7, padding: "7px 10px", fontSize: 12, color: "#fca5a5", marginTop: 6 }}>✓ Found: <strong>{hw.lookupResult.name}</strong> — will be marked pulled from {hw.lookupResult.location}</div>}
-                            {hw.lookupResult === false && (
-                              <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 7, padding: "9px 10px", marginTop: 6 }}>
-                                <div style={{ fontSize: 11, color: "#fcd34d", marginBottom: 6 }}>⚠ Not in inventory — add it so we can track it:</div>
-                                <input className="input" value={hw.name} onChange={e => updateRemovedItem(idx, { name: e.target.value })} placeholder="Item name (required)" style={{ marginBottom: 6 }} />
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <input className="input" value={hw.manufacturer} onChange={e => updateRemovedItem(idx, { manufacturer: e.target.value })} placeholder="Manufacturer" style={{ flex: 1 }} />
-                                  <input className="input" value={hw.model} onChange={e => updateRemovedItem(idx, { model: e.target.value })} placeholder="Model" style={{ flex: 1 }} />
-                                </div>
-                              </div>
-                            )}
+                {hwInvolved === "yes" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {hwItems.map((hw, idx) => (
+                      <div key={idx} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "10px 12px", border: "1px solid rgba(255,255,255,0.07)" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6b7280" }}>
+                            Item {idx + 1}
                           </div>
-                        ))}
-                        <button type="button" onClick={() => setRemovedItems(prev => [...prev, emptyHw()])} style={{ background: "rgba(248,113,113,0.06)", border: "1px dashed rgba(248,113,113,0.3)", borderRadius: 8, color: "#f87171", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px", width: "100%" }}>+ Add Another</button>
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6ee7b7", marginBottom: 8 }}>✚ New Hardware (Being Installed)</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {hwItems.map((hw, idx) => (
-                          <div key={idx} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "10px 12px", border: "1px solid rgba(52,211,153,0.15)" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>Item {idx + 1}</div>
-                              {hwItems.length > 1 && <button type="button" onClick={() => setHwItems(prev => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>}
-                            </div>
-                            <BarcodeInput value={hw.serial} onChange={val => updateHwItem(idx, { serial: val, lookupResult: null, name: "" })} placeholder="Scan or type new item serial…" onEnter={() => lookupHwSerial(idx)} />
-                            <button type="button" onClick={() => lookupHwSerial(idx)} disabled={hw.looking || !hw.serial.trim()} className="btn small" style={{ marginTop: 8, width: "100%" }}>
-                              {hw.looking ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Look up"}
-                            </button>
-                            {hw.lookupResult && hw.lookupResult !== false && <div style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 7, padding: "7px 10px", fontSize: 12, color: "#6ee7b7", marginTop: 6 }}>✓ Found: <strong>{hw.lookupResult.name}</strong> — {hw.lookupResult.status?.replace("_", " ")} · {hw.lookupResult.location}</div>}
-                            {hw.lookupResult === false && (
-                              <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 7, padding: "9px 10px", marginTop: 6 }}>
-                                <div style={{ fontSize: 11, color: "#fcd34d", marginBottom: 6 }}>⚠ Not in inventory — add it:</div>
-                                <input className="input" value={hw.name} onChange={e => updateHwItem(idx, { name: e.target.value })} placeholder="Item name (required)" style={{ marginBottom: 6 }} />
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <input className="input" value={hw.manufacturer} onChange={e => updateHwItem(idx, { manufacturer: e.target.value })} placeholder="Manufacturer" style={{ flex: 1 }} />
-                                  <input className="input" value={hw.model} onChange={e => updateHwItem(idx, { model: e.target.value })} placeholder="Model" style={{ flex: 1 }} />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        <button type="button" onClick={() => setHwItems(prev => [...prev, emptyHw()])} style={{ background: "rgba(52,211,153,0.06)", border: "1px dashed rgba(52,211,153,0.3)", borderRadius: 8, color: "#6ee7b7", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px", width: "100%" }}>+ Add Another</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* NEW INSTALL — only new hardware */}
-                {hwInvolved === "new_install" && (
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6ee7b7", marginBottom: 8 }}>✚ New Hardware Being Installed</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {hwItems.map((hw, idx) => (
-                        <div key={idx} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "10px 12px", border: "1px solid rgba(52,211,153,0.15)" }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>Item {idx + 1}</div>
-                            {hwItems.length > 1 && <button type="button" onClick={() => setHwItems(prev => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>}
-                          </div>
-                          <BarcodeInput value={hw.serial} onChange={val => updateHwItem(idx, { serial: val, lookupResult: null, name: "" })} placeholder="Scan or type serial…" onEnter={() => lookupHwSerial(idx)} />
-                          <button type="button" onClick={() => lookupHwSerial(idx)} disabled={hw.looking || !hw.serial.trim()} className="btn small" style={{ marginTop: 8, width: "100%" }}>
-                            {hw.looking ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Look up"}
-                          </button>
-                          {hw.lookupResult && hw.lookupResult !== false && <div style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 7, padding: "7px 10px", fontSize: 12, color: "#6ee7b7", marginTop: 6 }}>✓ Found: <strong>{hw.lookupResult.name}</strong> — {hw.lookupResult.status?.replace("_", " ")} · {hw.lookupResult.location}</div>}
-                          {hw.lookupResult === false && (
-                            <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 7, padding: "9px 10px", marginTop: 6 }}>
-                              <div style={{ fontSize: 11, color: "#fcd34d", marginBottom: 6 }}>⚠ Not in inventory — add it:</div>
-                              <input className="input" value={hw.name} onChange={e => updateHwItem(idx, { name: e.target.value })} placeholder="Item name (required)" style={{ marginBottom: 6 }} />
-                              <div style={{ display: "flex", gap: 6 }}>
-                                <input className="input" value={hw.manufacturer} onChange={e => updateHwItem(idx, { manufacturer: e.target.value })} placeholder="Manufacturer" style={{ flex: 1 }} />
-                                <input className="input" value={hw.model} onChange={e => updateHwItem(idx, { model: e.target.value })} placeholder="Model" style={{ flex: 1 }} />
-                              </div>
-                            </div>
+                          {hwItems.length > 1 && (
+                            <button type="button" onClick={() => setHwItems(prev => prev.filter((_, i) => i !== idx))}
+                              style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px" }}>×</button>
                           )}
                         </div>
-                      ))}
-                      <button type="button" onClick={() => setHwItems(prev => [...prev, emptyHw()])} style={{ background: "rgba(52,211,153,0.06)", border: "1px dashed rgba(52,211,153,0.3)", borderRadius: 8, color: "#6ee7b7", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px", width: "100%" }}>+ Add Another</button>
-                    </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <BarcodeInput
+                            value={hw.serial}
+                            onChange={val => updateHwItem(idx, { serial: val, lookupResult: null, name: "" })}
+                            placeholder="Type serial or tap Scan…"
+                            onEnter={() => lookupHwSerial(idx)}
+                          />
+                        </div>
+                        {hw.lookupResult && hw.lookupResult !== false && (
+                          <div style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 7, padding: "7px 10px", fontSize: 12, color: "#6ee7b7" }}>
+                            ✓ Found: <strong>{hw.lookupResult.name}</strong> — {hw.lookupResult.status?.replace("_", " ")} · {hw.lookupResult.location}
+                          </div>
+                        )}
+                        {hw.lookupResult === false && (
+                          <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 7, padding: "9px 10px" }}>
+                            <div style={{ fontSize: 11, color: "#fcd34d", marginBottom: 6 }}>⚠ Not in inventory</div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                              <span style={{ fontSize: 11, color: "#9ca3af" }}>Fill details below, or</span>
+                              <Link
+                                to={`/inventory/new?serial=${encodeURIComponent(hw.serial.trim())}&from=/tickets/${ticketId}`}
+                                style={{ fontSize: 11, color: "#818cf8", fontWeight: 600, textDecoration: "none" }}
+                              >
+                                Add to inventory first →
+                              </Link>
+                            </div>
+                            <input className="input" value={hw.name} onChange={e => updateHwItem(idx, { name: e.target.value })}
+                              placeholder="Item name (required)" style={{ marginBottom: 6 }} />
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <input className="input" value={hw.manufacturer} onChange={e => updateHwItem(idx, { manufacturer: e.target.value })} placeholder="Manufacturer" style={{ flex: 1 }} />
+                              <input className="input" value={hw.model} onChange={e => updateHwItem(idx, { model: e.target.value })} placeholder="Model" style={{ flex: 1 }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setHwItems(prev => [...prev, emptyHw()])}
+                      style={{ background: "rgba(129,140,248,0.08)", border: "1px dashed rgba(129,140,248,0.3)", borderRadius: 8, color: "#818cf8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px", width: "100%" }}>
+                      + Add Another Item
+                    </button>
                   </div>
                 )}
               </div>
+
               {resolutionError && <div className="error" style={{ marginTop: 8 }}>{resolutionError}</div>}
               <div className="btn-row" style={{ marginTop: 14 }}>
-                <button className="btn small" type="button" onClick={() => { setShowCloseModal(false); setHwInvolved(null); setHwItems([emptyHw()]); setRemovedItems([emptyHw()]); setResolutionError(null); setResolution(""); }} disabled={busy}>Cancel</button>
+                <button className="btn small" type="button" onClick={() => { setShowCloseModal(false); setHwInvolved(null); setHwItems([emptyHw()]); setResolutionError(null); }} disabled={busy}>Cancel</button>
                 <button className="btn primary small" type="button" onClick={confirmClose} disabled={busy}>
                   {busy ? <span className="spinner" /> : "Confirm close"}
                 </button>
