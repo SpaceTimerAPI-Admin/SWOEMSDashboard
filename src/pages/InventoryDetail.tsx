@@ -84,6 +84,41 @@ export default function InventoryDetail() {
   const [locationDraft, setLocationDraft]     = useState("");
   const [locationSaving, setLocationSaving]   = useState(false);
 
+  // Quick status update
+  const [statusSaving, setStatusSaving]   = useState(false);
+  const [statusError, setStatusError]     = useState<string | null>(null);
+
+  async function quickSetStatus(newStatus: string) {
+    setStatusSaving(true);
+    setStatusError(null);
+    try {
+      // Map status to the appropriate event type
+      const eventTypeMap: Record<string, string> = {
+        in_storage:  "pulled",
+        deployed:    "deployed",
+        in_repair:   "sent_to_repair",
+        retired:     "retired",
+        checked_out: "checked_out",
+      };
+      const event_type = eventTypeMap[newStatus] || "note";
+      const res = await apiFetch("/api/inventory-event", {
+        method: "POST",
+        body: JSON.stringify({
+          item_id: id,
+          event_type,
+          note: `Status manually set to "${STATUS_META[newStatus]?.label || newStatus}" via quick update`,
+          _force_status: newStatus,
+        }),
+      });
+      if (!res.ok) throw new Error(res.error || "Failed");
+      await load();
+    } catch (err: any) {
+      setStatusError(err?.message || "Failed to update status");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
   async function saveLocation() {
     if (!locationDraft.trim()) return;
     setLocationSaving(true);
@@ -252,6 +287,41 @@ export default function InventoryDetail() {
               </div>
             )}
             {item.notes && <div style={{ marginTop: 10, fontSize: 12, color: "var(--muted)", borderTop: "1px solid var(--border)", paddingTop: 10, lineHeight: 1.5 }}>{item.notes}</div>}
+          </div>
+
+          {/* Quick Status Update */}
+          <div className="card" style={{ padding: "12px 14px", marginBottom: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 10 }}>
+              ⚡ Quick Status Update
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              {Object.entries(STATUS_META).map(([status, meta]) => {
+                const isCurrent = item.status === status;
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    disabled={isCurrent || statusSaving}
+                    onClick={() => void quickSetStatus(status)}
+                    style={{
+                      padding: "6px 13px", borderRadius: 99, fontSize: 12, fontWeight: 600,
+                      cursor: isCurrent ? "default" : "pointer",
+                      border: `1px solid ${meta.color}${isCurrent ? "99" : "44"}`,
+                      background: isCurrent ? meta.bg : "rgba(255,255,255,0.04)",
+                      color: isCurrent ? meta.color : "var(--muted)",
+                      opacity: statusSaving && !isCurrent ? 0.5 : 1,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {statusSaving && !isCurrent ? <span className="spinner" style={{ width: 10, height: 10 }} /> : null}
+                    {isCurrent ? "✓ " : ""}{meta.label}
+                  </button>
+                );
+              })}
+            </div>
+            {statusError && (
+              <div style={{ fontSize: 12, color: "#FFB0B0", marginTop: 8 }}>⚠ {statusError}</div>
+            )}
           </div>
 
           {/* Quick action buttons */}

@@ -54,12 +54,13 @@ export const handler: Handler = async (event) => {
 
     if (error || !data) return json({ ok: false, error: error?.message || "No data returned" }, 500);
 
+    const entry = data!;
     return json({
       ok: true,
       entry: {
-        id: data.id,
-        note: data.note,
-        created_at: data.created_at,
+        id: entry.id,
+        note: entry.note,
+        created_at: entry.created_at,
         employee_name: DASHBOARD_NAME,
         employee_role: "ems",
       },

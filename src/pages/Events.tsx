@@ -42,6 +42,7 @@ export default function Events() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const dropInputRef = useRef<HTMLInputElement>(null);
   const [photoTargetId, setPhotoTargetId] = useState<string | null>(null);
+  const todayRef = useRef<HTMLDivElement>(null);
 
   // Upload modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -68,6 +69,15 @@ export default function Events() {
   }
 
   useEffect(() => { void load(monthOffset); }, [monthOffset]);
+
+  // Auto-scroll to today's date when events load for the current month
+  useEffect(() => {
+    if (!loading && monthOffset === 0 && todayRef.current) {
+      setTimeout(() => {
+        todayRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [loading, monthOffset]);
 
   function addFiles(files: FileList | File[]) {
     const pdfs = Array.from(files).filter(f => f.type === "application/pdf" || f.name.endsWith(".pdf"));
@@ -369,12 +379,12 @@ export default function Events() {
                         </div>
                         {/* Optional date override */}
                         {!isUploading && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <label style={{ fontSize: 11, color: "var(--muted2)", whiteSpace: "nowrap" }}>Override date:</label>
                             <input
                               type="date"
                               className="input"
-                              style={{ fontSize: 12, padding: "4px 8px", flex: "1 1 140px", minWidth: 0 }}
+                              style={{ fontSize: 12, padding: "4px 8px", flex: 1 }}
                               value={fileDateOverrides[i] || ""}
                               onChange={e => setFileDateOverrides(prev => { const n = [...prev]; n[i] = e.target.value; return n; })}
                             />
@@ -458,7 +468,7 @@ export default function Events() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([date, dayEvents]) => (
-            <div key={date}>
+            <div key={date} ref={isToday(date) ? todayRef : undefined}>
               <div style={{
                 fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em",
                 color: isToday(date) ? "#B0B8FF" : "var(--muted2)",

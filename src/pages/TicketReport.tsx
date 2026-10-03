@@ -104,10 +104,22 @@ function AnalysisSection({ text }: { text: string }) {
   );
 }
 
+const STATUSES = [
+  { value: "open",        label: "Open",        color: "#fcd34d" },
+  { value: "in_progress", label: "In Progress",  color: "#818cf8" },
+  { value: "closed",      label: "Closed",       color: "#6ee7b7" },
+  { value: "cancelled",   label: "Cancelled",    color: "#6b7280" },
+];
+
 export default function TicketReport() {
   const role = getRole();
-  const [search, setSearch] = useState("odyssey");
-  const [since, setSince] = useState("2026-05-25");
+  const [search, setSearch] = useState("");
+  const [since, setSince] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toLocaleDateString("en-CA");
+  });
+  const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set(["open", "in_progress"]));
   const [tickets, setTickets] = useState<any[]>([]);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -115,6 +127,15 @@ export default function TicketReport() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+
+  function toggleStatus(val: string) {
+    setStatusFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(val)) next.delete(val);
+      else next.add(val);
+      return next;
+    });
+  }
 
   if (role === "show_tech") {
     return (
@@ -128,7 +149,6 @@ export default function TicketReport() {
   }
 
   async function load() {
-    if (!search.trim()) return;
     setLoading(true);
     setAnalysisLoading(true);
     setError(null);
@@ -144,16 +164,11 @@ export default function TicketReport() {
       setHasLoaded(true);
       setLoading(false);
 
-      // Phase 2 — POST ticket data to backend, backend only runs AI (no DB re-query)
+      // Phase 2 — call Claude directly from the browser (no Netlify timeout)
       if ((ticketsRes.tickets || []).length > 0) {
         try {
-          const analysisRes = await fetchAnalysis(ticketsRes.tickets, search.trim(), since);
-          if (analysisRes.analysis) {
-            setAnalysis(analysisRes.analysis);
-          } else {
-            const errMsg = analysisRes.analysis_error || "AI analysis returned empty";
-            setAnalysisError(`${errMsg} — try generating the report again.`);
-          }
+          const text = await runAnalysis(ticketsRes.tickets, search.trim(), since);
+          setAnalysis(text);
         } catch (e: any) {
           setAnalysisError(`AI analysis failed: ${e?.message || "unknown error"}`);
         }
@@ -166,6 +181,16 @@ export default function TicketReport() {
     }
   }
 
+  // Apply status + search filters for display
+  const displayedTickets = tickets.filter(t => {
+    const matchStatus = statusFilters.size === 0 || statusFilters.has(t.status);
+    const matchSearch = !search.trim() || (
+      (t.title || "").toLowerCase().includes(search.toLowerCase()) ||
+      (t.location || "").toLowerCase().includes(search.toLowerCase()) ||
+      (t.description || "").toLowerCase().includes(search.toLowerCase())
+    );
+    return matchStatus && matchSearch;
+  });
   const closed = tickets.filter(t => t.status === "closed");
   const open = tickets.filter(t => t.status === "open");
   const overdue = tickets.filter(t => t.status === "open" && t.sla_due_at && new Date(t.sla_due_at) < new Date());
@@ -210,21 +235,59 @@ export default function TicketReport() {
         </div>
 
         <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          {/* Status checkboxes */}
+          <div style={{ marginBottom: 14 }}>
+            <div className="field-label" style={{ marginBottom: 8 }}>Status Filter</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {STATUSES.map(s => {
+                const checked = statusFilters.has(s.value);
+                return (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => toggleStatus(s.value)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "6px 12px", borderRadius: 8, cursor: "pointer",
+                      border: `1px solid ${checked ? s.color + "66" : "var(--border)"}`,
+                      background: checked ? `${s.color}18` : "rgba(255,255,255,0.04)",
+                      color: checked ? s.color : "var(--muted)",
+                      fontSize: 13, fontWeight: 600, transition: "all 0.15s",
+                    }}
+                  >
+                    <span style={{
+                      width: 14, height: 14, borderRadius: 3, border: `2px solid ${checked ? s.color : "rgba(255,255,255,0.25)"}`,
+                      background: checked ? s.color : "transparent", flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {checked && <span style={{ color: "#000", fontSize: 9, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                    </span>
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Search + date row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
             <label>
-              <div className="field-label">Search keyword</div>
+              <div className="field-label">Keyword (optional)</div>
               <input className="input" value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="e.g. odyssey" onKeyDown={e => e.key === "Enter" && load()} />
+                placeholder="e.g. odyssey, pump, HVAC" onKeyDown={e => e.key === "Enter" && load()} />
             </label>
             <label>
               <div className="field-label">Since date</div>
               <input className="input" type="date" value={since} onChange={e => setSince(e.target.value)} />
             </label>
           </div>
-          <button className="btn primary" onClick={load} disabled={loading} style={{ width: "100%" }}>
+
+          <button className="btn primary" onClick={load} disabled={loading || statusFilters.size === 0} style={{ width: "100%" }}>
             {loading
-              ? <><span className="spinner" style={{ marginRight: 6 }} /> Generating report + AI analysis…</>
-              : "Generate Report"}
+              ? <><span className="spinner" style={{ marginRight: 6 }} /> Loading tickets + AI analysis…</>
+              : statusFilters.size === 0
+                ? "Select at least one status"
+                : "Generate Report"}
           </button>
         </div>
       </div>
@@ -253,12 +316,12 @@ export default function TicketReport() {
           </div>
 
           <div style={{ fontSize: 12, color: "var(--muted2)", marginBottom: 20 }}>
-            {tickets.length} ticket{tickets.length !== 1 ? "s" : ""} matching "{search}" since {fmtDate(since + "T12:00:00")} · Generated {generatedOn}
+            {displayedTickets.length} of {tickets.length} ticket{tickets.length !== 1 ? "s" : ""}{search.trim() ? ` matching "${search}"` : ""} since {fmtDate(since + "T12:00:00")} · Generated {generatedOn}
           </div>
 
-          {tickets.length === 0 ? (
+          {displayedTickets.length === 0 ? (
             <div className="card" style={{ padding: 24, textAlign: "center" }}>
-              <div style={{ fontSize: 13, color: "var(--muted)" }}>No tickets found matching "{search}"</div>
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>No tickets match current filters.</div>
             </div>
           ) : (
             <>
@@ -289,11 +352,11 @@ export default function TicketReport() {
 
               {/* ── Ticket list ─────────────────────────────────────── */}
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                All Tickets ({tickets.length})
+                Tickets ({displayedTickets.length})
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {tickets.map((t, i) => {
+                {displayedTickets.map((t, i) => {
                   const sla = slaStatus(t);
                   const comments = [...(t.comments || [])].sort((a, b) =>
                     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()

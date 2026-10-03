@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { getWeekSchedule } from "../lib/api";
-import ReviewCalendar from "../components/ReviewCalendar";
 
 const TZ = "America/New_York";
 
@@ -106,14 +105,9 @@ export default function Schedule() {
   return (
     <div className="page fade-up" style={{ paddingBottom: 90 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, gap: 8 }}>
-        <div>
-          <div className="page-title">Schedule</div>
-          <div className="page-subtitle">{fmtMonthYear(weekStart)}</div>
-        </div>
-        <Link to="/settings" style={{ fontSize: 12, color: "var(--muted)", textDecoration: "none", whiteSpace: "nowrap" }}>
-          Upload ↗
-        </Link>
+      <div style={{ marginBottom: 4 }}>
+        <div className="page-title">Schedule</div>
+        <div className="page-subtitle">{fmtMonthYear(weekStart)}</div>
       </div>
 
       {/* Week navigation */}
@@ -268,8 +262,6 @@ export default function Schedule() {
           )}
         </>
       )}
-
-      <ReviewCalendar weekStart={weekStart} />
     </div>
   );
 }
