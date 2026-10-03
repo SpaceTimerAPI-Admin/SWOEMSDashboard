@@ -167,7 +167,7 @@ export default function TicketReport() {
       // Phase 2 — call Claude directly from the browser (no Netlify timeout)
       if ((ticketsRes.tickets || []).length > 0) {
         try {
-          const text = await runAnalysis(ticketsRes.tickets, search.trim(), since);
+          const text = await fetchAnalysis(ticketsRes.tickets, search.trim(), since);
           setAnalysis(text);
         } catch (e: any) {
           setAnalysisError(`AI analysis failed: ${e?.message || "unknown error"}`);
