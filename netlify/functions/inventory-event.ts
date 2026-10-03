@@ -29,14 +29,19 @@ export const handler: Handler = async (event) => {
   let resolvedItemId = item_id || null;
 
   if (!resolvedItemId && create_if_missing && new_item_serial) {
-    const assetTag = String(new_item_serial).trim();
-    const { data: existing } = await supabase.from("inventory_items").select("id").eq("asset_tag", assetTag).maybeSingle();
+    const serial = String(new_item_serial).trim();
+    // First check if an item with this serial number already exists
+    const { data: existing } = await supabase.from("inventory_items").select("id")
+      .eq("serial_number", serial).maybeSingle();
     if (existing) {
       resolvedItemId = existing.id;
     } else {
+      // Auto-generate a proper asset tag — never use the serial as asset_tag
+      const { data: tagData } = await supabase.rpc("generate_asset_tag");
+      const asset_tag = tagData || `SWO-${Date.now()}`;
       const { data: newItem, error: createErr } = await supabase.from("inventory_items").insert({
-        asset_tag: assetTag,
-        serial_number: assetTag,
+        asset_tag,
+        serial_number: serial,
         name: (new_item_name || "Unknown Item").trim(),
         manufacturer: new_item_manufacturer?.trim() || null,
         model: new_item_model?.trim() || null,
@@ -96,10 +101,7 @@ export const handler: Handler = async (event) => {
       updates.status = "retired";
       updates.location = location || "Retired";
       break;
-    case "note":
-      // Update location if provided with a note
-      if (location) updates.location = location;
-      break;
+    case "note": break;
     default: return badRequest(`Unknown event_type: ${event_type}`);
   }
 
