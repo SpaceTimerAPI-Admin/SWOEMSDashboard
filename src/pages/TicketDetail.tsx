@@ -52,7 +52,7 @@ export default function TicketDetail() {
     looking: boolean;
   };
   const emptyHw = (): HwItem => ({ serial: "", lookupResult: null, name: "", model: "", manufacturer: "", looking: false });
-  const [hwInvolved, setHwInvolved] = useState<"yes" | "no" | null>(null);
+  const [hwInvolved, setHwInvolved] = useState<"replaced" | "installed" | "no_change" | null>(null);
   const [hwItems, setHwItems]       = useState<HwItem[]>([emptyHw()]);
 
   // Always-visible inventory card on open tickets
@@ -169,9 +169,25 @@ export default function TicketDetail() {
 
   const [linkedItemBanner, setLinkedItemBanner] = useState<string | null>(null);
 
+  // Inventory items linked to this ticket (fetched from DB)
+  const [ticketInventory, setTicketInventory] = useState<any[]>([]);
+
+  async function loadTicketInventory() {
+    if (!ticketId) return;
+    try {
+      const token = localStorage.getItem("md_session_token") || localStorage.getItem("swoems_token") || "";
+      const res = await fetch(`/api/ticket-inventory?ticket_id=${ticketId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.ok) setTicketInventory(data.items || []);
+    } catch { /* silent */ }
+  }
+
   useEffect(() => {
     if (ticketId) {
       void load();
+      void loadTicketInventory();
       getItemReviews(ticketId).then((res: any) => {
         const data = res?.ok ? (res.data?.reviews ?? res.reviews) : [];
         setReviews(data || []);
@@ -254,8 +270,8 @@ export default function TicketDetail() {
   async function confirmClose() {
     const trimmed = resolution.trim();
     if (!trimmed) { setResolutionError("Please enter a resolution note."); return; }
-    if (hwInvolved === null) { setResolutionError("Please answer whether hardware was deployed."); return; }
-    if (hwInvolved === "yes") {
+    if (hwInvolved === null) { setResolutionError("Please answer the hardware question."); return; }
+    if (hwInvolved === "replaced" || hwInvolved === "installed") {
       for (let i = 0; i < hwItems.length; i++) {
         const hw = hwItems[i];
         if (!hw.serial.trim()) { setResolutionError(`Item ${i + 1}: Serial number required.`); return; }
@@ -266,16 +282,19 @@ export default function TicketDetail() {
     setBusy(true); setResolutionError(null);
     try {
       let resolutionComment = `Resolution: ${trimmed}`;
-      if (hwInvolved === "yes" && hwItems.length > 0) {
-        resolutionComment += `\n\nHardware deployed (${hwItems.length}):\n` +
+      if ((hwInvolved === "replaced" || hwInvolved === "installed") && hwItems.length > 0) {
+        const hwLabel = hwInvolved === "replaced" ? "Hardware replaced" : "Hardware installed";
+        resolutionComment += `\n\n${hwLabel} (${hwItems.length}):\n` +
           hwItems.map((hw, i) => `  ${i + 1}. ${hw.serial.trim()}${hw.name ? ` — ${hw.name}` : ""}`).join("\n");
+      } else if (hwInvolved === "no_change") {
+        resolutionComment += `\n\nHardware: No change`;
       }
       await addTicketComment({ id: ticketId, comment: resolutionComment });
       const res: any = await closeTicket(ticketId);
       if (!res?.ok) throw new Error(res?.error || "Failed to close work order");
 
       // Log inventory event for each hardware item
-      if (hwInvolved === "yes") {
+      if (hwInvolved === "replaced" || hwInvolved === "installed") {
         const token = localStorage.getItem("md_session_token") || "";
         for (const hw of hwItems) {
           if (!hw.serial.trim()) continue;
@@ -284,9 +303,9 @@ export default function TicketDetail() {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({
               item_id: hw.lookupResult && hw.lookupResult !== false ? hw.lookupResult.id : null,
-              event_type: "deployed",
+              event_type: hwInvolved === "replaced" ? "replaced" : "deployed",
               location: ticket?.location || "",
-              note: `Deployed via work order: ${ticket?.title || ticketId}`,
+              note: `${hwInvolved === "replaced" ? "Replaced" : "Installed"} via work order: ${ticket?.title || ticketId}`,
               linked_ticket_id: ticketId,
               create_if_missing: hw.lookupResult === false,
               new_item_serial: hw.serial.trim(),
@@ -301,7 +320,7 @@ export default function TicketDetail() {
       setShowCloseModal(false);
       setHwInvolved(null);
       setHwItems([emptyHw()]);
-      await load();
+      await Promise.all([load(), loadTicketInventory()]);
     } catch (e: any) {
       setResolutionError(e?.message || String(e));
     } finally { setBusy(false); }
@@ -622,6 +641,57 @@ export default function TicketDetail() {
             </div>
           )}
 
+          {/* Linked inventory items — shown on all tickets that have any */}
+          {ticketInventory.length > 0 && (
+            <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div className="detail-label" style={{ margin: 0 }}>🗂️ Linked Inventory</div>
+                <span style={{ fontSize: 11, background: "rgba(129,140,248,0.12)", color: "#c7d2fe", borderRadius: 99, padding: "2px 8px", fontWeight: 600 }}>
+                  {ticketInventory.length} item{ticketInventory.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {ticketInventory.map((invItem: any) => {
+                  const displayId = invItem.serial_number || invItem.asset_tag;
+                  const lastEvent = invItem.events?.[invItem.events.length - 1];
+                  const eventLabels: Record<string, { label: string; icon: string; color: string }> = {
+                    deployed:  { label: "Deployed",   icon: "🔧", color: "#818cf8" },
+                    replaced:  { label: "Replaced",   icon: "🔄", color: "#fcd34d" },
+                    note:      { label: "Linked",     icon: "📝", color: "#9ca3af" },
+                    received:  { label: "Received",   icon: "📦", color: "#6ee7b7" },
+                  };
+                  const em = eventLabels[lastEvent?.event_type] || { label: lastEvent?.event_type || "Linked", icon: "📦", color: "#9ca3af" };
+                  return (
+                    <Link key={invItem.id} to={`/inventory/${invItem.id}`} style={{ textDecoration: "none" }}>
+                      <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(129,140,248,0.05)", border: "1px solid rgba(129,140,248,0.15)", cursor: "pointer" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(129,140,248,0.1)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(129,140,248,0.05)")}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{invItem.name}</div>
+                            <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2, fontFamily: "monospace" }}>{displayId}</div>
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 99, flexShrink: 0, background: `${em.color}18`, color: em.color, border: `1px solid ${em.color}33` }}>
+                            {em.icon} {em.label}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 10, marginTop: 5, fontSize: 11, color: "var(--muted2)", flexWrap: "wrap" }}>
+                          {invItem.category_name && <span>📂 {invItem.category_name}</span>}
+                          {invItem.manufacturer && <span>· {invItem.manufacturer}</span>}
+                          {invItem.model && <span>· {invItem.model}</span>}
+                          {invItem.location && <span>· 📍 {invItem.location}</span>}
+                        </div>
+                        {lastEvent?.note && (
+                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontStyle: "italic" }}>"{lastEvent.note}"</div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="card" style={{ padding: "14px 15px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div className="detail-label" style={{ margin: 0 }}>History</div>
@@ -663,21 +733,38 @@ export default function TicketDetail() {
               {/* Hardware question */}
               <div style={{ marginTop: 14, padding: "12px 14px", background: "rgba(129,140,248,0.08)", border: "1px solid rgba(129,140,248,0.2)", borderRadius: 10 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#c7d2fe", marginBottom: 10 }}>
-                  📦 Was hardware deployed or installed?
+                  📦 Hardware change?
                 </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: hwInvolved === "yes" ? 12 : 0 }}>
-                  {([["yes", "✓ Yes"], ["no", "✗ No"]] as const).map(([v, label]) => (
-                    <button key={v} type="button" onClick={() => { setHwInvolved(v); setResolutionError(null); if (v === "yes") setHwItems([emptyHw()]); }}
-                      style={{ flex: 1, padding: "7px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1px solid", transition: "all 0.15s",
-                        background: hwInvolved === v ? (v === "yes" ? "rgba(129,140,248,0.2)" : "rgba(255,255,255,0.06)") : "rgba(255,255,255,0.04)",
-                        borderColor: hwInvolved === v ? (v === "yes" ? "rgba(129,140,248,0.4)" : "rgba(255,255,255,0.15)") : "rgba(255,255,255,0.08)",
-                        color: hwInvolved === v ? (v === "yes" ? "#c7d2fe" : "#e5e7eb") : "#6b7280" }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: (hwInvolved === "replaced" || hwInvolved === "installed") ? 12 : 0 }}>
+                  {([
+                    ["replaced",  "🔄 Replaced"],
+                    ["installed", "➕ Installed"],
+                    ["no_change", "— No Change"],
+                  ] as const).map(([v, label]) => (
+                    <button key={v} type="button"
+                      onClick={() => { setHwInvolved(v); setResolutionError(null); if (v === "replaced" || v === "installed") setHwItems([emptyHw()]); }}
+                      style={{ flex: 1, padding: "7px 4px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid", transition: "all 0.15s",
+                        background: hwInvolved === v
+                          ? (v === "replaced"  ? "rgba(251,191,36,0.15)"
+                           : v === "installed" ? "rgba(129,140,248,0.2)"
+                           :                    "rgba(255,255,255,0.06)")
+                          : "rgba(255,255,255,0.04)",
+                        borderColor: hwInvolved === v
+                          ? (v === "replaced"  ? "rgba(251,191,36,0.35)"
+                           : v === "installed" ? "rgba(129,140,248,0.4)"
+                           :                    "rgba(255,255,255,0.15)")
+                          : "rgba(255,255,255,0.08)",
+                        color: hwInvolved === v
+                          ? (v === "replaced"  ? "#fcd34d"
+                           : v === "installed" ? "#c7d2fe"
+                           :                    "#e5e7eb")
+                          : "#6b7280" }}>
                       {label}
                     </button>
                   ))}
                 </div>
 
-                {hwInvolved === "yes" && (
+                {(hwInvolved === "replaced" || hwInvolved === "installed") && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {hwItems.map((hw, idx) => (
                       <div key={idx} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "10px 12px", border: "1px solid rgba(255,255,255,0.07)" }}>

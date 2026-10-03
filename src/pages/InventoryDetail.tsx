@@ -26,6 +26,7 @@ const EVENT_META: Record<string, { label: string; icon: string; color: string }>
   checked_out:           { label: "Checked Out",          icon: "👤", color: "#fcd34d" },
   checked_in:            { label: "Checked In",           icon: "↩️", color: "#6ee7b7" },
   deployed:              { label: "Deployed",             icon: "🔧", color: "#818cf8" },
+  replaced:              { label: "Replaced",             icon: "🔄", color: "#fcd34d" },
   pulled:                { label: "Pulled from Service",  icon: "⬆️", color: "#9ca3af" },
   sent_to_repair:        { label: "Sent to Repair",       icon: "🔨", color: "#f87171" },
   returned_from_repair:  { label: "Returned from Repair", icon: "✅", color: "#6ee7b7" },
@@ -36,6 +37,8 @@ const EVENT_META: Record<string, { label: string; icon: string; color: string }>
 const TICKET_STATUS_COLORS: Record<string, string> = {
   open: "#fcd34d", in_progress: "#818cf8", closed: "#6ee7b7", cancelled: "#6b7280",
 };
+
+const CATEGORIES = ["Lighting", "Sound", "Video", "Rides", "Other"];
 
 const EVENT_ACTIONS: { event_type: string; label: string; icon: string; locationLabel: string; locationPlaceholder: string; locationRequired: boolean; needsTakenBy?: boolean; needsVendor?: boolean; needsCondition?: boolean; statusFilter?: string[] }[] = [
   { event_type: "checked_out",          label: "Check Out",          icon: "👤", locationLabel: "Where is it going?",       locationPlaceholder: "e.g. Main Gate, Backstage",      locationRequired: true,  needsTakenBy: true,  statusFilter: ["in_storage"] },
@@ -57,6 +60,106 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
   return res.json();
 }
 
+// Inline editable field — click the value to edit
+function InlineField({ label, value, onSave, monospace, multiline }: {
+  label: string; value: string; onSave: (v: string) => Promise<void>; monospace?: boolean; multiline?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState("");
+  const [saving, setSaving]   = useState(false);
+
+  function start() { setDraft(value || ""); setEditing(true); }
+  async function save() {
+    setSaving(true);
+    try { await onSave(draft); setEditing(false); } finally { setSaving(false); }
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>{label}</div>
+        {!editing && (
+          <button type="button" onClick={start}
+            style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "1px 5px", borderRadius: 4, textDecoration: "underline" }}>
+            edit
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+          {multiline ? (
+            <textarea className="textarea" value={draft} onChange={e => setDraft(e.target.value)}
+              autoFocus style={{ flex: 1, fontSize: 13, minHeight: 50 }} />
+          ) : (
+            <input className="input" value={draft} onChange={e => setDraft(e.target.value)}
+              autoFocus onKeyDown={e => { if (e.key === "Enter") void save(); if (e.key === "Escape") setEditing(false); }}
+              style={{ flex: 1, fontSize: 13, fontFamily: monospace ? "monospace" : undefined }} />
+          )}
+          <button type="button" className="btn primary small" onClick={save} disabled={saving}>
+            {saving ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Save"}
+          </button>
+          <button type="button" className="btn small" onClick={() => setEditing(false)}>✕</button>
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2, fontFamily: monospace ? "monospace" : undefined, cursor: "pointer" }}
+          onClick={start}>
+          {value || <span style={{ color: "var(--muted2)" }}>Not set</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Category picker — inline
+function InlineCategoryField({ value, onSave }: { value: string; onSave: (v: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState(value || "");
+  const [saving, setSaving]   = useState(false);
+
+  async function save(cat: string) {
+    setSaving(true);
+    try { await onSave(cat); setEditing(false); } finally { setSaving(false); }
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Category</div>
+        {!editing && (
+          <button type="button" onClick={() => { setDraft(value || ""); setEditing(true); }}
+            style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "1px 5px", borderRadius: 4, textDecoration: "underline" }}>
+            edit
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div>
+          <div className="tag-row" style={{ flexWrap: "wrap" }}>
+            {CATEGORIES.map(c => (
+              <button key={c} type="button"
+                className={`tag-btn${draft === c ? " active" : ""}`}
+                disabled={saving}
+                onClick={() => { setDraft(c); void save(c); }}>
+                {saving && draft === c ? <span className="spinner" style={{ width: 10, height: 10, marginRight: 4 }} /> : null}
+                {c}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => setEditing(false)}
+            style={{ fontSize: 11, color: "var(--muted2)", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2, cursor: "pointer" }}
+          onClick={() => { setDraft(value || ""); setEditing(true); }}>
+          {value || <span style={{ color: "var(--muted2)" }}>Not set</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function InventoryDetail() {
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
@@ -67,6 +170,7 @@ export default function InventoryDetail() {
   const [stats, setStats]   = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "audit" | "tickets">("overview");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Action form
   const [showAction, setShowAction]     = useState(false);
@@ -88,11 +192,20 @@ export default function InventoryDetail() {
   const [statusSaving, setStatusSaving]   = useState(false);
   const [statusError, setStatusError]     = useState<string | null>(null);
 
+  async function patchItem(fields: Record<string, string>) {
+    setSaveError(null);
+    const res = await apiFetch("/api/inventory-update", {
+      method: "POST",
+      body: JSON.stringify({ id, ...fields }),
+    });
+    if (!res.ok) throw new Error(res.error || "Failed to save");
+    setItem((prev: any) => ({ ...prev, ...res.item }));
+  }
+
   async function quickSetStatus(newStatus: string) {
     setStatusSaving(true);
     setStatusError(null);
     try {
-      // Map status to the appropriate event type
       const eventTypeMap: Record<string, string> = {
         in_storage:  "pulled",
         deployed:    "deployed",
@@ -104,8 +217,7 @@ export default function InventoryDetail() {
       const res = await apiFetch("/api/inventory-event", {
         method: "POST",
         body: JSON.stringify({
-          item_id: id,
-          event_type,
+          item_id: id, event_type,
           note: `Status manually set to "${STATUS_META[newStatus]?.label || newStatus}" via quick update`,
           _force_status: newStatus,
         }),
@@ -171,6 +283,9 @@ export default function InventoryDetail() {
   const availableActions = EVENT_ACTIONS.filter(a => !a.statusFilter || a.statusFilter.includes(item.status));
   const selectedAction = EVENT_ACTIONS.find(a => a.event_type === actionType);
 
+  // Primary display ID: serial_number if set, otherwise asset_tag
+  const displayId = item.serial_number || item.asset_tag;
+
   // Linked tickets (deduplicated)
   const linkedTickets: any[] = [];
   const seenIds = new Set<string>();
@@ -189,7 +304,11 @@ export default function InventoryDetail() {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
         <div>
           <div className="page-title">{item.name}</div>
-          <div style={{ fontFamily: "monospace", fontSize: 12, color: "var(--muted2)", marginTop: 2 }}>{item.asset_tag}</div>
+          {/* Show serial # as primary sub-ID; show asset tag underneath if different */}
+          <div style={{ fontFamily: "monospace", fontSize: 12, color: "var(--muted2)", marginTop: 2 }}>{displayId}</div>
+          {item.serial_number && item.asset_tag && item.serial_number !== item.asset_tag && (
+            <div style={{ fontFamily: "monospace", fontSize: 10, color: "var(--muted2)", opacity: 0.6, marginTop: 1 }}>Tag: {item.asset_tag}</div>
+          )}
         </div>
         <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 12px", borderRadius: 99, flexShrink: 0, alignSelf: "flex-start", color: sm.color, background: sm.bg, border: `1px solid ${sm.color}44` }}>
           {sm.label}
@@ -229,51 +348,74 @@ export default function InventoryDetail() {
         ))}
       </div>
 
+      {saveError && (
+        <div style={{ marginBottom: 10, padding: "8px 12px", background: "var(--danger-bg)", border: "1px solid rgba(255,84,84,0.3)", borderRadius: 8, fontSize: 12, color: "#FFB0B0" }}>
+          ⚠ {saveError}
+        </div>
+      )}
+
       {/* ── OVERVIEW TAB ── */}
       {activeTab === "overview" && (
         <>
           <div className="card" style={{ padding: 16, marginBottom: 10 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px" }}>
-              {[
-                { label: "Category",     value: item.category_name },
-                { label: "Manufacturer", value: item.manufacturer },
-                { label: "Model",        value: item.model },
-                { label: "Serial #",     value: item.serial_number },
-                { label: "Added",        value: item.created_at ? fmtDateShort(item.created_at) : null },
-              ].filter(f => f.value).map(f => (
-                <div key={f.label}>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>{f.label}</div>
-                  <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2, fontFamily: f.label === "Serial #" ? "monospace" : undefined }}>{f.value}</div>
+            {/* Editable fields grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 16px" }}>
+              <InlineCategoryField
+                value={item.category_name || ""}
+                onSave={async v => { await patchItem({ category_name: v }); }}
+              />
+              <InlineField
+                label="Manufacturer"
+                value={item.manufacturer || ""}
+                onSave={async v => { await patchItem({ manufacturer: v }); }}
+              />
+              <InlineField
+                label="Model"
+                value={item.model || ""}
+                onSave={async v => { await patchItem({ model: v }); }}
+              />
+              <InlineField
+                label="Serial #"
+                value={item.serial_number || ""}
+                monospace
+                onSave={async v => { await patchItem({ serial_number: v }); }}
+              />
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)", marginBottom: 2 }}>Added</div>
+                <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
+                  {item.created_at ? fmtDateShort(item.created_at) : <span style={{ color: "var(--muted2)" }}>Unknown</span>}
                 </div>
-              ))}
-              {/* Location — inline editable */}
-              <div style={{ gridColumn: "1 / -1" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Location</div>
-                  {!editingLocation && (
-                    <button type="button" onClick={() => { setLocationDraft(item.location || ""); setEditingLocation(true); }}
-                      style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "1px 5px", borderRadius: 4, textDecoration: "underline" }}>
-                      edit
-                    </button>
-                  )}
-                </div>
-                {editingLocation ? (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <input className="input" value={locationDraft} onChange={e => setLocationDraft(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") void saveLocation(); if (e.key === "Escape") setEditingLocation(false); }}
-                      placeholder="Enter new location…" autoFocus style={{ flex: 1, fontSize: 13 }} />
-                    <button type="button" className="btn primary small" onClick={saveLocation} disabled={locationSaving || !locationDraft.trim()}>
-                      {locationSaving ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Save"}
-                    </button>
-                    <button type="button" className="btn small" onClick={() => setEditingLocation(false)}>✕</button>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
-                    {item.location || <span style={{ color: "var(--muted2)" }}>Not set</span>}
-                  </div>
-                )}
               </div>
             </div>
+
+            {/* Location — inline editable */}
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Location</div>
+                {!editingLocation && (
+                  <button type="button" onClick={() => { setLocationDraft(item.location || ""); setEditingLocation(true); }}
+                    style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "1px 5px", borderRadius: 4, textDecoration: "underline" }}>
+                    edit
+                  </button>
+                )}
+              </div>
+              {editingLocation ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input className="input" value={locationDraft} onChange={e => setLocationDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") void saveLocation(); if (e.key === "Escape") setEditingLocation(false); }}
+                    placeholder="Enter new location…" autoFocus style={{ flex: 1, fontSize: 13 }} />
+                  <button type="button" className="btn primary small" onClick={saveLocation} disabled={locationSaving || !locationDraft.trim()}>
+                    {locationSaving ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Save"}
+                  </button>
+                  <button type="button" className="btn small" onClick={() => setEditingLocation(false)}>✕</button>
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>
+                  {item.location || <span style={{ color: "var(--muted2)" }}>Not set</span>}
+                </div>
+              )}
+            </div>
+
             {item.status === "checked_out" && (
               <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: 8, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
                 <div style={{ fontSize: 12, color: "#fcd34d", fontWeight: 600 }}>👤 Checked out to {item.checked_out_to_name}</div>
@@ -386,7 +528,6 @@ export default function InventoryDetail() {
                 const em = EVENT_META[ev.event_type] || { label: ev.event_type, icon: "•", color: "#9ca3af" };
                 return (
                   <div key={ev.id} style={{ display: "flex", gap: 12, paddingBottom: i < events.length - 1 ? 14 : 0, marginBottom: i < events.length - 1 ? 14 : 0, borderBottom: i < events.length - 1 ? "1px solid var(--border)" : "none" }}>
-                    {/* Timeline dot */}
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
                       <div style={{ width: 28, height: 28, borderRadius: "50%", background: `${em.color}22`, border: `1px solid ${em.color}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>{em.icon}</div>
                       {i < events.length - 1 && <div style={{ width: 1, flex: 1, background: "rgba(255,255,255,0.06)", marginTop: 4 }} />}
@@ -437,7 +578,6 @@ export default function InventoryDetail() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {linkedTickets.map((t: any) => {
                 const statusColor = TICKET_STATUS_COLORS[t.status] || "#6b7280";
-                // Find which events reference this ticket
                 const relatedEvents = events.filter(e => e.linked_ticket_id === t.id);
                 return (
                   <Link key={t.id} to={`/tickets/${t.id}`} style={{ textDecoration: "none" }}>
