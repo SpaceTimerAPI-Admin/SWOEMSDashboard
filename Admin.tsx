@@ -86,22 +86,10 @@ export default function Admin() {
           <div className="page-title">Admin</div>
           <div className="page-subtitle">User Management</div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8 }}>
           <Link to="/admin/schedule"
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
             📅 Schedule
-          </Link>
-          <Link to="/admin/qr"
-            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-            📲 QR Code
-          </Link>
-          <Link to="/admin/elijah"
-            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(92,107,255,0.3)", background: "rgba(92,107,255,0.08)", color: "#B0B8FF", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-            🤖 Elijah Logs
-          </Link>
-          <Link to="/admin/report"
-            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(52,211,153,0.3)", background: "rgba(52,211,153,0.08)", color: "#7EEFC4", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-            📊 Reports
           </Link>
           <button
             className="btn primary"
@@ -148,45 +136,9 @@ export default function Admin() {
                   <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>
                     ID #{emp.employee_id} · {emp.email}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--muted2)", marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: "var(--muted2)" }}>
                     Last login: {fmtDate(emp.last_login_at)}
                   </div>
-                  {/* Email alert toggles — only show for EMS/Admin since Show Tech don't get emails */}
-                  {emp.role !== "show_tech" && emp.email && (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {([
-                        { key: "email_overdue_alert",      label: "Overdue Alerts" },
-                        { key: "email_assigned_recap",     label: "Assigned Recap" },
-                        { key: "email_assignment_notify",  label: "Assignment Notify" },
-                        { key: "email_weekly_summary",     label: "Weekly Summary", adminOnly: true },
-                        { key: "email_sound_recap",        label: "🎵 Sound Recap" },
-                        { key: "email_lighting_recap",     label: "💡 Lighting Recap" },
-                      ] as { key: string; label: string; adminOnly?: boolean }[])
-                        .filter(pref => !pref.adminOnly || emp.role === "admin")
-                        .map(pref => {
-                          // Tag recaps are opt-in (default false); all others are opt-out (default true)
-                          const optIn = pref.key.startsWith("email_sound") || pref.key.startsWith("email_lighting");
-                          const on = optIn ? emp[pref.key] === true : emp[pref.key] !== false;
-                          return (
-                            <button
-                              key={pref.key}
-                              title={`${on ? "Disable" : "Enable"} ${pref.label}`}
-                              onClick={() => handleUpdate(emp.id, { [pref.key]: !on })}
-                              style={{
-                                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
-                                border: "1px solid",
-                                borderColor: on ? "rgba(52,211,153,0.3)" : "rgba(255,255,255,0.1)",
-                                background: on ? "rgba(52,211,153,0.1)" : "rgba(255,255,255,0.04)",
-                                color: on ? "#7EEFC4" : "#6b7280",
-                                cursor: "pointer",
-                              }}
-                            >
-                              {on ? "✓" : "✗"} {pref.label}
-                            </button>
-                          );
-                        })}
-                    </div>
-                  )}
                 </div>
                 <button onClick={() => openEdit(emp)}
                   style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)",
@@ -219,11 +171,11 @@ export default function Admin() {
                 <input className="input" type="password" inputMode="numeric" maxLength={4} value={form.pin} onChange={e => setForm(f => ({ ...f, pin: e.target.value }))} placeholder="••••" /></label>
               <div style={{ marginTop: 8 }}>
                 <div className="field-label">Role</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   {ROLES.map(r => (
                     <button key={r} type="button"
                       onClick={() => setForm(f => ({ ...f, role: r }))}
-                      style={{ flex: "1 1 80px", padding: "8px 4px", borderRadius: 8, border: "1px solid",
+                      style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: "1px solid",
                         borderColor: form.role === r ? ROLE_TEXT[r] + "66" : "var(--border)",
                         background: form.role === r ? ROLE_COLORS[r] : "rgba(255,255,255,0.04)",
                         color: form.role === r ? ROLE_TEXT[r] : "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
@@ -269,11 +221,11 @@ export default function Admin() {
                 <input className="input" type="password" inputMode="numeric" maxLength={4} value={editForm.pin} onChange={e => setEditForm((f: any) => ({ ...f, pin: e.target.value }))} placeholder="••••" /></label>
               <div style={{ marginTop: 8 }}>
                 <div className="field-label">Role</div>
-                <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                   {ROLES.map(r => (
                     <button key={r} type="button"
                       onClick={() => setEditForm((f: any) => ({ ...f, role: r }))}
-                      style={{ flex: "1 1 80px", padding: "7px 4px", borderRadius: 8, border: "1px solid",
+                      style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: "1px solid",
                         borderColor: editForm.role === r ? ROLE_TEXT[r] + "66" : "var(--border)",
                         background: editForm.role === r ? ROLE_COLORS[r] : "rgba(255,255,255,0.04)",
                         color: editForm.role === r ? ROLE_TEXT[r] : "var(--muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -282,7 +234,7 @@ export default function Admin() {
                   ))}
                 </div>
               </div>
-              <div style={{ marginTop: 14, display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
+              <div style={{ marginTop: 14, display: "flex", gap: 8, justifyContent: "space-between" }}>
                 <button
                   onClick={() => handleUpdate(editTarget.id, { is_active: !editTarget.is_active })}
                   disabled={busy}
