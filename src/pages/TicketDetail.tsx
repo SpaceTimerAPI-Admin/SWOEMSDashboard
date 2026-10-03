@@ -55,6 +55,59 @@ export default function TicketDetail() {
   const [hwInvolved, setHwInvolved] = useState<"yes" | "no" | null>(null);
   const [hwItems, setHwItems]       = useState<HwItem[]>([emptyHw()]);
 
+  // Always-visible inventory card on open tickets
+  const [invSerial, setInvSerial]           = useState("");
+  const [invLookup, setInvLookup]           = useState<any>(null); // null=idle, false=not found, object=found
+  const [invLooking, setInvLooking]         = useState(false);
+  const [invLinked, setInvLinked]           = useState<any[]>([]); // items linked so far this session
+  const [invError, setInvError]             = useState<string | null>(null);
+  const [invSuccess, setInvSuccess]         = useState<string | null>(null);
+
+  async function lookupInvSerial() {
+    const serial = invSerial.trim();
+    if (!serial) return;
+    setInvLooking(true);
+    setInvLookup(null);
+    setInvError(null);
+    try {
+      const token = localStorage.getItem("md_session_token") || localStorage.getItem("swoems_token") || "";
+      const res = await fetch(`/api/inventory-lookup?serial=${encodeURIComponent(serial)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setInvLookup(data.found ? data.item : false);
+    } catch { setInvLookup(false); }
+    finally { setInvLooking(false); }
+  }
+
+  async function linkInvItem() {
+    const serial = invSerial.trim();
+    if (!invLookup || invLookup === false) return;
+    setInvError(null);
+    try {
+      const token = localStorage.getItem("md_session_token") || localStorage.getItem("swoems_token") || "";
+      const res = await fetch("/api/inventory-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          item_id: invLookup.id,
+          event_type: "note",
+          linked_ticket_id: ticketId,
+          note: `Linked to work order`,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Failed to link");
+      setInvLinked(prev => [...prev, invLookup]);
+      setInvSerial("");
+      setInvLookup(null);
+      setInvSuccess(`✓ ${invLookup.name} linked`);
+      setTimeout(() => setInvSuccess(null), 3000);
+    } catch (e: any) {
+      setInvError(e?.message || "Failed to link item");
+    }
+  }
+
   // Due date editing
   const [editingDue, setEditingDue] = useState(false);
   const [newDueDate, setNewDueDate] = useState("");
@@ -466,6 +519,69 @@ export default function TicketDetail() {
               <div className="prewrap detail-value" style={{ marginTop: 4 }}>{ticket.details}</div>
             </div>
           )}
+
+          {/* Always-visible inventory card — scan to attach items any time the ticket is open */}
+          {!isClosed && <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div className="detail-label" style={{ margin: 0 }}>🗂️ Inventory</div>
+              {invLinked.length > 0 && (
+                <span style={{ fontSize: 11, background: "rgba(52,211,153,0.12)", color: "#6ee7b7", borderRadius: 99, padding: "2px 8px", fontWeight: 600 }}>
+                  {invLinked.length} linked
+                </span>
+              )}
+            </div>
+
+            {/* Items linked this session */}
+            {invLinked.map((item, i) => (
+              <div key={i} style={{ background: "rgba(52,211,153,0.06)", border: "1px solid rgba(52,211,153,0.15)", borderRadius: 7, padding: "6px 10px", marginBottom: 6, fontSize: 12, color: "#6ee7b7" }}>
+                ✓ {item.name}{item.serial_number ? ` · ${item.serial_number}` : ""}
+              </div>
+            ))}
+
+            {invSuccess && (
+              <div style={{ fontSize: 12, color: "#6ee7b7", marginBottom: 8, fontWeight: 600 }}>{invSuccess}</div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+              <BarcodeInput
+                value={invSerial}
+                onChange={val => { setInvSerial(val); setInvLookup(null); setInvError(null); }}
+                placeholder="Scan or type serial number…"
+                onEnter={lookupInvSerial}
+              />
+              <button className="btn small" type="button" onClick={lookupInvSerial} disabled={invLooking || !invSerial.trim()}
+                style={{ flexShrink: 0 }}>
+                {invLooking ? <span className="spinner" /> : "Look up"}
+              </button>
+            </div>
+
+            {invLookup && invLookup !== false && (
+              <div style={{ marginTop: 8, background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 7, padding: "8px 10px" }}>
+                <div style={{ fontSize: 12, color: "#6ee7b7", marginBottom: 6 }}>
+                  ✓ Found: <strong>{invLookup.name}</strong>
+                  {invLookup.serial_number && <span style={{ color: "#9ca3af" }}> · {invLookup.serial_number}</span>}
+                  <span style={{ marginLeft: 6, color: "#9ca3af" }}>{invLookup.status?.replace("_", " ")} · {invLookup.location}</span>
+                </div>
+                <button className="btn primary small" type="button" onClick={linkInvItem}>
+                  Link to this work order
+                </button>
+              </div>
+            )}
+
+            {invLookup === false && (
+              <div style={{ marginTop: 8, background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 7, padding: "8px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, color: "#fcd34d" }}>⚠ Serial not found in inventory</span>
+                <Link
+                  to={`/inventory/new?serial=${encodeURIComponent(invSerial.trim())}&from=/tickets/${ticketId}`}
+                  style={{ fontSize: 12, color: "#818cf8", fontWeight: 600, textDecoration: "none" }}
+                >
+                  Add to inventory first →
+                </Link>
+              </div>
+            )}
+
+            {invError && <div className="error" style={{ marginTop: 6, fontSize: 12 }}>{invError}</div>}
+          </div>}
 
           <div className="card" style={{ padding: "14px 15px", marginBottom: 10 }}>
             <div className="detail-label" style={{ marginBottom: 8 }}>Add Update</div>
