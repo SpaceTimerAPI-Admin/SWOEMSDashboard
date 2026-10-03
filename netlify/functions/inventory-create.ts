@@ -16,12 +16,9 @@ export const handler: Handler = async (event) => {
 
   const supabase = supabaseAdmin();
 
-  // Generate asset tag if no serial provided
-  let asset_tag = (serial_number || "").trim();
-  if (!asset_tag) {
-    const { data: tagData } = await supabase.rpc("generate_asset_tag");
-    asset_tag = tagData || `SWO-${Date.now()}`;
-  }
+  // Asset tag is always auto-generated — serial_number is stored separately
+  const { data: tagData } = await supabase.rpc("generate_asset_tag");
+  const asset_tag = tagData || `SWO-${Date.now()}`;
 
   // Resolve category id
   let category_id: string | null = null;
@@ -30,11 +27,13 @@ export const handler: Handler = async (event) => {
     category_id = cat?.id || null;
   }
 
+  const serial = (serial_number || "").trim() || null;
+
   const { data: item, error } = await supabase
     .from("inventory_items")
     .insert({
       asset_tag,
-      serial_number: serial_number?.trim() || null,
+      serial_number: serial,
       name: name.trim(),
       manufacturer: manufacturer?.trim() || null,
       model: model?.trim() || null,
@@ -59,7 +58,9 @@ export const handler: Handler = async (event) => {
     performed_by: emp.id,
     performed_by_name: emp.name,
     location: location?.trim() || "Shop",
-    note: notes?.trim() || "Item added to inventory",
+    note: serial
+      ? `Item added to inventory (serial: ${serial})`
+      : (notes?.trim() || "Item added to inventory"),
   });
 
   return json({ ok: true, item });
