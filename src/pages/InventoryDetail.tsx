@@ -14,11 +14,12 @@ function daysSince(iso: string) {
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  in_storage:   { label: "In Storage",   color: "#6ee7b7", bg: "rgba(52,211,153,0.15)" },
-  checked_out:  { label: "Checked Out",  color: "#fcd34d", bg: "rgba(251,191,36,0.15)" },
-  deployed:     { label: "Deployed",     color: "#818cf8", bg: "rgba(129,140,248,0.15)" },
-  in_repair:    { label: "In Repair",    color: "#f87171", bg: "rgba(248,113,113,0.15)" },
-  retired:      { label: "Retired",      color: "#6b7280", bg: "rgba(107,114,128,0.15)" },
+  in_storage:    { label: "In Storage",    color: "#6ee7b7", bg: "rgba(52,211,153,0.15)" },
+  checked_out:   { label: "Checked Out",   color: "#fcd34d", bg: "rgba(251,191,36,0.15)" },
+  deployed:      { label: "Deployed",      color: "#818cf8", bg: "rgba(129,140,248,0.15)" },
+  needs_repair:  { label: "Needs Repair",  color: "#fb923c", bg: "rgba(251,146,60,0.15)"  },
+  in_repair:     { label: "In Repair",     color: "#f87171", bg: "rgba(248,113,113,0.15)" },
+  retired:       { label: "Retired",       color: "#6b7280", bg: "rgba(107,114,128,0.15)" },
 };
 
 const EVENT_META: Record<string, { label: string; icon: string; color: string }> = {
@@ -27,6 +28,7 @@ const EVENT_META: Record<string, { label: string; icon: string; color: string }>
   checked_in:            { label: "Checked In",           icon: "↩️", color: "#6ee7b7" },
   deployed:              { label: "Deployed",             icon: "🔧", color: "#818cf8" },
   replaced:              { label: "Replaced",             icon: "🔄", color: "#fcd34d" },
+  needs_repair:          { label: "Needs Repair",         icon: "⚠️", color: "#fb923c" },
   pulled:                { label: "Pulled from Service",  icon: "⬆️", color: "#9ca3af" },
   sent_to_repair:        { label: "Sent to Repair",       icon: "🔨", color: "#f87171" },
   returned_from_repair:  { label: "Returned from Repair", icon: "✅", color: "#6ee7b7" },
@@ -45,7 +47,8 @@ const EVENT_ACTIONS: { event_type: string; label: string; icon: string; location
   { event_type: "checked_in",           label: "Check In",           icon: "↩️", locationLabel: "Returned to",              locationPlaceholder: "e.g. Shop, Storage Room",        locationRequired: true,  needsCondition: true, statusFilter: ["checked_out"] },
   { event_type: "deployed",             label: "Deploy",             icon: "🔧", locationLabel: "Deploy location",           locationPlaceholder: "e.g. Mako Lift Tower, Stage L",  locationRequired: true,  statusFilter: ["in_storage", "checked_out"] },
   { event_type: "pulled",               label: "Pull from Service",  icon: "⬆️", locationLabel: "Returning to",             locationPlaceholder: "e.g. Shop, EMS Storage",         locationRequired: true,  needsCondition: true, statusFilter: ["deployed"] },
-  { event_type: "sent_to_repair",       label: "Send to Repair",     icon: "🔨", locationLabel: "Repair location / vendor", locationPlaceholder: "e.g. Shop bench, B&H Service",   locationRequired: true,  needsVendor: true,    statusFilter: ["in_storage", "checked_out", "deployed"] },
+  { event_type: "needs_repair",         label: "Flag: Needs Repair", icon: "⚠️", locationLabel: "Current location",         locationPlaceholder: "Where is the item now?",         locationRequired: false, statusFilter: ["in_storage", "checked_out", "deployed"] },
+  { event_type: "sent_to_repair",       label: "Send to Repair",     icon: "🔨", locationLabel: "Repair location / vendor", locationPlaceholder: "e.g. Shop bench, B&H Service",   locationRequired: true,  needsVendor: true,    statusFilter: ["in_storage", "checked_out", "deployed", "needs_repair"] },
   { event_type: "returned_from_repair", label: "Return from Repair", icon: "✅", locationLabel: "Returned to",              locationPlaceholder: "e.g. Shop, EMS Storage",         locationRequired: true,  needsCondition: true, statusFilter: ["in_repair"] },
   { event_type: "retired",              label: "Retire",             icon: "🗃️", locationLabel: "Final location / reason",  locationPlaceholder: "e.g. Dead stock, Written off",   locationRequired: false },
   { event_type: "note",                 label: "Add Note",           icon: "📝", locationLabel: "Current location",         locationPlaceholder: "Where is this item right now?",  locationRequired: false },
@@ -165,12 +168,23 @@ export default function InventoryDetail() {
   const nav = useNavigate();
   const profile = getProfile();
 
-  const [item, setItem]     = useState<any>(null);
-  const [events, setEvents] = useState<any[]>([]);
-  const [stats, setStats]   = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [item, setItem]           = useState<any>(null);
+  const [events, setEvents]       = useState<any[]>([]);
+  const [stats, setStats]         = useState<any>(null);
+  const [loading, setLoading]     = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "audit" | "tickets">("overview");
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Linked work orders — fetched separately so they're always accurate
+  const [linkedTickets, setLinkedTickets] = useState<any[]>([]);
+
+  async function loadLinkedTickets() {
+    if (!id) return;
+    try {
+      const res = await apiFetch(`/api/ticket-inventory?item_id=${id}`);
+      if (res.ok) setLinkedTickets(res.tickets || []);
+    } catch { /* silent */ }
+  }
 
   // Action form
   const [showAction, setShowAction]     = useState(false);
@@ -207,11 +221,12 @@ export default function InventoryDetail() {
     setStatusError(null);
     try {
       const eventTypeMap: Record<string, string> = {
-        in_storage:  "pulled",
-        deployed:    "deployed",
-        in_repair:   "sent_to_repair",
-        retired:     "retired",
-        checked_out: "checked_out",
+        in_storage:   "pulled",
+        deployed:     "deployed",
+        needs_repair: "needs_repair",
+        in_repair:    "sent_to_repair",
+        retired:      "retired",
+        checked_out:  "checked_out",
       };
       const event_type = eventTypeMap[newStatus] || "note";
       const res = await apiFetch("/api/inventory-event", {
@@ -245,7 +260,7 @@ export default function InventoryDetail() {
     } catch { } finally { setLocationSaving(false); }
   }
 
-  useEffect(() => { if (id) void load(); }, [id]);
+  useEffect(() => { if (id) { void load(); void loadLinkedTickets(); } }, [id]);
 
   async function load() {
     setLoading(true);
@@ -285,16 +300,6 @@ export default function InventoryDetail() {
 
   // Primary display ID: serial_number if set, otherwise asset_tag
   const displayId = item.serial_number || item.asset_tag;
-
-  // Linked tickets (deduplicated)
-  const linkedTickets: any[] = [];
-  const seenIds = new Set<string>();
-  for (const ev of events) {
-    if (ev.linked_ticket && !seenIds.has(ev.linked_ticket.id)) {
-      seenIds.add(ev.linked_ticket.id);
-      linkedTickets.push(ev.linked_ticket);
-    }
-  }
 
   return (
     <div className="page fade-up">
@@ -578,7 +583,6 @@ export default function InventoryDetail() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {linkedTickets.map((t: any) => {
                 const statusColor = TICKET_STATUS_COLORS[t.status] || "#6b7280";
-                const relatedEvents = events.filter(e => e.linked_ticket_id === t.id);
                 return (
                   <Link key={t.id} to={`/tickets/${t.id}`} style={{ textDecoration: "none" }}>
                     <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer" }}
@@ -595,9 +599,9 @@ export default function InventoryDetail() {
                         {t.category && <span style={{ marginLeft: 8 }}>· {t.category}</span>}
                         {t.created_at && <span style={{ marginLeft: 8 }}>· {fmtDateShort(t.created_at)}</span>}
                       </div>
-                      {relatedEvents.length > 0 && (
+                      {t.events?.length > 0 && (
                         <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                          {relatedEvents.map(ev => {
+                          {t.events.map((ev: any) => {
                             const em = EVENT_META[ev.event_type] || { label: ev.event_type, icon: "•", color: "#9ca3af" };
                             return (
                               <span key={ev.id} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 99, background: `${em.color}18`, color: em.color, border: `1px solid ${em.color}33` }}>

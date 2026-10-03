@@ -88,6 +88,10 @@ export const handler: Handler = async (event) => {
       updates.deployed_to = null; updates.deployed_by = null; updates.deployed_by_name = null; updates.deployed_at = null;
       updates.location = location || "Shop";
       break;
+    case "needs_repair":
+      updates.status = "needs_repair";
+      updates.location = location || item.location;
+      break;
     case "sent_to_repair":
       updates.status = "in_repair";
       updates.location = vendor ? `Repair: ${vendor}` : "In Repair";
