@@ -32,6 +32,56 @@ function dueInfo(t: WorkOrder) {
   return { label: `Due ${fmt}`, variant: "success" as const };
 }
 
+// ── Excel export ──────────────────────────────────────────────────────────────
+async function exportToExcel(openAll: WorkOrder[]) {
+  // Dynamically load SheetJS from CDN
+  if (!(window as any).XLSX) {
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load SheetJS"));
+      document.head.appendChild(script);
+    });
+  }
+  const XLSX = (window as any).XLSX;
+
+  const rows = openAll.map(t => ({
+    "Title":       t.title || "Untitled",
+    "Type":        t._type === "project" ? "Project" : "Ticket",
+    "Category":    t.tag || "Misc",
+    "Location":    t.location || "",
+    "Assigned To": t.assigned_to_name || "",
+    "Submitted By":t.created_by_name || "",
+    "Created":     t.created_at ? new Date(t.created_at).toLocaleString() : "",
+    "Due Date":    t.sla_due_at ? new Date(t.sla_due_at).toLocaleString() : "",
+    "Status":      t.status || "open",
+    "Overdue":     parseDate(t.sla_due_at) > 0 && parseDate(t.sla_due_at) < Date.now() ? "Yes" : "No",
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Column widths
+  ws["!cols"] = [
+    { wch: 40 }, // Title
+    { wch: 10 }, // Type
+    { wch: 12 }, // Category
+    { wch: 22 }, // Location
+    { wch: 20 }, // Assigned To
+    { wch: 20 }, // Submitted By
+    { wch: 20 }, // Created
+    { wch: 20 }, // Due Date
+    { wch: 10 }, // Status
+    { wch: 8  }, // Overdue
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Open Work Orders");
+
+  const date = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `open-work-orders-${date}.xlsx`);
+}
+
 export default function Tickets() {
   const [items, setItems] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +93,7 @@ export default function Tickets() {
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [showFilters, setShowFilters]     = useState(false);
   const [sortBy, setSortBy]               = useState<"newest" | "oldest" | "due_soon" | "due_late">("newest");
+  const [exporting, setExporting]         = useState(false);
   const profile = getProfile();
   const role = getRole();
   const isShowTech = role === "show_tech";
@@ -57,7 +108,6 @@ export default function Tickets() {
       if (!tr?.ok) throw new Error(tr?.error || "Failed to load");
       const tickets = (tr?.tickets || tr?.data?.tickets || []).map((t: any) => ({ ...t, _type: "ticket" }));
       const projects = (pr?.ok ? (pr?.projects || pr?.data?.projects || []) : []).map((p: any) => ({ ...p, _type: "project" }));
-      // Merge and sort by SLA due date
       const merged = [...tickets, ...projects].sort((a, b) => parseDate(a.sla_due_at) - parseDate(b.sla_due_at));
       setItems(merged);
     } catch (e: any) {
@@ -160,6 +210,18 @@ export default function Tickets() {
     due_late: "Due latest",
   };
 
+  async function handleExport() {
+    if (exporting || openAll.length === 0) return;
+    setExporting(true);
+    try {
+      await exportToExcel(openAll);
+    } catch (err: any) {
+      alert("Export failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="page">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
@@ -167,17 +229,55 @@ export default function Tickets() {
           <h1 className="page-title">Work Orders</h1>
           <div className="page-subtitle">All tickets and projects — sorted by due date.</div>
         </div>
-        <button onClick={() => setShowFilters(v => !v)} style={{
-          padding: "7px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
-          border: "1px solid", transition: "all 0.15s",
-          borderColor: activeFilters > 0 ? "rgba(92,107,255,0.5)" : "var(--border)",
-          background: activeFilters > 0 ? "rgba(92,107,255,0.15)" : "rgba(255,255,255,0.05)",
-          color: activeFilters > 0 ? "#B0B8FF" : "var(--muted)",
-          display: "flex", alignItems: "center", gap: 6,
-        }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
-          Filter{activeFilters > 0 ? ` (${activeFilters})` : ""} · {SORT_LABELS[sortBy]}
-        </button>
+
+        {/* Right-side controls: Export + Filter */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* Export button */}
+          <button
+            onClick={handleExport}
+            disabled={exporting || loading || openAll.length === 0}
+            title={openAll.length === 0 ? "No open tickets to export" : `Export ${openAll.length} open work orders`}
+            style={{
+              padding: "7px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: exporting || openAll.length === 0 ? "default" : "pointer",
+              border: "1px solid rgba(52,211,153,0.35)",
+              background: "rgba(52,211,153,0.08)",
+              color: exporting || openAll.length === 0 ? "rgba(52,211,153,0.4)" : "#34d399",
+              display: "flex", alignItems: "center", gap: 6,
+              transition: "all 0.15s",
+              opacity: loading ? 0.5 : 1,
+            }}
+          >
+            {exporting ? (
+              <>
+                <span className="spinner" style={{ width: 12, height: 12, borderColor: "#34d399", borderTopColor: "transparent", borderWidth: 2 }} />
+                Exporting…
+              </>
+            ) : (
+              <>
+                {/* Down-arrow / spreadsheet icon */}
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Export
+              </>
+            )}
+          </button>
+
+          {/* Filter button */}
+          <button onClick={() => setShowFilters(v => !v)} style={{
+            padding: "7px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
+            border: "1px solid", transition: "all 0.15s",
+            borderColor: activeFilters > 0 ? "rgba(92,107,255,0.5)" : "var(--border)",
+            background: activeFilters > 0 ? "rgba(92,107,255,0.15)" : "rgba(255,255,255,0.05)",
+            color: activeFilters > 0 ? "#B0B8FF" : "var(--muted)",
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+            Filter{activeFilters > 0 ? ` (${activeFilters})` : ""} · {SORT_LABELS[sortBy]}
+          </button>
+        </div>
       </div>
 
       {/* Filter panel */}
