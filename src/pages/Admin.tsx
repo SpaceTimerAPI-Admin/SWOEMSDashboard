@@ -11,9 +11,38 @@ const ROLE_COLORS: Record<string, string> = {
 };
 const ROLE_TEXT: Record<string, string> = { admin: "#FFD07A", ems: "#B0B8FF", show_tech: "#7EEFC4" };
 
+const EMAIL_PREFS: { key: string; label: string; desc: string }[] = [
+  { key: "email_overdue_alert",      label: "Overdue Alert",      desc: "Emailed when a ticket goes overdue" },
+  { key: "email_assigned_recap",     label: "Assigned Recap",     desc: "Daily recap of tickets assigned to them" },
+  { key: "email_assignment_notify",  label: "Assignment Notify",  desc: "Instant email when assigned a ticket" },
+  { key: "email_weekly_summary",     label: "Weekly Summary",     desc: "Weekly summary of all activity" },
+  { key: "email_sound_recap",        label: "Sound Recap",        desc: "Sound department daily recap" },
+  { key: "email_lighting_recap",     label: "Lighting Recap",     desc: "Lighting department daily recap" },
+];
+
 function fmtDate(iso: string) {
   if (!iso) return "Never";
   return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
+        background: checked ? "var(--primary)" : "rgba(255,255,255,0.12)",
+        position: "relative", transition: "background 0.2s", flexShrink: 0,
+      }}
+    >
+      <span style={{
+        position: "absolute", top: 2, left: checked ? 18 : 2,
+        width: 16, height: 16, borderRadius: "50%", background: "#fff",
+        transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+      }} />
+    </button>
+  );
 }
 
 export default function Admin() {
@@ -75,7 +104,19 @@ export default function Admin() {
 
   function openEdit(emp: any) {
     setEditTarget(emp);
-    setEditForm({ name: emp.name, email: emp.email, role: emp.role, pin: "" });
+    setEditForm({
+      name: emp.name,
+      email: emp.email,
+      role: emp.role,
+      pin: "",
+      // Email prefs — default to false if not set
+      email_overdue_alert: !!emp.email_overdue_alert,
+      email_assigned_recap: !!emp.email_assigned_recap,
+      email_assignment_notify: !!emp.email_assignment_notify,
+      email_weekly_summary: !!emp.email_weekly_summary,
+      email_sound_recap: !!emp.email_sound_recap,
+      email_lighting_recap: !!emp.email_lighting_recap,
+    });
     setStatusMsg(null);
   }
 
@@ -86,7 +127,11 @@ export default function Admin() {
           <div className="page-title">Admin</div>
           <div className="page-subtitle">User Management</div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link to="/admin/elijah"
+            style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(92,107,255,0.35)", background: "rgba(92,107,255,0.1)", color: "#B0B8FF", fontSize: 13, fontWeight: 600, textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+            🤖 Elijah Logs
+          </Link>
           <Link to="/admin/schedule"
             style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
             📅 Schedule
@@ -117,37 +162,52 @@ export default function Admin() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {employees.map(emp => (
-            <div key={emp.id} className="card" style={{ padding: "14px 16px", opacity: emp.is_active ? 1 : 0.55 }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{emp.name}</span>
-                    <span style={{ fontSize: 11, padding: "1px 8px", borderRadius: 99, fontWeight: 600,
-                      background: ROLE_COLORS[emp.role] || ROLE_COLORS.ems,
-                      color: ROLE_TEXT[emp.role] || ROLE_TEXT.ems }}>
-                      {ROLE_LABELS[emp.role] || emp.role}
-                    </span>
-                    {!emp.is_active && (
+          {employees.map(emp => {
+            const activeEmailPrefs = EMAIL_PREFS.filter(p => emp[p.key]);
+            return (
+              <div key={emp.id} className="card" style={{ padding: "14px 16px", opacity: emp.is_active ? 1 : 0.55 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{emp.name}</span>
                       <span style={{ fontSize: 11, padding: "1px 8px", borderRadius: 99, fontWeight: 600,
-                        background: "rgba(255,84,84,0.12)", color: "#FFB0B0" }}>Inactive</span>
+                        background: ROLE_COLORS[emp.role] || ROLE_COLORS.ems,
+                        color: ROLE_TEXT[emp.role] || ROLE_TEXT.ems }}>
+                        {ROLE_LABELS[emp.role] || emp.role}
+                      </span>
+                      {!emp.is_active && (
+                        <span style={{ fontSize: 11, padding: "1px 8px", borderRadius: 99, fontWeight: 600,
+                          background: "rgba(255,84,84,0.12)", color: "#FFB0B0" }}>Inactive</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>
+                      ID #{emp.employee_id} · {emp.email}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted2)", marginBottom: activeEmailPrefs.length ? 6 : 0 }}>
+                      Last login: {fmtDate(emp.last_login_at)}
+                    </div>
+                    {/* Active email prefs summary */}
+                    {activeEmailPrefs.length > 0 && (
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {activeEmailPrefs.map(p => (
+                          <span key={p.key} style={{
+                            fontSize: 10, padding: "1px 7px", borderRadius: 99, fontWeight: 600,
+                            background: "rgba(0,163,224,0.1)", color: "#70CFFF",
+                            border: "1px solid rgba(0,163,224,0.2)",
+                          }}>✉ {p.label}</span>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>
-                    ID #{emp.employee_id} · {emp.email}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--muted2)" }}>
-                    Last login: {fmtDate(emp.last_login_at)}
-                  </div>
+                  <button onClick={() => openEdit(emp)}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)",
+                      background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+                    Edit
+                  </button>
                 </div>
-                <button onClick={() => openEdit(emp)}
-                  style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)",
-                    background: "rgba(255,255,255,0.05)", color: "var(--muted)", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
-                  Edit
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -206,8 +266,8 @@ export default function Admin() {
       {/* EDIT MODAL */}
       {editTarget && (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditTarget(null); }}>
-          <div className="card modal-card" style={{ maxWidth: 400, width: "100%" }}>
-            <div className="modal-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div className="card modal-card" style={{ maxWidth: 420, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+            <div className="modal-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "var(--bg1)", zIndex: 1, paddingBottom: 12 }}>
               <h3 className="modal-title">Edit — {editTarget.name}</h3>
               <button onClick={() => setEditTarget(null)}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 20, lineHeight: 1 }}>×</button>
@@ -234,7 +294,37 @@ export default function Admin() {
                   ))}
                 </div>
               </div>
-              <div style={{ marginTop: 14, display: "flex", gap: 8, justifyContent: "space-between" }}>
+
+              {/* Email Report Preferences */}
+              <div style={{ marginTop: 16 }}>
+                <div className="field-label" style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  ✉ Email Reports
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {EMAIL_PREFS.map(pref => (
+                    <div key={pref.key} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                      padding: "9px 12px", borderRadius: 8,
+                      background: editForm[pref.key] ? "rgba(0,163,224,0.07)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${editForm[pref.key] ? "rgba(0,163,224,0.2)" : "var(--border)"}`,
+                      transition: "all 0.15s",
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: editForm[pref.key] ? "#70CFFF" : "var(--text)" }}>
+                          {pref.label}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 1 }}>{pref.desc}</div>
+                      </div>
+                      <Toggle
+                        checked={!!editForm[pref.key]}
+                        onChange={v => setEditForm((f: any) => ({ ...f, [pref.key]: v }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16, display: "flex", gap: 8, justifyContent: "space-between" }}>
                 <button
                   onClick={() => handleUpdate(editTarget.id, { is_active: !editTarget.is_active })}
                   disabled={busy}
@@ -247,7 +337,18 @@ export default function Admin() {
                 <button className="btn primary"
                   disabled={busy}
                   onClick={() => {
-                    const changes: any = { name: editForm.name, email: editForm.email, role: editForm.role };
+                    const changes: any = {
+                      name: editForm.name,
+                      email: editForm.email,
+                      role: editForm.role,
+                      // Always send all email prefs so they can be toggled off
+                      email_overdue_alert: !!editForm.email_overdue_alert,
+                      email_assigned_recap: !!editForm.email_assigned_recap,
+                      email_assignment_notify: !!editForm.email_assignment_notify,
+                      email_weekly_summary: !!editForm.email_weekly_summary,
+                      email_sound_recap: !!editForm.email_sound_recap,
+                      email_lighting_recap: !!editForm.email_lighting_recap,
+                    };
                     if (editForm.pin) changes.pin = editForm.pin;
                     handleUpdate(editTarget.id, changes);
                   }}>
