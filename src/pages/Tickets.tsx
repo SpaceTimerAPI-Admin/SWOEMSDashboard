@@ -216,7 +216,7 @@ export default function Tickets() {
     );
   }
 
-  const activeFilters = [filterTag, filterType !== "all" ? filterType : "", filterOverdue ? "overdue" : "", filterStatus !== "all" ? filterStatus : ""].filter(Boolean).length;
+  const activeFilters = [filterTag, filterOverdue ? "overdue" : "", filterStatus !== "all" ? filterStatus : ""].filter(Boolean).length;
 
   const SORT_LABELS: Record<string, string> = {
     last_updated:  "Last updated",
@@ -328,21 +328,6 @@ export default function Tickets() {
                     <input type="radio" name="filterStatus" checked={filterStatus === v} onChange={() => setFilterStatus(v)} style={{ accentColor: "var(--primary)" }} />
                     <span style={{ fontSize: 13, color: filterStatus === v ? "var(--text)" : "var(--muted)" }}>
                       {v === "all" ? "All" : v === "open" ? "Open" : "Closed"}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Type */}
-            <div style={{ flex: 1, minWidth: 130 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 7 }}>Type</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                {(["all", "ticket", "project"] as const).map(v => (
-                  <label key={v} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                    <input type="radio" name="filterType" checked={filterType === v} onChange={() => setFilterType(v)} style={{ accentColor: "var(--primary)" }} />
-                    <span style={{ fontSize: 13, color: filterType === v ? "var(--text)" : "var(--muted)" }}>
-                      {v === "all" ? "All" : v === "ticket" ? "Tickets" : "Projects"}
                     </span>
                   </label>
                 ))}
