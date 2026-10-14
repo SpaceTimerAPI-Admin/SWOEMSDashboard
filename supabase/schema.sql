@@ -265,3 +265,15 @@ alter table public.tickets add column if not exists updated_at timestamptz null;
 update public.tickets set updated_at = created_at where updated_at is null;
 -- Index for efficient sorting by last updated
 create index if not exists tickets_updated_at_idx on public.tickets(updated_at desc nulls last);
+
+-- Migration: add last_login_at to employees (tracks when each user last logged in)
+alter table public.employees add column if not exists last_login_at timestamptz null;
+-- Migration: add role and notification preference columns to employees if missing
+alter table public.employees add column if not exists role text not null default 'ems';
+alter table public.employees add column if not exists email_overdue_alert boolean not null default false;
+alter table public.employees add column if not exists email_assigned_recap boolean not null default false;
+alter table public.employees add column if not exists email_weekly_summary boolean not null default false;
+alter table public.employees add column if not exists email_assignment_notify boolean not null default false;
+alter table public.employees add column if not exists email_sound_recap boolean not null default false;
+alter table public.employees add column if not exists email_lighting_recap boolean not null default false;
+alter table public.employees add column if not exists preferences jsonb null;

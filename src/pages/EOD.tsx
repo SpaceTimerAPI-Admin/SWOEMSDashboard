@@ -16,6 +16,15 @@ function fmtTime(v: any): string {
   return new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+function fmtDateTime(v: any): string {
+  const ms = parseDate(v);
+  if (!ms) return "";
+  return new Date(ms).toLocaleString("en-US", {
+    month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  });
+}
+
 function isClosed(item: any): boolean {
   const s = (item?.status || "").toLowerCase();
   return s === "closed" || s === "done" || !!item?.closed_at || !!item?.closedAt;
@@ -28,6 +37,31 @@ const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   Rides:    { bg: "rgba(255,84,84,0.12)", text: "#FFB0B0" },
   Misc:     { bg: "rgba(255,255,255,0.07)", text: "rgba(200,210,255,0.75)" },
 };
+
+// Activity chip config
+const ACTIVITY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  "New Ticket":   { bg: "rgba(0,163,224,0.13)", text: "#70CFFF", border: "rgba(0,163,224,0.28)" },
+  "New Project":  { bg: "rgba(0,163,224,0.13)", text: "#70CFFF", border: "rgba(0,163,224,0.28)" },
+  "Closed":       { bg: "rgba(46,232,160,0.1)",  text: "#7EEFC4", border: "rgba(46,232,160,0.25)" },
+  "New Comment":  { bg: "rgba(168,144,255,0.12)", text: "#C4B5FF", border: "rgba(168,144,255,0.28)" },
+  "Reopened":     { bg: "rgba(255,182,39,0.12)",  text: "#FFD07A", border: "rgba(255,182,39,0.28)" },
+  "Open":         { bg: "rgba(255,255,255,0.06)", text: "rgba(200,210,255,0.6)", border: "rgba(255,255,255,0.1)" },
+};
+
+function ActivityChip({ label }: { label: string }) {
+  const style = ACTIVITY_STYLES[label] || ACTIVITY_STYLES["Open"];
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", padding: "2px 8px",
+      borderRadius: 999, fontSize: 11, fontWeight: 700,
+      background: style.bg, color: style.text,
+      border: `1px solid ${style.border}`,
+      letterSpacing: "0.02em",
+    }}>
+      {label}
+    </span>
+  );
+}
 
 function TagBadge({ tag }: { tag: string }) {
   const colors = TAG_COLORS[tag] || TAG_COLORS.Misc;
@@ -49,6 +83,31 @@ function StatusDot({ closed }: { closed: boolean }) {
       background: closed ? "rgba(255,255,255,0.2)" : "#2EE8A0",
       boxShadow: closed ? "none" : "0 0 6px rgba(46,232,160,0.6)",
     }} />
+  );
+}
+
+function LastCommentBlock({ comment }: { comment: { comment: string; employee_name: string; created_at: string } }) {
+  return (
+    <div style={{
+      marginTop: 8, padding: "8px 10px", borderRadius: 8,
+      background: "rgba(168,144,255,0.07)", borderLeft: "2px solid rgba(168,144,255,0.35)",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3, gap: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(196,181,255,0.8)", flexShrink: 0 }}>
+          💬 {comment.employee_name}
+        </span>
+        <span style={{ fontSize: 10, color: "var(--muted2)", whiteSpace: "nowrap" }}>
+          {fmtDateTime(comment.created_at)}
+        </span>
+      </div>
+      <div style={{
+        fontSize: 12, color: "var(--muted)", lineHeight: 1.45,
+        overflow: "hidden", display: "-webkit-box",
+        WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+      }}>
+        {comment.comment}
+      </div>
+    </div>
   );
 }
 
@@ -266,16 +325,33 @@ export default function EOD() {
                             <StatusDot closed={isClosed(t)} />
                             <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{t.title || "Untitled"}</span>
                           </div>
-                          {t.location && <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>📍 {t.location}</div>}
+                          {t.location && <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>📍 {t.location}</div>}
+
+                          {/* Activity bubbles row */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
+                            {/* Created at bubble — always shown */}
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: 999,
+                              background: "rgba(255,255,255,0.06)", color: "var(--muted2)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                            }}>
+                              📌 Created {fmtTime(t.created_at)}
+                            </span>
+                            {/* Today's activity chip */}
+                            {t.activity && <ActivityChip label={t.activity} />}
+                          </div>
+
                           <div style={{ fontSize: 11, color: "var(--muted2)" }}>
-                            Ticket · {fmtTime(t.created_at)}
-                            {t.created_by_name ? ` · ${t.created_by_name}` : ""}
+                            Work Order · {fmtTime(t.created_at)}
                           </div>
                         </div>
                         <span className={`chip ${isClosed(t) ? "neutral" : "success"}`}>
                           {isClosed(t) ? "Closed" : "Open"}
                         </span>
                       </div>
+
+                      {/* Last comment block */}
+                      {t.last_comment && <LastCommentBlock comment={t.last_comment} />}
                     </Link>
                   ))}
                   {group.projects.map((p: any) => (
@@ -286,16 +362,31 @@ export default function EOD() {
                             <StatusDot closed={isClosed(p)} />
                             <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{p.title || "Untitled"}</span>
                           </div>
-                          {p.location && <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 2 }}>📍 {p.location}</div>}
+                          {p.location && <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>📍 {p.location}</div>}
+
+                          {/* Activity bubbles row */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, padding: "1px 7px", borderRadius: 999,
+                              background: "rgba(255,255,255,0.06)", color: "var(--muted2)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                            }}>
+                              📌 Created {fmtTime(p.created_at)}
+                            </span>
+                            {p.activity && <ActivityChip label={p.activity} />}
+                          </div>
+
                           <div style={{ fontSize: 11, color: "var(--muted2)" }}>
                             Project · {fmtTime(p.created_at)}
-                            {p.created_by_name ? ` · ${p.created_by_name}` : ""}
                           </div>
                         </div>
                         <span className={`chip ${isClosed(p) ? "neutral" : "warn"}`}>
                           {isClosed(p) ? "Closed" : "Open"}
                         </span>
                       </div>
+
+                      {/* Last comment block */}
+                      {p.last_comment && <LastCommentBlock comment={p.last_comment} />}
                     </Link>
                   ))}
                 </div>
