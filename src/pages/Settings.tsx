@@ -151,7 +151,7 @@ export default function Settings() {
     savePrefs({ backgroundImage: "" });
   }
 
-  const activeTheme = prefs.theme || "hos";
+  const activeTheme = prefs.theme || "seaworld";
 
   return (
     <div className="page fade-up">

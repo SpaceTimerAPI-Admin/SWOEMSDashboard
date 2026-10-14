@@ -61,7 +61,8 @@ create table if not exists public.tickets (
   closed_by uuid null references public.employees(id),
   closed_at timestamptz null,
   sla_minutes int not null default 60,
-  sla_due_at timestamptz not null
+  sla_due_at timestamptz not null,
+  updated_at timestamptz null
 );
 
 create index if not exists tickets_status_idx on public.tickets(status);
@@ -257,3 +258,10 @@ create index if not exists project_photos_project_id_idx on public.project_photo
 
 alter table public.ticket_photos enable row level security;
 alter table public.project_photos enable row level security;
+
+-- Migration: add updated_at to tickets for "last updated" sort and display
+alter table public.tickets add column if not exists updated_at timestamptz null;
+-- Backfill: set updated_at = created_at for existing tickets that have no value
+update public.tickets set updated_at = created_at where updated_at is null;
+-- Index for efficient sorting by last updated
+create index if not exists tickets_updated_at_idx on public.tickets(updated_at desc nulls last);

@@ -4,6 +4,7 @@ import { listTickets, listProjects } from "../lib/api";
 import { getProfile, getRole } from "../lib/auth";
 
 type WorkOrder = any;
+type SortOption = "last_updated" | "newest" | "oldest" | "due_soon" | "due_late" | "overdue_first";
 
 function isClosed(t: WorkOrder): boolean {
   return ["closed", "done"].includes((t?.status || "").toLowerCase()) || !!t?.closed_at;
@@ -92,7 +93,9 @@ export default function Tickets() {
   const [filterType, setFilterType]       = useState<"all" | "ticket" | "project">("all");
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [showFilters, setShowFilters]     = useState(false);
-  const [sortBy, setSortBy]               = useState<"newest" | "oldest" | "due_soon" | "due_late">("newest");
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    return (localStorage.getItem("swoems_sort_pref") as SortOption) || "last_updated";
+  });
   const [exporting, setExporting]         = useState(false);
   const profile = getProfile();
   const role = getRole();
@@ -129,11 +132,18 @@ export default function Tickets() {
 
     function applySort(arr: WorkOrder[]): WorkOrder[] {
       switch (sortBy) {
-        case "newest":   return [...arr].sort((a, b) => parseDate(b.created_at) - parseDate(a.created_at));
-        case "oldest":   return [...arr].sort((a, b) => parseDate(a.created_at) - parseDate(b.created_at));
-        case "due_soon": return [...arr].sort((a, b) => parseDate(a.sla_due_at) - parseDate(b.sla_due_at));
-        case "due_late": return [...arr].sort((a, b) => parseDate(b.sla_due_at) - parseDate(a.sla_due_at));
-        default:         return arr;
+        case "last_updated":  return [...arr].sort((a, b) => parseDate(b.updated_at || b.created_at) - parseDate(a.updated_at || a.created_at));
+        case "newest":        return [...arr].sort((a, b) => parseDate(b.created_at) - parseDate(a.created_at));
+        case "oldest":        return [...arr].sort((a, b) => parseDate(a.created_at) - parseDate(b.created_at));
+        case "due_soon":      return [...arr].sort((a, b) => parseDate(a.sla_due_at) - parseDate(b.sla_due_at));
+        case "due_late":      return [...arr].sort((a, b) => parseDate(b.sla_due_at) - parseDate(a.sla_due_at));
+        case "overdue_first": return [...arr].sort((a, b) => {
+          const aOverdue = parseDate(a.sla_due_at) > 0 && parseDate(a.sla_due_at) < Date.now() ? 0 : 1;
+          const bOverdue = parseDate(b.sla_due_at) > 0 && parseDate(b.sla_due_at) < Date.now() ? 0 : 1;
+          if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+          return parseDate(a.sla_due_at) - parseDate(b.sla_due_at);
+        });
+        default:              return arr;
       }
     }
 
@@ -189,6 +199,11 @@ export default function Tickets() {
           {t.created_at && <><span className="dot">•</span><span>{fmtDateTime(t.created_at)}</span></>}
           {submitter && <><span className="dot">•</span><span>by {submitter}</span></>}
         </div>
+        {(t.updated_at || t.created_at) && (
+          <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 4 }}>
+            Last updated — {fmtDateTime(t.updated_at || t.created_at)}
+          </div>
+        )}
         <div className="chip-row">
           {due && <span className={`chip ${due.variant}`}>{due.label}</span>}
           {assignedName && (
@@ -204,11 +219,18 @@ export default function Tickets() {
   const activeFilters = [filterTag, filterType !== "all" ? filterType : "", filterOverdue ? "overdue" : "", filterStatus !== "all" ? filterStatus : ""].filter(Boolean).length;
 
   const SORT_LABELS: Record<string, string> = {
-    newest: "Newest first",
-    oldest: "Oldest first",
-    due_soon: "Due soonest",
-    due_late: "Due latest",
+    last_updated:  "Last updated",
+    newest:        "Newest first",
+    oldest:        "Oldest first",
+    due_soon:      "Due soonest",
+    due_late:      "Due latest",
+    overdue_first: "Overdue first",
   };
+
+  function handleSortChange(v: SortOption) {
+    setSortBy(v);
+    localStorage.setItem("swoems_sort_pref", v);
+  }
 
   async function handleExport() {
     if (exporting || openAll.length === 0) return;
@@ -288,9 +310,9 @@ export default function Tickets() {
             <div style={{ flex: 1, minWidth: 130 }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 7 }}>Sort By</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                {(["newest", "oldest", "due_soon", "due_late"] as const).map(v => (
+                {(["last_updated", "newest", "oldest", "due_soon", "due_late", "overdue_first"] as const).map(v => (
                   <label key={v} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                    <input type="radio" name="sortBy" checked={sortBy === v} onChange={() => setSortBy(v)} style={{ accentColor: "var(--primary)" }} />
+                    <input type="radio" name="sortBy" checked={sortBy === v} onChange={() => handleSortChange(v)} style={{ accentColor: "var(--primary)" }} />
                     <span style={{ fontSize: 13, color: sortBy === v ? "var(--text)" : "var(--muted)" }}>{SORT_LABELS[v]}</span>
                   </label>
                 ))}

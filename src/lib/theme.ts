@@ -3,7 +3,7 @@
  * Reads from server on login, falls back to localStorage for instant load.
  */
 
-export type ThemePreset = "hos" | "classic" | "purple" | "forest" | "slate" | "custom";
+export type ThemePreset = "seaworld" | "hos" | "classic" | "purple" | "forest" | "slate" | "custom";
 
 export interface UserPreferences {
   theme?: ThemePreset;
@@ -21,6 +21,15 @@ export const PRESETS: {
   glow: string; navBg: string;
   gradient: string;
 }[] = [
+  {
+    id: "seaworld", label: "SeaWorld Blue", emoji: "🌊",
+    primary: "#0066B3", primary2: "#00A3E0",
+    bg0: "#04080F", bg1: "#060D18",
+    border: "rgba(0,130,220,0.18)", borderStrong: "rgba(0,150,240,0.32)",
+    text: "#E8F4FF", muted: "rgba(180,215,255,0.65)", muted2: "rgba(160,200,255,0.4)",
+    glow: "rgba(0,102,179,0.35)", navBg: "rgba(4,8,18,0.94)",
+    gradient: "radial-gradient(ellipse 800px 600px at 15% -5%, rgba(0,100,200,.22) 0%, transparent 60%), radial-gradient(ellipse 600px 500px at 90% 5%, rgba(0,60,140,.14) 0%, transparent 55%), radial-gradient(ellipse 1000px 800px at 50% 100%, rgba(0,80,170,.18) 0%, transparent 60%), linear-gradient(180deg, #060D18 0%, #04080F 100%)",
+  },
   {
     id: "hos", label: "Howl-O-Scream", emoji: "🎃",
     primary: "#CC1111", primary2: "#E82020",
@@ -101,8 +110,8 @@ export function applyTheme(prefs: UserPreferences) {
 
   // Resolve which preset to use (custom falls back to classic for structural vars)
   const isCustom = prefs.theme === "custom";
-  const basePreset = PRESETS.find(p => p.id === prefs.theme) || PRESETS.find(p => p.id === "classic")!;
-  const preset = isCustom ? { ...PRESETS[1] } : basePreset; // start from classic for custom
+  const basePreset = PRESETS.find(p => p.id === prefs.theme) || PRESETS.find(p => p.id === "seaworld")!;
+  const preset = isCustom ? { ...PRESETS.find(p => p.id === "seaworld")! } : basePreset; // start from seaworld for custom
 
   let primary   = isCustom && prefs.primaryColor ? prefs.primaryColor : preset.primary;
   let primary2  = isCustom && prefs.primaryColor ? prefs.primaryColor : preset.primary2;

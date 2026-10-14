@@ -35,6 +35,14 @@ export const handler: Handler = async (event) => {
 
     if (error) return json({ ok: false, error: error.message }, 500);
 
+    // Reset SLA to 2 days from now and record updated_at on every comment/update
+    const now = new Date();
+    const sla_due_at = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    await supabase
+      .from("tickets")
+      .update({ updated_at: now.toISOString(), sla_due_at, sla_minutes: 2880 })
+      .eq("id", ticket_id);
+
     // no GroupMe on every comment (spam) - can change later
 
     return json({ ok: true, comment: data });

@@ -14,9 +14,18 @@ export const handler: Handler = async (event) => {
     if (!id) return badRequest("id required");
 
     const supabase = supabaseAdmin();
+    const now = new Date();
+    const sla_due_at = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
     const { error } = await supabase
       .from("tickets")
-      .update({ status: "open", closed_at: null, closed_by: null })
+      .update({
+        status: "open",
+        closed_at: null,
+        closed_by: null,
+        updated_at: now.toISOString(),
+        sla_due_at,
+        sla_minutes: 2880,
+      })
       .eq("id", id);
 
     if (error) return json({ ok: false, error: error.message }, 500);

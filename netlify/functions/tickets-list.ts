@@ -32,7 +32,7 @@ export const handler: Handler = async (event) => {
     let q = supabase
       .from("tickets")
       .select(`
-        id, title, location, details, status, tag, created_at, sla_due_at, sla_minutes,
+        id, title, location, details, status, tag, created_at, updated_at, sla_due_at, sla_minutes,
         created_by, assigned_to, assigned_to_show_tech,
         employees!tickets_created_by_fkey(name, role),
         assignee:employees!tickets_assigned_to_fkey(name, role)
