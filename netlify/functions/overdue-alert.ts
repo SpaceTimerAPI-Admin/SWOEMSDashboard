@@ -129,25 +129,14 @@ function assignedTicketCard(t: any, now: Date): string {
 }
 
 function buildHtml(opts: {
-  name: string;
   overdueTickets: any[];
-  myTickets: any[];
   now: Date;
   dateDisplay: string;
 }): string {
-  const { name, overdueTickets, myTickets, now, dateDisplay } = opts;
+  const { overdueTickets, now, dateDisplay } = opts;
   const overdueCount = overdueTickets.length;
-  const myOverdueCount = myTickets.filter((t: any) => new Date(t.sla_due_at) < now).length;
 
   const overdueSection = overdueTickets.map(t => overdueTicketCard(t, now)).join("");
-
-  const mySection = myTickets.length === 0 ? "" : `
-    <div style="margin-top:32px;margin-bottom:16px;">
-      <h2 style="font-size:17px;color:#e5e7eb;font-weight:800;margin:0 0 4px;">📋 Your Assigned Tickets</h2>
-      <div style="font-size:13px;color:#6b7280;">${myTickets.length} open ticket${myTickets.length !== 1 ? "s" : ""} currently assigned to you${myOverdueCount > 0 ? `, ${myOverdueCount} overdue` : ""}</div>
-    </div>
-    ${myTickets.map(t => assignedTicketCard(t, now)).join("")}
-  `;
 
   return `<!DOCTYPE html>
 <html>
@@ -157,7 +146,7 @@ function buildHtml(opts: {
 
     <!-- Header -->
     <div style="text-align:center;margin-bottom:28px;">
-      <div style="font-size:13px;color:#6b7280;margin-bottom:6px;">SeaWorld Entertainment Maintenance · Hi ${escapeHtml(name)}</div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:6px;">SeaWorld Entertainment Maintenance</div>
       <h1 style="margin:0;font-size:24px;color:#f87171;font-weight:800;">⚠️ Overdue Ticket Alert</h1>
       <div style="font-size:13px;color:#6b7280;margin-top:6px;">${dateDisplay}</div>
     </div>
@@ -170,11 +159,8 @@ function buildHtml(opts: {
       </div>
     </div>
 
-    <!-- All overdue tickets (shared section) -->
+    <!-- All overdue tickets -->
     ${overdueSection}
-
-    <!-- Personal assigned section -->
-    ${mySection}
 
     <!-- Footer -->
     <div style="text-align:center;margin-top:28px;padding-top:20px;border-top:1px solid #1e2030;">
@@ -297,44 +283,35 @@ export const handler: Handler = async () => {
       timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric",
     });
 
-    let sentCount = 0;
+    const allEmails = employees.map((e: any) => e.email).filter(Boolean);
+    const toEmail   = allEmails[0];
+    const ccEmails  = allEmails.slice(1);
 
-    // Each recipient gets a personalized email: shared overdue list + their own assigned section
-    for (const emp of employees) {
-      const myTickets = byAssignee.get(emp.id) || [];
+    const html = buildHtml({ overdueTickets: shapedOverdue, now, dateDisplay });
+    const subject = `⚠️ SWOEMS — ${shapedOverdue.length} Overdue Ticket${shapedOverdue.length !== 1 ? "s" : ""} · ${now.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" })}`;
 
-      const html = buildHtml({
-        name: emp.name,
-        overdueTickets: shapedOverdue,
-        myTickets,
-        now,
-        dateDisplay,
+    const payload: Record<string, any> = { from, to: [toEmail], subject, html };
+    if (ccEmails.length > 0) payload.cc = ccEmails;
+
+    try {
+      const sendRes = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify(payload),
       });
 
-      const subject = myTickets.length > 0
-        ? `⚠️ SWOEMS — ${shapedOverdue.length} Overdue (${myTickets.length} assigned to you) · ${now.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" })}`
-        : `⚠️ SWOEMS — ${shapedOverdue.length} Overdue Ticket${shapedOverdue.length !== 1 ? "s" : ""} · ${now.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" })}`;
-
-      try {
-        const sendRes = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-          body: JSON.stringify({ from, to: [emp.email], subject, html }),
-        });
-
-        if (sendRes.ok) {
-          sentCount++;
-        } else {
-          const errBody = await sendRes.text();
-          console.error(`[overdue-alert] Resend error for ${emp.email}:`, sendRes.status, errBody);
-        }
-      } catch (e: any) {
-        console.error(`[overdue-alert] Send failed for ${emp.email}:`, e?.message);
+      if (!sendRes.ok) {
+        const errBody = await sendRes.text();
+        console.error("[overdue-alert] Resend error:", sendRes.status, errBody);
+        return { statusCode: 500, body: `Resend error: ${sendRes.status}` };
       }
+    } catch (e: any) {
+      console.error("[overdue-alert] Send failed:", e?.message);
+      return { statusCode: 500, body: e?.message || "Send failed" };
     }
 
-    console.log(`[overdue-alert] Sent ${sentCount}/${employees.length} emails — ${shapedOverdue.length} overdue tickets system-wide.`);
-    return { statusCode: 200, body: `OK — ${sentCount} sent, ${shapedOverdue.length} overdue tickets.` };
+    console.log(`[overdue-alert] Sent 1 email to ${allEmails.length} recipients — ${shapedOverdue.length} overdue tickets system-wide.`);
+    return { statusCode: 200, body: `OK — ${allEmails.length} recipients, ${shapedOverdue.length} overdue tickets.` };
 
   } catch (e: any) {
     console.error("[overdue-alert] Uncaught error:", e?.message);

@@ -370,10 +370,15 @@ Return nothing else — no explanation, no markdown, just the JSON object.`,
 
     const subject = `📊 SWOEMS Weekly Summary · ${weekStartLabel} – ${weekEndLabel}`;
 
+    const toEmail  = recipients[0];
+    const ccEmails = recipients.slice(1);
+    const payload: Record<string, any> = { from, to: [toEmail], subject, html };
+    if (ccEmails.length > 0) payload.cc = ccEmails;
+
     const sendRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-      body: JSON.stringify({ from, to: recipients, subject, html }),
+      body: JSON.stringify(payload),
     });
 
     if (!sendRes.ok) {
@@ -382,8 +387,8 @@ Return nothing else — no explanation, no markdown, just the JSON object.`,
       return { statusCode: 500, body: `Resend error: ${sendRes.status}` };
     }
 
-    console.log(`[weekly-summary] Sent to ${recipients.length} admins — ${opened.length} opened, ${closed.length} closed.`);
-    return { statusCode: 200, body: `OK — ${recipients.length} admins, ${opened.length} opened, ${closed.length} closed.` };
+    console.log(`[weekly-summary] Sent 1 email to ${recipients.length} recipients (CC'd) — ${opened.length} opened, ${closed.length} closed.`);
+    return { statusCode: 200, body: `OK — ${recipients.length} recipients, ${opened.length} opened, ${closed.length} closed.` };
 
   } catch (e: any) {
     console.error("[weekly-summary] Error:", e?.message);
