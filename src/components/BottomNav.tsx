@@ -55,7 +55,7 @@ export default function BottomNav() {
         </NavLink>
         <NavLink to="/eod" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           <EodIcon />
-          EOD
+          Activity
         </NavLink>
         <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           <SettingsIcon />

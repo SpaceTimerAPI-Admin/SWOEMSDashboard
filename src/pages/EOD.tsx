@@ -136,7 +136,6 @@ function TicketDescription({ details }: { details?: string }) {
 }
 
 export default function EOD() {
-  const [handoffNotes, setHandoffNotes] = useState("");
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -202,7 +201,7 @@ export default function EOD() {
     setStatus(null);
     setBusy(true);
     try {
-      const res: any = await sendEod({ handoff_notes: handoffNotes, report_date: selectedDate || undefined });
+      const res: any = await sendEod({ report_date: selectedDate || undefined });
       if (!res?.ok) throw new Error(res?.error || "Failed to send");
       const tc = res.data?.ticket_count ?? 0;
       const pc = res.data?.project_count ?? 0;
@@ -220,7 +219,7 @@ export default function EOD() {
 
   return (
     <div className="page fade-up">
-      <div className="page-title">End of Day</div>
+      <div className="page-title">Activity Report</div>
       <div className="page-subtitle">
         {reportDay
           ? new Date(reportDay + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
@@ -232,6 +231,31 @@ export default function EOD() {
           }}>VIEWING PAST DAY</span>
         )}
       </div>
+
+      {/* Send EOD Report button — only shown for today */}
+      {isToday && (
+        <div style={{ marginBottom: 14 }}>
+          {status && (
+            <div style={{
+              marginBottom: 10, padding: "10px 13px", borderRadius: 10, fontSize: 13,
+              background: status.ok ? "var(--success-bg)" : "var(--danger-bg)",
+              color: status.ok ? "#7EEFC4" : "#FFB0B0",
+              border: `1px solid ${status.ok ? "rgba(46,232,160,0.22)" : "rgba(255,84,84,0.25)"}`,
+            }}>
+              {status.ok ? "✓ " : "⚠ "}{status.msg}
+            </div>
+          )}
+          <button
+            className="btn primary full"
+            onClick={onSend}
+            disabled={busy}
+          >
+            {busy
+              ? <><span className="spinner" /> Sending report…</>
+              : `Send EOD Report${totalItems > 0 ? ` (${totalItems} items)` : ""}`}
+          </button>
+        </div>
+      )}
 
       {/* Date search */}
       <div className="card" style={{ padding: "10px 14px", marginTop: 10, marginBottom: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -453,44 +477,6 @@ export default function EOD() {
         </div>
       )}
 
-      {/* Handoff Notes + Send */}
-      <div className="card" style={{ padding: "16px" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)", marginBottom: 12 }}>
-          Handoff Notes
-        </div>
-
-        <textarea
-          className="textarea"
-          style={{ minHeight: 80 }}
-          value={handoffNotes}
-          onChange={(e) => setHandoffNotes(e.target.value)}
-          placeholder="What does the next shift need to know?"
-        />
-
-        {status && (
-          <div style={{
-            marginTop: 12, padding: "10px 13px", borderRadius: 10, fontSize: 13,
-            background: status.ok ? "var(--success-bg)" : "var(--danger-bg)",
-            color: status.ok ? "#7EEFC4" : "#FFB0B0",
-            border: `1px solid ${status.ok ? "rgba(46,232,160,0.22)" : "rgba(255,84,84,0.25)"}`,
-          }}>
-            {status.ok ? "✓ " : "⚠ "}{status.msg}
-          </div>
-        )}
-
-        <button
-          className="btn primary full"
-          style={{ marginTop: 14 }}
-          onClick={onSend}
-          disabled={busy}
-        >
-          {busy
-            ? <><span className="spinner" /> Sending report…</>
-            : isToday
-              ? `Send EOD report${totalItems > 0 ? ` (${totalItems} items)` : ""}`
-              : `Send report for ${reportDay ? new Date(reportDay + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "this day"}${totalItems > 0 ? ` (${totalItems} items)` : ""}`}
-        </button>
-      </div>
     </div>
   );
 }
