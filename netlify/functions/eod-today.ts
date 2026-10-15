@@ -29,8 +29,8 @@ export const handler: Handler = async (event) => {
     const [ticketsCreated, ticketsClosed, ticketsCommented,
            projectsCreated, projectsClosed, projectsCommented,
            olderOpenTickets, olderOpenProjects, shiftLogRes] = await Promise.all([
-      supabase.from("tickets").select("id, title, location, tag, status, created_at, closed_at, created_by").gte("created_at", start).lte("created_at", end),
-      supabase.from("tickets").select("id, title, location, tag, status, created_at, closed_at, created_by").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
+      supabase.from("tickets").select("id, title, location, tag, status, details, created_at, closed_at, created_by").gte("created_at", start).lte("created_at", end),
+      supabase.from("tickets").select("id, title, location, tag, status, details, created_at, closed_at, created_by").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
       supabase.from("ticket_comments")
         .select("ticket_id, comment, created_at, employee_id, employees!ticket_comments_employee_id_fkey(name)")
         .gte("created_at", start).lte("created_at", end)
@@ -41,36 +41,37 @@ export const handler: Handler = async (event) => {
         .select("project_id, comment, created_at, employee_id, employees!project_comments_employee_id_fkey(name)")
         .gte("created_at", start).lte("created_at", end)
         .order("created_at", { ascending: false }),
-      supabase.from("tickets").select("id, title, location, tag, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
-      supabase.from("projects").select("id, title, location, tag, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
+      supabase.from("tickets").select("id, title, location, tag, details, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
+      supabase.from("projects").select("id, title, location, tag, details, created_at").eq("status", "open").lt("created_at", start).order("created_at", { ascending: true }),
       supabase.from("shift_log_entries")
         .select("id, note, created_at, employee_id, employees!shift_log_entries_employee_id_fkey(name)")
         .gte("created_at", start).lte("created_at", end)
         .order("created_at", { ascending: false }),
     ]);
 
-    // Build a map of last comment per ticket (comments already sorted desc, so first = latest)
-    const ticketLastComment = new Map<string, { comment: string; employee_name: string; created_at: string }>();
+    // Build a map of ALL today's comments per ticket (comments sorted desc = newest first)
+    type CommentEntry = { comment: string; employee_name: string; created_at: string };
+    const ticketCommentsMap = new Map<string, CommentEntry[]>();
     for (const c of (ticketsCommented.data || [])) {
-      if (!ticketLastComment.has(c.ticket_id)) {
-        ticketLastComment.set(c.ticket_id, {
-          comment: c.comment,
-          employee_name: (c as any).employees?.name || "Unknown",
-          created_at: c.created_at,
-        });
-      }
+      const entry: CommentEntry = {
+        comment: c.comment,
+        employee_name: (c as any).employees?.name || "Unknown",
+        created_at: c.created_at,
+      };
+      if (!ticketCommentsMap.has(c.ticket_id)) ticketCommentsMap.set(c.ticket_id, []);
+      ticketCommentsMap.get(c.ticket_id)!.push(entry);
     }
 
-    // Build a map of last comment per project
-    const projectLastComment = new Map<string, { comment: string; employee_name: string; created_at: string }>();
+    // Build a map of ALL today's comments per project
+    const projectCommentsMap = new Map<string, CommentEntry[]>();
     for (const c of (projectsCommented.data || [])) {
-      if (!projectLastComment.has(c.project_id)) {
-        projectLastComment.set(c.project_id, {
-          comment: c.comment,
-          employee_name: (c as any).employees?.name || "Unknown",
-          created_at: c.created_at,
-        });
-      }
+      const entry: CommentEntry = {
+        comment: c.comment,
+        employee_name: (c as any).employees?.name || "Unknown",
+        created_at: c.created_at,
+      };
+      if (!projectCommentsMap.has(c.project_id)) projectCommentsMap.set(c.project_id, []);
+      projectCommentsMap.get(c.project_id)!.push(entry);
     }
 
     // Track which ticket IDs had which activity today
@@ -107,7 +108,7 @@ export const handler: Handler = async (event) => {
     for (const t of [...(ticketsCreated.data || []), ...(ticketsClosed.data || [])]) ticketMap.set(t.id, t);
     const onlyCommentedTicketIds = [...commentedTicketIds].filter(id => !ticketMap.has(id));
     if (onlyCommentedTicketIds.length) {
-      const { data: extra } = await supabase.from("tickets").select("id, title, location, tag, status, created_at, closed_at, created_by").in("id", onlyCommentedTicketIds);
+      const { data: extra } = await supabase.from("tickets").select("id, title, location, tag, status, details, created_at, closed_at, created_by").in("id", onlyCommentedTicketIds);
       for (const t of (extra || [])) ticketMap.set(t.id, t);
     }
 
@@ -116,26 +117,26 @@ export const handler: Handler = async (event) => {
     for (const p of [...(projectsCreated.data || []), ...(projectsClosed.data || [])]) projectMap.set(p.id, p);
     const onlyCommentedProjectIds = [...commentedProjectIds].filter(id => !projectMap.has(id));
     if (onlyCommentedProjectIds.length) {
-      const { data: extra } = await supabase.from("projects").select("id, title, location, tag, status, created_at, closed_at, created_by").in("id", onlyCommentedProjectIds);
+      const { data: extra } = await supabase.from("projects").select("id, title, location, tag, status, details, created_at, closed_at, created_by").in("id", onlyCommentedProjectIds);
       for (const p of (extra || [])) projectMap.set(p.id, p);
     }
 
-    // Enrich each ticket with activity label and last comment
+    // Enrich each ticket with activity label and all today's comments (newest first)
     const tickets = Array.from(ticketMap.values())
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       .map((t: any) => ({
         ...t,
         activity: ticketActivity(t.id, t.status),
-        last_comment: ticketLastComment.get(t.id) || null,
+        comments: ticketCommentsMap.get(t.id) || [],
       }));
 
-    // Enrich each project with activity label and last comment
+    // Enrich each project with activity label and all today's comments (newest first)
     const projects = Array.from(projectMap.values())
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       .map((p: any) => ({
         ...p,
         activity: projectActivity(p.id, p.status),
-        last_comment: projectLastComment.get(p.id) || null,
+        comments: projectCommentsMap.get(p.id) || [],
       }));
 
     const shiftLogEntries = (shiftLogRes.data || []).map((e: any) => ({

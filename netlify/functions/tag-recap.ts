@@ -206,6 +206,7 @@ export const handler: Handler = async () => {
         .from("employees")
         .select("id, name, email")
         .eq("is_active", true)
+        .neq("role", "show_tech")
         .eq(prefColumn, true)
         .neq("email", "");
 

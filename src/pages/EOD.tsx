@@ -86,10 +86,10 @@ function StatusDot({ closed }: { closed: boolean }) {
   );
 }
 
-function LastCommentBlock({ comment }: { comment: { comment: string; employee_name: string; created_at: string } }) {
+function CommentBlock({ comment }: { comment: { comment: string; employee_name: string; created_at: string } }) {
   return (
     <div style={{
-      marginTop: 8, padding: "8px 10px", borderRadius: 8,
+      marginTop: 6, padding: "8px 10px", borderRadius: 8,
       background: "rgba(168,144,255,0.07)", borderLeft: "2px solid rgba(168,144,255,0.35)",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3, gap: 6 }}>
@@ -107,6 +107,30 @@ function LastCommentBlock({ comment }: { comment: { comment: string; employee_na
       }}>
         {comment.comment}
       </div>
+    </div>
+  );
+}
+
+function CommentsSection({ comments }: { comments: { comment: string; employee_name: string; created_at: string }[] }) {
+  if (!comments || comments.length === 0) return null;
+  return (
+    <div style={{ marginTop: 6 }}>
+      {comments.map((c, i) => <CommentBlock key={i} comment={c} />)}
+    </div>
+  );
+}
+
+function TicketDescription({ details }: { details?: string }) {
+  if (!details) return null;
+  return (
+    <div style={{
+      marginTop: 6, padding: "7px 10px", borderRadius: 8,
+      background: "rgba(0,163,224,0.06)", borderLeft: "2px solid rgba(0,163,224,0.3)",
+      fontSize: 12, color: "var(--muted)", lineHeight: 1.5,
+      overflow: "hidden", display: "-webkit-box",
+      WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
+    }}>
+      {details}
     </div>
   );
 }
@@ -350,8 +374,11 @@ export default function EOD() {
                         </span>
                       </div>
 
-                      {/* Last comment block */}
-                      {t.last_comment && <LastCommentBlock comment={t.last_comment} />}
+                      {/* Show description for new tickets */}
+                      {t.activity === "New Ticket" && <TicketDescription details={t.details} />}
+
+                      {/* All today's comments */}
+                      <CommentsSection comments={t.comments} />
                     </Link>
                   ))}
                   {group.projects.map((p: any) => (
@@ -385,8 +412,11 @@ export default function EOD() {
                         </span>
                       </div>
 
-                      {/* Last comment block */}
-                      {p.last_comment && <LastCommentBlock comment={p.last_comment} />}
+                      {/* Show description for new projects */}
+                      {p.activity === "New Project" && <TicketDescription details={p.details} />}
+
+                      {/* All today's comments */}
+                      <CommentsSection comments={p.comments} />
                     </Link>
                   ))}
                 </div>
