@@ -34,6 +34,7 @@ const EVENT_META: Record<string, { label: string; icon: string; color: string }>
   replaced:              { label: "Hardware Replaced",    icon: "🔄", color: "#6ee7b7" },
   retired:               { label: "Retired",              icon: "🗃️", color: "#6b7280" },
   note:                  { label: "Note",                 icon: "📝", color: "#9ca3af" },
+  field_edit:            { label: "Fields Updated",       icon: "✏️", color: "#c4b5fd" },
 };
 
 const TICKET_STATUS_COLORS: Record<string, string> = {
@@ -128,6 +129,52 @@ function InlineField({
   );
 }
 
+// ── Inline name field (larger display) ───────────────────────────────────────
+function InlineNameField({
+  value,
+  onSave,
+}: {
+  value: string | null | undefined;
+  onSave: (val: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState("");
+  const [saving, setSaving]   = useState(false);
+
+  function startEdit() { setDraft(value || ""); setEditing(true); }
+
+  async function save() {
+    if (!draft.trim()) return;
+    setSaving(true);
+    try { await onSave(draft.trim()); setEditing(false); } finally { setSaving(false); }
+  }
+
+  return editing ? (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1 }}>
+      <input
+        className="input"
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") void save(); if (e.key === "Escape") setEditing(false); }}
+        autoFocus
+        style={{ fontSize: 20, fontWeight: 700, flex: 1 }}
+      />
+      <button type="button" className="btn primary small" onClick={save} disabled={saving || !draft.trim()}>
+        {saving ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "Save"}
+      </button>
+      <button type="button" className="btn small" onClick={() => setEditing(false)}>✕</button>
+    </div>
+  ) : (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+      <div className="page-title" style={{ margin: 0 }}>{value}</div>
+      <button type="button" onClick={startEdit}
+        style={{ background: "none", border: "none", color: "var(--muted2)", fontSize: 10, cursor: "pointer", padding: "2px 6px", borderRadius: 4, textDecoration: "underline", flexShrink: 0, alignSelf: "center" }}>
+        edit
+      </button>
+    </div>
+  );
+}
+
 // ── Inline category field ─────────────────────────────────────────────────────
 function InlineCategoryField({
   value,
@@ -185,6 +232,63 @@ function InlineCategoryField({
   );
 }
 
+// ── Delete confirmation modal ─────────────────────────────────────────────────
+function DeleteModal({
+  itemName,
+  onConfirm,
+  onCancel,
+  deleting,
+}: {
+  itemName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 999,
+      background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div className="card" style={{ maxWidth: 380, width: "100%", padding: 24 }}>
+        <div style={{ fontSize: 22, marginBottom: 10, textAlign: "center" }}>🗑️</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 8, textAlign: "center" }}>
+          Delete this item?
+        </div>
+        <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 6, textAlign: "center" }}>
+          <strong style={{ color: "var(--text)" }}>{itemName}</strong>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--muted2)", marginBottom: 20, textAlign: "center", lineHeight: 1.5 }}>
+          This will permanently delete the item and all of its history. This cannot be undone.
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            className="btn small"
+            onClick={onCancel}
+            disabled={deleting}
+            style={{ flex: 1 }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn small"
+            onClick={onConfirm}
+            disabled={deleting}
+            style={{
+              flex: 1, background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.35)",
+              color: "#f87171", fontWeight: 700,
+            }}
+          >
+            {deleting ? <><span className="spinner" style={{ width: 12, height: 12 }} /> Deleting…</> : "Yes, Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function InventoryDetail() {
   const { id } = useParams<{ id: string }>();
@@ -220,6 +324,11 @@ export default function InventoryDetail() {
   // Field patch errors
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Delete state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting]               = useState(false);
+  const [deleteError, setDeleteError]         = useState<string | null>(null);
+
   useEffect(() => { if (id) void load(); }, [id]);
 
   async function load() {
@@ -242,6 +351,26 @@ export default function InventoryDetail() {
       throw new Error(msg);
     }
     setItem((prev: any) => ({ ...prev, ...fields }));
+    // Refresh events so audit trail updates live
+    const refreshed = await apiFetch(`/api/inventory-get?id=${id}`);
+    if (refreshed.ok) { setEvents(refreshed.events || []); setStats(refreshed.stats || null); }
+  }
+
+  async function deleteItem() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await apiFetch("/api/inventory-delete", {
+        method: "POST",
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) throw new Error(res.error || "Failed to delete");
+      nav("/inventory");
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete");
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
   }
 
   async function quickSetStatus(newStatus: string) {
@@ -332,12 +461,24 @@ export default function InventoryDetail() {
 
   return (
     <div className="page fade-up">
+      {showDeleteModal && (
+        <DeleteModal
+          itemName={item.name}
+          onConfirm={deleteItem}
+          onCancel={() => setShowDeleteModal(false)}
+          deleting={deleting}
+        />
+      )}
+
       <span className="back-link" style={{ cursor: "pointer" }} onClick={() => nav(-1)}>← Inventory</span>
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-        <div>
-          <div className="page-title">{item.name}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <InlineNameField
+            value={item.name}
+            onSave={val => patchItem({ name: val })}
+          />
           <div style={{ fontFamily: "monospace", fontSize: 12, color: "var(--muted2)", marginTop: 2 }}>{displayId}</div>
           {item.serial_number && item.asset_tag && item.serial_number !== item.asset_tag && (
             <div style={{ fontFamily: "monospace", fontSize: 11, color: "var(--muted2)", opacity: 0.6 }}>{item.asset_tag}</div>
@@ -402,6 +543,16 @@ export default function InventoryDetail() {
                 />
               </div>
 
+              {/* Asset Tag — inline editable */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <InlineField
+                  label="Asset Tag"
+                  value={item.asset_tag}
+                  mono
+                  onSave={val => patchItem({ asset_tag: val })}
+                />
+              </div>
+
               {/* Category — dropdown */}
               <InlineCategoryField
                 value={item.category_name}
@@ -426,17 +577,11 @@ export default function InventoryDetail() {
 
               {/* Added date — read only */}
               {item.created_at && (
-                <div>
+                <div style={{ gridColumn: "1 / -1" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Added</div>
                   <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2 }}>{fmtDateShort(item.created_at)}</div>
                 </div>
               )}
-
-              {/* Asset tag — read only */}
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted2)" }}>Asset Tag</div>
-                <div style={{ fontSize: 13, color: "var(--text)", marginTop: 2, fontFamily: "monospace" }}>{item.asset_tag}</div>
-              </div>
 
               {/* Location — inline editable */}
               <div style={{ gridColumn: "1 / -1" }}>
@@ -568,6 +713,28 @@ export default function InventoryDetail() {
               </form>
             </div>
           )}
+
+          {/* Danger zone — Delete */}
+          <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid rgba(248,113,113,0.15)" }}>
+            {deleteError && (
+              <div style={{ fontSize: 12, color: "#f87171", marginBottom: 10, padding: "7px 10px", background: "rgba(248,113,113,0.08)", borderRadius: 6, border: "1px solid rgba(248,113,113,0.2)" }}>
+                ⚠ {deleteError}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              style={{
+                background: "none", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 8,
+                color: "#f87171", fontSize: 12, fontWeight: 600, padding: "8px 16px",
+                cursor: "pointer", opacity: 0.7, transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(248,113,113,0.08)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.7"; (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
+            >
+              🗑️ Delete Item
+            </button>
+          </div>
         </>
       )}
 
