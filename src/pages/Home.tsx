@@ -334,28 +334,88 @@ export default function Home() {
               Upload one in Settings.
             </Link>
           </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {scheduleEntries.map((entry: any, i: number) => (
+        ) : (() => {
+          // Group entries into EMS (part_time + full_time) and Show Ops
+          const ems = scheduleEntries.filter((e: any) =>
+            e.section === "ems_part_time" || e.section === "ems_full_time" || !e.section
+          );
+          const showOps = scheduleEntries.filter((e: any) => e.section === "show_ops");
+          // If no section data, fall back to flat list
+          const hasSections = scheduleEntries.some((e: any) => e.section);
+
+          function ShiftRow({ entry, i }: { entry: any; i: number }) {
+            return (
               <div key={i} style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
+                display: "flex", alignItems: "flex-start", justifyContent: "space-between",
                 gap: 8, padding: "8px 10px", borderRadius: 8,
                 background: "rgba(255,255,255,0.04)",
               }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
-                  {entry.employee_name}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
+                    {entry.employee_name}
+                  </div>
+                  {entry.shift_note && (
+                    <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2, fontStyle: "italic" }}>
+                      {entry.shift_note}
+                    </div>
+                  )}
                 </div>
                 {entry.shift_start && entry.shift_end ? (
-                  <div style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
+                  <div style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", marginTop: 2 }}>
                     {entry.all_shifts || `${entry.shift_start} – ${entry.shift_end}`}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: "var(--muted2)" }}>—</div>
+                  <div style={{ fontSize: 12, color: "var(--muted2)", marginTop: 2 }}>—</div>
                 )}
               </div>
-            ))}
-          </div>
-        )}
+            );
+          }
+
+          if (!hasSections) {
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {scheduleEntries.map((entry: any, i: number) => (
+                  <ShiftRow key={i} entry={entry} i={i} />
+                ))}
+              </div>
+            );
+          }
+
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {ems.length > 0 && (
+                <div>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
+                    color: "rgba(92,107,255,0.85)", marginBottom: 6, paddingLeft: 2,
+                  }}>
+                    EMS
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {ems.map((entry: any, i: number) => (
+                      <ShiftRow key={i} entry={entry} i={i} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {showOps.length > 0 && (
+                <div>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
+                    color: "rgba(255,182,39,0.85)", marginBottom: 6, paddingLeft: 2,
+                  }}>
+                    Show Ops
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {showOps.map((entry: any, i: number) => (
+                      <ShiftRow key={i} entry={entry} i={i} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
       {assigned.length > 0 && (
         <div style={{ marginBottom: 20 }}>

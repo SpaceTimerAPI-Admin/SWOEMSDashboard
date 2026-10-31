@@ -3,9 +3,12 @@
  * Body: { image_base64: string, content_type: string }
  *
  * Accepts image (jpeg/png) or PDF.
- * For each date range covered by the upload:
- *   - Upserts new/updated entries
- *   - Deletes entries for employees NOT present on those dates (handles removed shifts)
+ * Reads the new EMS schedule format:
+ *   - Header rows: Day / Date / OP Hours (two op windows per day) / event name
+ *   - Section headers: "PART TIME", "Full Time", "Show Ops"
+ *   - Each employee has TWO rows: times row + label row (Opener, Closer, SUP, etc.)
+ *   - Notes column on the far right
+ * Upserts entries and removes employees NOT in the upload for covered dates.
  */
 import type { Handler } from "@netlify/functions";
 import { requireSession } from "./_auth";
@@ -18,6 +21,8 @@ interface ScheduleEntry {
   shift_start: string | null;
   shift_end: string | null;
   all_shifts: string | null;
+  section: "ems_part_time" | "ems_full_time" | "show_ops" | null;
+  shift_note: string | null;
 }
 
 export const handler: Handler = async (event) => {
@@ -53,36 +58,64 @@ export const handler: Handler = async (event) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",  // Better accuracy for complex table layouts
-        max_tokens: 4096,
+        model: "claude-sonnet-4-6",
+        max_tokens: 8192,
         messages: [{
           role: "user",
           content: [
             contentBlock,
             {
               type: "text",
-              text: `You are reading a SeaWorld weekly work schedule. I need you to be extremely precise.
+              text: `You are reading a SeaWorld EMS weekly work schedule image. Read it very carefully and precisely.
 
-PHASE 1 — MAP THE COLUMNS:
-Read the header row. Write out each column number and its exact date, like:
-Col 1: Thursday 5/7/2026 = 2026-05-07
-Col 2: Friday 5/8/2026 = 2026-05-08
-...and so on for all columns.
+THE SCHEDULE LAYOUT:
+- Top header: Day names (e.g. Thurs, Friday, Saturday…), then dates, then OP Hours (two time windows per day), then event name (HOSO, HOSO Strike, etc.)
+- The schedule is divided into SECTIONS separated by dark/shaded rows:
+    • "PART TIME" section  → section = "ems_part_time"
+    • "Full Time" section  → section = "ems_full_time"  
+    • "Show Ops" section   → section = "show_ops"
+- Each employee has TWO consecutive rows:
+    • ROW 1 (name row): Employee name in far-left column. Each day column has TWO cells showing shift times (start | end), OR "X X" meaning OFF.
+    • ROW 2 (label row): No name in far-left column. Each day shows a role/project label: Opener, Closer, SUP, HOSO Project, Purchasing, Christmas Project, Christmas Install, etc. These labels go in the shift_label field and are NOT part of the shift times.
+- "X" or "X X" in a day cell = OFF (no shift for that day). Skip those days.
+- The FAR RIGHT column is "Notes" — a single note per employee for the whole week. Examples: "HOSO Closer", "Project Support after Closing", "Show op after opening", "Supporting Install/Strike".
 
-PHASE 2 — EXTRACT SHIFTS:
-For each employee, go through each column using your map from Phase 1. Only record a cell if it contains a time range (like "6:00 AM - 2:30 PM"). Skip "Off", "OFF", "PTO", blank cells.
+PHASE 1 — MAP THE DATE COLUMNS:
+Read each column's date from the header (Day + Date rows). Write them out:
+Col 1: Thursday 2026-10-29
+Col 2: Friday 2026-10-30
+… etc.
 
-Strip all location text (SWF TECH EMS, SSFF, Ad Hoc, EO, etc). Keep times only.
+PHASE 2 — IDENTIFY SECTIONS:
+Note which employees are under each section header (PART TIME / Full Time / Show Ops).
 
-PHASE 3 — SECOND SHIFTS:
-A row with NO name in the far-left column = second shift for the employee above. Merge with " / ".
+PHASE 3 — EXTRACT EACH EMPLOYEE'S SHIFTS:
+For each employee:
+- Note their section
+- Note their Notes column value (null if blank)
+- For each day: if they have times (not X/OFF/blank), record start and end time
 
-PHASE 4 — OUTPUT:
-Return ONLY a JSON array. No markdown. No explanation. Each item:
-{"employee_name":"Firstname L.","work_date":"YYYY-MM-DD","shift_start":"H:MM AM","shift_end":"H:MM PM","all_shifts":"H:MM AM - H:MM PM"}
+IMPORTANT time reading rules:
+- Times appear as two cells per day: left cell = start, right cell = end
+- Read times exactly: "6:00am", "2:30pm", "1:00am", "10:30am", "5:00PM", "12:00 AM" etc.
+- End time "1:00am" or "2:00am" etc. means the shift runs past midnight — keep it as written
+- If someone has TWO shifts in a day (split shift), join as "6:00am - 2:30pm / 5:00pm - 2:00am"
 
-Convert names from "LASTNAME, FIRSTNAME M" to "Firstname L." format.
-Be precise — a shift on Thursday must have Thursday's date, not Sunday's.`,
+PHASE 4 — OUTPUT FORMAT:
+Return ONLY a valid JSON array. No markdown fences. No explanation text. Each object:
+{
+  "employee_name": "Firstname L.",
+  "work_date": "YYYY-MM-DD",
+  "shift_start": "H:MMam",
+  "shift_end": "H:MMpm",
+  "all_shifts": "H:MMam - H:MMpm",
+  "section": "ems_part_time" | "ems_full_time" | "show_ops",
+  "shift_note": "text from Notes column or null"
+}
+
+Name format: convert "LASTNAME, FIRSTNAME" → "Firstname L." (first name + last initial + period).
+Skip any day where the cell shows X, OFF, or is blank.
+One JSON object per (employee, work_date) pair.`,
             },
           ],
         }],
@@ -97,7 +130,6 @@ Be precise — a shift on Thursday must have Thursday's date, not Sunday's.`,
 
     const responseText = await claudeRes.text();
 
-    // Detect gateway timeout / HTML error pages before attempting JSON parse
     if (responseText.trim().startsWith("<") || responseText.includes("Inactivity Timeout")) {
       console.error("[schedule-upload] Gateway timeout or HTML error returned");
       return json({ ok: false, error: "The request timed out. Try uploading a photo of the schedule instead of a PDF, or crop the image closer to the schedule." }, 504);
@@ -109,14 +141,13 @@ Be precise — a shift on Thursday must have Thursday's date, not Sunday's.`,
     let entries: ScheduleEntry[] = [];
     try {
       const cleaned = rawText.replace(/```json|```/g, "").trim();
-      // Find the JSON array even if there's surrounding text
       const match = cleaned.match(/\[[\s\S]*\]/);
       if (!match) throw new Error("No JSON array found");
       entries = JSON.parse(match[0]);
       if (!Array.isArray(entries)) throw new Error("Not an array");
     } catch {
       console.error("[schedule-upload] Failed to parse Claude response:", rawText);
-      return json({ ok: false, error: "Could not parse schedule. Try a clearer photo or check the PDF." }, 422);
+      return json({ ok: false, error: "Could not parse schedule. Try a clearer photo." }, 422);
     }
 
     const valid = entries.filter(e =>
@@ -127,29 +158,26 @@ Be precise — a shift on Thursday must have Thursday's date, not Sunday's.`,
       return json({ ok: false, error: "No schedule entries found in the upload." }, 422);
     }
 
-    // Sanity check — all dates should be within a reasonable 14-day window
-    // (catches cases where Claude reads a date from a different part of the doc)
+    // Sanity check — filter to densest 7-day window if dates span more than 14 days
     const dateCounts = new Map<string, number>();
-    for (const e of valid as any[]) {
+    for (const e of valid) {
       dateCounts.set(e.work_date, (dateCounts.get(e.work_date) || 0) + 1);
     }
-    // Find the "center of mass" date
     const allMs = [...dateCounts.keys()].map(d => new Date(d + "T12:00:00").getTime());
     const minMs = Math.min(...allMs);
     const maxMs = Math.max(...allMs);
     const spanDays = (maxMs - minMs) / 86400000;
-    // If dates span more than 14 days something is wrong — filter to the densest 7-day window
-    let filtered = valid as any[];
+    let filtered = valid;
     if (spanDays > 14) {
       const medianMs = allMs.sort((a, b) => a - b)[Math.floor(allMs.length / 2)];
       const windowMs = 7 * 86400000;
-      filtered = valid.filter((e: any) => {
+      filtered = valid.filter(e => {
         const ms = new Date(e.work_date + "T12:00:00").getTime();
         return Math.abs(ms - medianMs) <= windowMs;
       });
     }
 
-    // Deduplicate — merge same person+date entries (handles second shifts returned separately)
+    // Deduplicate — merge same person+date (handles split shifts returned separately)
     const mergeMap = new Map<string, any>();
     for (const e of filtered) {
       const key = `${e.work_date}::${e.employee_name}`;
@@ -157,59 +185,54 @@ Be precise — a shift on Thursday must have Thursday's date, not Sunday's.`,
         mergeMap.set(key, { ...e });
       } else {
         const existing = mergeMap.get(key);
-        // Keep earliest start
         if (e.shift_start && (!existing.shift_start || e.shift_start < existing.shift_start)) {
           existing.shift_start = e.shift_start;
         }
-        // Keep latest end
         if (e.shift_end && (!existing.shift_end || e.shift_end > existing.shift_end)) {
           existing.shift_end = e.shift_end;
         }
-        // Merge all_shifts strings
         if (e.all_shifts && existing.all_shifts && e.all_shifts !== existing.all_shifts) {
           existing.all_shifts = `${existing.all_shifts} / ${e.all_shifts}`;
         } else if (e.all_shifts && !existing.all_shifts) {
           existing.all_shifts = e.all_shifts;
         }
+        // Keep non-null section and shift_note
+        if (!existing.section && e.section) existing.section = e.section;
+        if (!existing.shift_note && e.shift_note) existing.shift_note = e.shift_note;
       }
     }
     const deduped = Array.from(mergeMap.values());
 
-    // Determine which dates this upload covers
     const uploadedDates = [...new Set(deduped.map((e: any) => e.work_date))].sort();
 
     const supabase = supabaseAdmin();
 
-    // For each date covered by this upload, delete entries for employees
-    // who are NOT in the new upload (they've been removed from the schedule)
+    // For each covered date, remove employees NOT in this upload
     for (const date of uploadedDates) {
       const presentEmployees = deduped
         .filter((e: any) => e.work_date === date)
         .map((e: any) => e.employee_name);
 
       if (presentEmployees.length > 0) {
-        // Delete rows for this date where employee is NOT in the new list
         await supabase
           .from("schedule_entries")
           .delete()
           .eq("work_date", date)
           .not("employee_name", "in", `(${presentEmployees.map(n => `"${n}"`).join(",")})`);
       } else {
-        // No one is working this date in the new upload — clear it entirely
-        await supabase
-          .from("schedule_entries")
-          .delete()
-          .eq("work_date", date);
+        await supabase.from("schedule_entries").delete().eq("work_date", date);
       }
     }
 
-    // Upsert the new/updated entries
+    // Upsert new entries
     const rows = deduped.map((e: any) => ({
       work_date: e.work_date,
       employee_name: e.employee_name,
       shift_start: e.shift_start || null,
       shift_end: e.shift_end || null,
       all_shifts: e.all_shifts || null,
+      section: e.section || null,
+      shift_note: e.shift_note || null,
       uploaded_by: session.employee.id,
       uploaded_at: new Date().toISOString(),
     }));
