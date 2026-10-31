@@ -224,22 +224,36 @@ One JSON object per (employee, work_date) pair.`,
       }
     }
 
-    // Upsert new entries
-    const rows = deduped.map((e: any) => ({
+    // Upsert new entries — try with new columns first, fall back if migration not yet run
+    const baseRow = (e: any) => ({
       work_date: e.work_date,
       employee_name: e.employee_name,
       shift_start: e.shift_start || null,
       shift_end: e.shift_end || null,
       all_shifts: e.all_shifts || null,
-      section: e.section || null,
-      shift_note: e.shift_note || null,
       uploaded_by: session.employee.id,
       uploaded_at: new Date().toISOString(),
+    });
+
+    const fullRows = deduped.map((e: any) => ({
+      ...baseRow(e),
+      section: e.section || null,
+      shift_note: e.shift_note || null,
     }));
 
-    const { error: upsertError } = await supabase
+    let { error: upsertError } = await supabase
       .from("schedule_entries")
-      .upsert(rows, { onConflict: "work_date,employee_name" });
+      .upsert(fullRows, { onConflict: "work_date,employee_name" });
+
+    // If it failed because section/shift_note columns don't exist yet, retry without them
+    if (upsertError && (upsertError.message.includes("section") || upsertError.message.includes("shift_note") || upsertError.message.includes("column"))) {
+      console.warn("[schedule-upload] Falling back to upsert without section/shift_note columns:", upsertError.message);
+      const fallbackRows = deduped.map(baseRow);
+      const fallback = await supabase
+        .from("schedule_entries")
+        .upsert(fallbackRows, { onConflict: "work_date,employee_name" });
+      upsertError = fallback.error;
+    }
 
     if (upsertError) {
       console.error("[schedule-upload] Supabase upsert error:", upsertError);
