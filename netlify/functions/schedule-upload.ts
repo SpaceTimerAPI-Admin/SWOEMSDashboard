@@ -67,10 +67,11 @@ export const handler: Handler = async (event) => {
               contentBlock,
               {
                 type: "text",
-                text: `Extract the work schedule from this image into a JSON array. Start your response with [ and end with ]. No other text.
+                text: `Today is ${new Date().toISOString().slice(0, 10)}. Extract the work schedule from this image into a JSON array. Start your response with [ and end with ]. No other text.
 
 Rules:
-- Header rows have day names and YYYY-MM-DD dates — read them carefully
+- Header rows have day names and dates — the year is ${new Date().getFullYear()}, use exact YYYY-MM-DD format
+- Read the month and day numbers directly from the image header; do NOT guess or infer dates from context
 - Three sections separated by shaded/dark rows: "PART TIME"→"ems_part_time", "Full Time"→"ems_full_time", "Show Ops"→"show_ops"
 - Each employee has TWO rows: first row has their name + shift times, second row has role labels — only use the first row
 - Each day column has two time cells: left=shift_start, right=shift_end. Cell showing "X" or "X X" = day off, skip it
