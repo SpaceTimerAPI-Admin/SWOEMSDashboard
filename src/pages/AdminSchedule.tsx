@@ -141,6 +141,32 @@ export default function AdminSchedule() {
     setAddForm({ employee_name: "", shift_start: "", shift_end: "" });
   }
 
+  /** Resize image to max 1600px on longest side, JPEG quality 0.85 */
+  function resizeImage(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX = 1600;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
+          else { width = Math.round(width * MAX / height); height = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        resolve(dataUrl.split(",")[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
+      img.src = url;
+    });
+  }
+
   async function handleAiUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -148,15 +174,20 @@ export default function AdminSchedule() {
     setAiStatus(null);
     setAiUploading(true);
     try {
-      const base64 = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res((r.result as string).split(",")[1]);
-        r.onerror = () => rej(new Error("Read failed"));
-        r.readAsDataURL(file);
-      });
+      // PDFs sent as-is; images resized to max 1600px to stay well under Netlify's 6MB body limit
+      const isPdf = file.type === "application/pdf";
+      const base64 = isPdf
+        ? await new Promise<string>((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res((r.result as string).split(",")[1]);
+            r.onerror = () => rej(new Error("Read failed"));
+            r.readAsDataURL(file);
+          })
+        : await resizeImage(file);
+
       const result: any = await uploadSchedule({
         image_base64: base64,
-        content_type: file.type || "image/jpeg",
+        content_type: isPdf ? "application/pdf" : "image/jpeg",
       });
       if (!result?.ok) throw new Error(result?.error || "Failed to read schedule");
       const data = result.data ?? result;
