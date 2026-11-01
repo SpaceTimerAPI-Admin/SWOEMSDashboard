@@ -22,7 +22,7 @@ export const handler: Handler = async (event) => {
     const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from("schedule_entries")
-      .select("employee_name, shift_start, shift_end, all_shifts, section, shift_note")
+      .select("employee_name, shift_start, shift_end, all_shifts")
       .eq("work_date", today)
       .order("shift_start", { ascending: true, nullsFirst: false });
 
