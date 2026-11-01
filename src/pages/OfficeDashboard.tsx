@@ -289,48 +289,22 @@ export default function OfficeDashboard() {
           </div>
           {schedule.length === 0 ? (
             <span style={{ fontSize: 10, color: "#374151" }}>No schedule uploaded</span>
-          ) : (() => {
-            const emsEntries = schedule.filter((s: any) => s.section === "ems_part_time" || s.section === "ems_full_time" || !s.section);
-            const showOpsEntries = schedule.filter((s: any) => s.section === "show_ops");
-            const hasSections = schedule.some((s: any) => s.section);
-
-            function ShiftPill({ s }: { s: any }) {
-              return (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, padding: "3px 6px", borderRadius: 5, background: "rgba(255,255,255,0.05)" }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#c7d2fe", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.employee_name}</div>
-                  <div style={{ fontSize: 9, color: "#6b7280", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtShiftRange(s)}</div>
-                </div>
-              );
-            }
-
-            if (!hasSections) {
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  {schedule.map((s: any, i: number) => <ShiftPill key={i} s={s} />)}
-                </div>
-              );
-            }
-            return (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {emsEntries.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(129,140,248,0.9)", marginBottom: 3 }}>EMS</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      {emsEntries.map((s: any, i: number) => <ShiftPill key={i} s={s} />)}
-                    </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {[...schedule]
+                .sort((a: any, b: any) => (a.section === "show_ops" ? 1 : 0) - (b.section === "show_ops" ? 1 : 0))
+                .map((s: any, i: number) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{
+                      width: 4, height: 4, borderRadius: "50%", flexShrink: 0,
+                      background: s.section === "show_ops" ? "rgba(251,191,36,0.9)" : "rgba(129,140,248,0.9)",
+                    }} />
+                    <div style={{ fontSize: 10, fontWeight: 600, color: "#c7d2fe", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.employee_name}</div>
+                    <div style={{ fontSize: 9, color: "#6b7280", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtShiftRange(s)}</div>
                   </div>
-                )}
-                {showOpsEntries.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(251,191,36,0.9)", marginBottom: 3 }}>Show Ops</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      {showOpsEntries.map((s: any, i: number) => <ShiftPill key={i} s={s} />)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+                ))}
+            </div>
+          )}
         </div>
 
         {/* Clock */}

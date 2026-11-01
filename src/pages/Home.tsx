@@ -335,58 +335,37 @@ export default function Home() {
             </Link>
           </div>
         ) : (() => {
-          const ems = scheduleEntries.filter((e: any) =>
-            e.section === "ems_part_time" || e.section === "ems_full_time" || !e.section
+          // Sort: EMS first, then Show Ops — colour-coded dot, no section labels
+          const sectionOrder = (s: string | null) =>
+            s === "show_ops" ? 1 : 0;
+          const sorted = [...scheduleEntries].sort(
+            (a: any, b: any) => sectionOrder(a.section) - sectionOrder(b.section)
           );
-          const showOps = scheduleEntries.filter((e: any) => e.section === "show_ops");
-          const hasSections = scheduleEntries.some((e: any) => e.section);
-
-          function ShiftRow({ entry }: { entry: any }) {
-            const time = entry.all_shifts || (entry.shift_start && entry.shift_end ? `${entry.shift_start}–${entry.shift_end}` : null);
-            return (
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                gap: 6, padding: "4px 8px", borderRadius: 6,
-                background: "rgba(255,255,255,0.04)",
-              }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {entry.employee_name}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  {time || "—"}
-                </div>
-              </div>
-            );
-          }
-
-          function Section({ label, color, entries }: { label: string; color: string; entries: any[] }) {
-            return (
-              <div>
-                <div style={{
-                  fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
-                  color, marginBottom: 4, paddingLeft: 2,
-                }}>
-                  {label}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  {entries.map((e, i) => <ShiftRow key={i} entry={e} />)}
-                </div>
-              </div>
-            );
-          }
-
-          if (!hasSections) {
-            return (
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                {scheduleEntries.map((e: any, i: number) => <ShiftRow key={i} entry={e} />)}
-              </div>
-            );
-          }
 
           return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {ems.length > 0 && <Section label="EMS" color="rgba(92,107,255,0.9)" entries={ems} />}
-              {showOps.length > 0 && <Section label="Show Ops" color="rgba(255,182,39,0.9)" entries={showOps} />}
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {sorted.map((entry: any, i: number) => {
+                const time = entry.all_shifts || (entry.shift_start && entry.shift_end ? `${entry.shift_start}–${entry.shift_end}` : null);
+                const isShowOps = entry.section === "show_ops";
+                return (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "3px 8px", borderRadius: 5,
+                    background: "rgba(255,255,255,0.04)",
+                  }}>
+                    <div style={{
+                      width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
+                      background: isShowOps ? "rgba(255,182,39,0.8)" : "rgba(92,107,255,0.8)",
+                    }} />
+                    <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {entry.employee_name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {time || "—"}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })()}
