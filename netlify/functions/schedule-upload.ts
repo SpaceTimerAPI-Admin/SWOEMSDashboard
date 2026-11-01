@@ -58,64 +58,26 @@ export const handler: Handler = async (event) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 8192,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 4000,
         messages: [{
           role: "user",
           content: [
             contentBlock,
             {
               type: "text",
-              text: `You are reading a SeaWorld EMS weekly work schedule image. Read it very carefully and precisely.
+              text: `Extract the work schedule from this image. Output ONLY a valid JSON array, no other text.
 
-THE SCHEDULE LAYOUT:
-- Top header: Day names (e.g. Thurs, Friday, Saturday…), then dates, then OP Hours (two time windows per day), then event name (HOSO, HOSO Strike, etc.)
-- The schedule is divided into SECTIONS separated by dark/shaded rows:
-    • "PART TIME" section  → section = "ems_part_time"
-    • "Full Time" section  → section = "ems_full_time"  
-    • "Show Ops" section   → section = "show_ops"
-- Each employee has TWO consecutive rows:
-    • ROW 1 (name row): Employee name in far-left column. Each day column has TWO cells showing shift times (start | end), OR "X X" meaning OFF.
-    • ROW 2 (label row): No name in far-left column. Each day shows a role/project label: Opener, Closer, SUP, HOSO Project, Purchasing, Christmas Project, Christmas Install, etc. These labels go in the shift_label field and are NOT part of the shift times.
-- "X" or "X X" in a day cell = OFF (no shift for that day). Skip those days.
-- The FAR RIGHT column is "Notes" — a single note per employee for the whole week. Examples: "HOSO Closer", "Project Support after Closing", "Show op after opening", "Supporting Install/Strike".
+Layout rules:
+- Header row has day names and dates (use exact YYYY-MM-DD dates)
+- Three sections: "PART TIME"→"ems_part_time", "Full Time"→"ems_full_time", "Show Ops"→"show_ops"
+- Each employee = TWO rows: Row 1 has name + times, Row 2 has role labels (ignore row 2 times)
+- Each day has two time cells: start | end. "X" or "X X" = OFF, skip that day
+- Far-right column = Notes (shift_note for whole week, null if blank)
+- Names formatted as "LASTNAME, FIRSTNAME" → convert to "Firstname L."
 
-PHASE 1 — MAP THE DATE COLUMNS:
-Read each column's date from the header (Day + Date rows). Write them out:
-Col 1: Thursday 2026-10-29
-Col 2: Friday 2026-10-30
-… etc.
-
-PHASE 2 — IDENTIFY SECTIONS:
-Note which employees are under each section header (PART TIME / Full Time / Show Ops).
-
-PHASE 3 — EXTRACT EACH EMPLOYEE'S SHIFTS:
-For each employee:
-- Note their section
-- Note their Notes column value (null if blank)
-- For each day: if they have times (not X/OFF/blank), record start and end time
-
-IMPORTANT time reading rules:
-- Times appear as two cells per day: left cell = start, right cell = end
-- Read times exactly: "6:00am", "2:30pm", "1:00am", "10:30am", "5:00PM", "12:00 AM" etc.
-- End time "1:00am" or "2:00am" etc. means the shift runs past midnight — keep it as written
-- If someone has TWO shifts in a day (split shift), join as "6:00am - 2:30pm / 5:00pm - 2:00am"
-
-PHASE 4 — OUTPUT FORMAT:
-Return ONLY a valid JSON array. No markdown fences. No explanation text. Each object:
-{
-  "employee_name": "Firstname L.",
-  "work_date": "YYYY-MM-DD",
-  "shift_start": "H:MMam",
-  "shift_end": "H:MMpm",
-  "all_shifts": "H:MMam - H:MMpm",
-  "section": "ems_part_time" | "ems_full_time" | "show_ops",
-  "shift_note": "text from Notes column or null"
-}
-
-Name format: convert "LASTNAME, FIRSTNAME" → "Firstname L." (first name + last initial + period).
-Skip any day where the cell shows X, OFF, or is blank.
-One JSON object per (employee, work_date) pair.`,
+Output one object per (employee, work_date):
+[{"employee_name":"Firstname L.","work_date":"YYYY-MM-DD","shift_start":"H:MMam","shift_end":"H:MMpm","all_shifts":"H:MMam - H:MMpm","section":"ems_part_time","shift_note":null}]`,
             },
           ],
         }],
