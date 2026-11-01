@@ -316,9 +316,9 @@ export default function Home() {
         </Link>
       )}
 
-      {/* Today's Shift — bottom */}
-      <div className="card" style={{ padding: "14px 16px", marginTop: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+      {/* Today's Shift */}
+      <div className="card" style={{ padding: "12px 14px", marginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)" }}>
             👥 On Shift Today
           </div>
@@ -335,84 +335,58 @@ export default function Home() {
             </Link>
           </div>
         ) : (() => {
-          // Group entries into EMS (part_time + full_time) and Show Ops
           const ems = scheduleEntries.filter((e: any) =>
             e.section === "ems_part_time" || e.section === "ems_full_time" || !e.section
           );
           const showOps = scheduleEntries.filter((e: any) => e.section === "show_ops");
-          // If no section data, fall back to flat list
           const hasSections = scheduleEntries.some((e: any) => e.section);
 
-          function ShiftRow({ entry, i }: { entry: any; i: number }) {
+          function ShiftRow({ entry }: { entry: any }) {
+            const time = entry.all_shifts || (entry.shift_start && entry.shift_end ? `${entry.shift_start}–${entry.shift_end}` : null);
             return (
-              <div key={i} style={{
-                display: "flex", alignItems: "flex-start", justifyContent: "space-between",
-                gap: 8, padding: "8px 10px", borderRadius: 8,
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 6, padding: "4px 8px", borderRadius: 6,
                 background: "rgba(255,255,255,0.04)",
               }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
-                    {entry.employee_name}
-                  </div>
-                  {entry.shift_note && (
-                    <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2, fontStyle: "italic" }}>
-                      {entry.shift_note}
-                    </div>
-                  )}
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {entry.employee_name}
                 </div>
-                {entry.shift_start && entry.shift_end ? (
-                  <div style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", marginTop: 2 }}>
-                    {entry.all_shifts || `${entry.shift_start} – ${entry.shift_end}`}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: "var(--muted2)", marginTop: 2 }}>—</div>
-                )}
+                <div style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>
+                  {time || "—"}
+                </div>
+              </div>
+            );
+          }
+
+          function Section({ label, color, entries }: { label: string; color: string; entries: any[] }) {
+            return (
+              <div>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
+                  color, marginBottom: 4, paddingLeft: 2,
+                }}>
+                  {label}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {entries.map((e, i) => <ShiftRow key={i} entry={e} />)}
+                </div>
               </div>
             );
           }
 
           if (!hasSections) {
             return (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {scheduleEntries.map((entry: any, i: number) => (
-                  <ShiftRow key={i} entry={entry} i={i} />
-                ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {scheduleEntries.map((e: any, i: number) => <ShiftRow key={i} entry={e} />)}
               </div>
             );
           }
 
           return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {ems.length > 0 && (
-                <div>
-                  <div style={{
-                    fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
-                    color: "rgba(92,107,255,0.85)", marginBottom: 6, paddingLeft: 2,
-                  }}>
-                    EMS
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {ems.map((entry: any, i: number) => (
-                      <ShiftRow key={i} entry={entry} i={i} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {showOps.length > 0 && (
-                <div>
-                  <div style={{
-                    fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
-                    color: "rgba(255,182,39,0.85)", marginBottom: 6, paddingLeft: 2,
-                  }}>
-                    Show Ops
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {showOps.map((entry: any, i: number) => (
-                      <ShiftRow key={i} entry={entry} i={i} />
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {ems.length > 0 && <Section label="EMS" color="rgba(92,107,255,0.9)" entries={ems} />}
+              {showOps.length > 0 && <Section label="Show Ops" color="rgba(255,182,39,0.9)" entries={showOps} />}
             </div>
           );
         })()}

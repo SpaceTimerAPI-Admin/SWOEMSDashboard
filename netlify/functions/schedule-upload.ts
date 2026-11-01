@@ -142,22 +142,20 @@ One JSON object per working day per employee:
       return json({ ok: false, error: "No schedule entries found in the upload." }, 422);
     }
 
-    // Sanity check — filter to densest 7-day window if dates span more than 14 days
-    const dateCounts = new Map<string, number>();
-    for (const e of valid) {
-      dateCounts.set(e.work_date, (dateCounts.get(e.work_date) || 0) + 1);
-    }
-    const allMs = [...dateCounts.keys()].map(d => new Date(d + "T12:00:00").getTime());
-    const minMs = Math.min(...allMs);
-    const maxMs = Math.max(...allMs);
-    const spanDays = (maxMs - minMs) / 86400000;
-    let filtered = valid;
-    if (spanDays > 14) {
-      const medianMs = allMs.sort((a, b) => a - b)[Math.floor(allMs.length / 2)];
-      const windowMs = 7 * 86400000;
+    // Sanity check — keep only dates within 30 days of today (removes hallucinated wrong-year dates)
+    const todayMs = Date.now();
+    const windowMs = 30 * 24 * 60 * 60 * 1000;
+    let filtered = valid.filter(e => {
+      const ms = new Date(e.work_date + "T12:00:00").getTime();
+      return Math.abs(ms - todayMs) <= windowMs;
+    });
+    // If that wiped everything (AI got all dates wrong), fall back to the closest date cluster
+    if (filtered.length === 0) {
+      const allMs = valid.map(e => new Date(e.work_date + "T12:00:00").getTime());
+      const closest = allMs.reduce((a, b) => Math.abs(a - todayMs) < Math.abs(b - todayMs) ? a : b);
       filtered = valid.filter(e => {
         const ms = new Date(e.work_date + "T12:00:00").getTime();
-        return Math.abs(ms - medianMs) <= windowMs;
+        return Math.abs(ms - closest) <= 7 * 24 * 60 * 60 * 1000;
       });
     }
 
