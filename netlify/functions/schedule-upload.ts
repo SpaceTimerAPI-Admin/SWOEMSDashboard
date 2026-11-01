@@ -60,27 +60,33 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 4000,
-        messages: [{
-          role: "user",
-          content: [
-            contentBlock,
-            {
-              type: "text",
-              text: `Extract the work schedule from this image. Output ONLY a valid JSON array, no other text.
+        messages: [
+          {
+            role: "user",
+            content: [
+              contentBlock,
+              {
+                type: "text",
+                text: `Extract the work schedule from this image into a JSON array. Start your response with [ and end with ]. No other text.
 
-Layout rules:
-- Header row has day names and dates (use exact YYYY-MM-DD dates)
-- Three sections: "PART TIME"→"ems_part_time", "Full Time"→"ems_full_time", "Show Ops"→"show_ops"
-- Each employee = TWO rows: Row 1 has name + times, Row 2 has role labels (ignore row 2 times)
-- Each day has two time cells: start | end. "X" or "X X" = OFF, skip that day
-- Far-right column = Notes (shift_note for whole week, null if blank)
-- Names formatted as "LASTNAME, FIRSTNAME" → convert to "Firstname L."
+Rules:
+- Header rows have day names and YYYY-MM-DD dates — read them carefully
+- Three sections separated by shaded/dark rows: "PART TIME"→"ems_part_time", "Full Time"→"ems_full_time", "Show Ops"→"show_ops"
+- Each employee has TWO rows: first row has their name + shift times, second row has role labels — only use the first row
+- Each day column has two time cells: left=shift_start, right=shift_end. Cell showing "X" or "X X" = day off, skip it
+- Far-right "Notes" column = shift_note (one value per employee for the whole week, null if empty)
+- Name format "LASTNAME, FIRSTNAME M." → convert to "Firstname L."
 
-Output one object per (employee, work_date):
-[{"employee_name":"Firstname L.","work_date":"YYYY-MM-DD","shift_start":"H:MMam","shift_end":"H:MMpm","all_shifts":"H:MMam - H:MMpm","section":"ems_part_time","shift_note":null}]`,
-            },
-          ],
-        }],
+One JSON object per working day per employee:
+[{"employee_name":"string","work_date":"YYYY-MM-DD","shift_start":"h:mmap","shift_end":"h:mmap","all_shifts":"h:mmap - h:mmap","section":"ems_part_time|ems_full_time|show_ops","shift_note":"string or null"}]`,
+              },
+            ],
+          },
+          {
+            role: "assistant",
+            content: "[",
+          },
+        ],
       }),
     });
 
@@ -108,13 +114,22 @@ Output one object per (employee, work_date):
 
     let entries: ScheduleEntry[] = [];
     try {
-      const cleaned = rawText.replace(/```json|```/g, "").trim();
-      const match = cleaned.match(/\[[\s\S]*\]/);
-      if (!match) throw new Error("No JSON array found");
-      entries = JSON.parse(match[0]);
-      if (!Array.isArray(entries)) throw new Error("Not an array");
+      // The assistant was prefilled with "[" so the response continues from there.
+      // Reconstruct the full array string and parse it.
+      const reconstructed = "[" + rawText;
+      const cleaned = reconstructed.replace(/```json|```/g, "").trim();
+      // Try full parse first, then fall back to regex extraction
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        const match = cleaned.match(/\[[\s\S]*\]/);
+        if (match) parsed = JSON.parse(match[0]);
+      }
+      if (!Array.isArray(parsed)) throw new Error("Not an array");
+      entries = parsed;
     } catch {
-      console.error("[schedule-upload] Failed to parse Claude response:", rawText);
+      console.error("[schedule-upload] Failed to parse Claude response:", rawText.slice(0, 500));
       return json({ ok: false, error: "Could not parse schedule. Try a clearer photo." }, 422);
     }
 
