@@ -135,7 +135,13 @@ One JSON object per (employee, work_date) pair.`,
       return json({ ok: false, error: "The request timed out. Try uploading a photo of the schedule instead of a PDF, or crop the image closer to the schedule." }, 504);
     }
 
-    const claudeData = JSON.parse(responseText);
+    let claudeData: any;
+    try {
+      claudeData = JSON.parse(responseText);
+    } catch {
+      console.error("[schedule-upload] Failed to parse Claude API response as JSON. First 500 chars:", responseText.slice(0, 500));
+      return json({ ok: false, error: "Vision API returned an unexpected response. Try again." }, 500);
+    }
     const rawText = claudeData?.content?.[0]?.text || "";
 
     let entries: ScheduleEntry[] = [];
