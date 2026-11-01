@@ -67,19 +67,29 @@ export const handler: Handler = async (event) => {
               contentBlock,
               {
                 type: "text",
-                text: `Today is ${new Date().toISOString().slice(0, 10)}. Extract the work schedule from this image into a JSON array. Start your response with [ and end with ]. No other text.
+                text: `Today is ${new Date().toISOString().slice(0, 10)} and the year is ${new Date().getFullYear()}. Extract the EMS work schedule from this image into a JSON array. Start your response with [ and end with ]. No other text.
 
-Rules:
-- Header rows have day names and dates — the year is ${new Date().getFullYear()}, use exact YYYY-MM-DD format
-- Read the month and day numbers directly from the image header; do NOT guess or infer dates from context
-- Three sections separated by shaded/dark rows: "PART TIME"→"ems_part_time", "Full Time"→"ems_full_time", "Show Ops"→"show_ops"
-- Each employee has TWO rows: first row has their name + shift times, second row has role labels — only use the first row
-- Each day column has two time cells: left=shift_start, right=shift_end. Cell showing "X" or "X X" = day off, skip it
-- Far-right "Notes" column = shift_note (one value per employee for the whole week, null if empty)
-- Name format "LASTNAME, FIRSTNAME M." → convert to "Firstname L."
+CRITICAL: All dates MUST use year ${new Date().getFullYear()}. Read month/day from the image header row labeled "Date". Do NOT use any other year.
 
-One JSON object per working day per employee:
-[{"employee_name":"string","work_date":"YYYY-MM-DD","shift_start":"h:mmap","shift_end":"h:mmap","all_shifts":"h:mmap - h:mmap","section":"ems_part_time|ems_full_time|show_ops","shift_note":"string or null"}]`,
+Schedule structure:
+- Row 1 "Day": day names (Thurs, Friday, Saturday, Sunday, Monday, Tuesday, Wednesday)
+- Row 2 "Date": date numbers like "29-Oct", "30-Oct" — combine with year ${new Date().getFullYear()} to get YYYY-MM-DD
+- Row 3 "OP Hours": two time cells per day (operating window) — IGNORE these, they are not shift times
+- Row 4: event name — IGNORE
+- Then three employee sections separated by bold/dark header rows:
+  "PART TIME" → section = "ems_part_time"
+  "Full Time" → section = "ems_full_time"
+  "Show Ops"  → section = "show_ops"
+
+For each employee (name in leftmost column, format "LASTNAME, FIRSTNAME"):
+- They have TWO rows: row 1 = shift times, row 2 = role label (Opener, Closer, SUP, etc.) — IGNORE row 2
+- Each day has TWO time cells side by side: left = shift_start, right = shift_end
+- "X" in both cells = day off → skip that day entirely
+- Far-right "Notes" column = shift_note for the whole week (null if blank)
+- Convert name "LASTNAME, FIRSTNAME" → "Firstname L." (first name + last initial + period)
+
+Output one JSON object per (employee, working day):
+[{"employee_name":"Firstname L.","work_date":"${new Date().getFullYear()}-MM-DD","shift_start":"h:mmap","shift_end":"h:mmap","all_shifts":"h:mmap - h:mmap","section":"ems_part_time","shift_note":null}]`,
               },
             ],
           },

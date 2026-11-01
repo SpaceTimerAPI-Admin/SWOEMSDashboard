@@ -43,7 +43,7 @@ export const handler: Handler = async (event) => {
     const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from("schedule_entries")
-      .select("work_date, employee_name, shift_start, shift_end, all_shifts")
+      .select("work_date, employee_name, shift_start, shift_end, all_shifts, section, shift_note")
       .gte("work_date", weekStart)
       .lte("work_date", endStr)
       .order("work_date", { ascending: true })
