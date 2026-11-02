@@ -335,37 +335,37 @@ export default function Home() {
             </Link>
           </div>
         ) : (() => {
-          // Sort: EMS first, then Show Ops — colour-coded dot, no section labels
-          const sectionOrder = (s: string | null) =>
-            s === "show_ops" ? 1 : 0;
-          const sorted = [...scheduleEntries].sort(
-            (a: any, b: any) => sectionOrder(a.section) - sectionOrder(b.section)
-          );
+          const ems = scheduleEntries.filter((e: any) => e.section !== "show_ops");
+          const showOps = scheduleEntries.filter((e: any) => e.section === "show_ops");
+          const hasSections = scheduleEntries.some((e: any) => e.section);
+
+          function Col({ label, color, entries }: { label: string; color: string; entries: any[] }) {
+            return (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color, marginBottom: 4 }}>{label}</div>
+                {entries.map((e: any, i: number) => {
+                  const time = e.all_shifts || (e.shift_start && e.shift_end ? `${e.shift_start}–${e.shift_end}` : null);
+                  return (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 4, padding: "2px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.employee_name}</div>
+                      <div style={{ fontSize: 10, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>{time || "—"}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          if (!hasSections) {
+            return (
+              <Col label="On Shift" color="var(--muted2)" entries={scheduleEntries} />
+            );
+          }
 
           return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {sorted.map((entry: any, i: number) => {
-                const time = entry.all_shifts || (entry.shift_start && entry.shift_end ? `${entry.shift_start}–${entry.shift_end}` : null);
-                const isShowOps = entry.section === "show_ops";
-                return (
-                  <div key={i} style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "3px 8px", borderRadius: 5,
-                    background: "rgba(255,255,255,0.04)",
-                  }}>
-                    <div style={{
-                      width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
-                      background: isShowOps ? "rgba(255,182,39,0.8)" : "rgba(92,107,255,0.8)",
-                    }} />
-                    <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {entry.employee_name}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>
-                      {time || "—"}
-                    </div>
-                  </div>
-                );
-              })}
+            <div style={{ display: "flex", gap: 14 }}>
+              {ems.length > 0 && <Col label="EMS" color="rgba(92,107,255,0.9)" entries={ems} />}
+              {showOps.length > 0 && <Col label="Show Ops" color="rgba(255,182,39,0.9)" entries={showOps} />}
             </div>
           );
         })()}

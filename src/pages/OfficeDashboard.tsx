@@ -289,22 +289,36 @@ export default function OfficeDashboard() {
           </div>
           {schedule.length === 0 ? (
             <span style={{ fontSize: 10, color: "#374151" }}>No schedule uploaded</span>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {[...schedule]
-                .sort((a: any, b: any) => (a.section === "show_ops" ? 1 : 0) - (b.section === "show_ops" ? 1 : 0))
-                .map((s: any, i: number) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <div style={{
-                      width: 4, height: 4, borderRadius: "50%", flexShrink: 0,
-                      background: s.section === "show_ops" ? "rgba(251,191,36,0.9)" : "rgba(129,140,248,0.9)",
-                    }} />
-                    <div style={{ fontSize: 10, fontWeight: 600, color: "#c7d2fe", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.employee_name}</div>
-                    <div style={{ fontSize: 9, color: "#6b7280", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtShiftRange(s)}</div>
-                  </div>
-                ))}
-            </div>
-          )}
+          ) : (() => {
+            const ems = schedule.filter((s: any) => s.section !== "show_ops");
+            const showOps = schedule.filter((s: any) => s.section === "show_ops");
+            const hasSections = schedule.some((s: any) => s.section);
+
+            function Col({ label, color, entries }: { label: string; color: string; entries: any[] }) {
+              return (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color, marginBottom: 3 }}>{label}</div>
+                  {entries.map((s: any, i: number) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 4, padding: "1px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      <div style={{ fontSize: 9, fontWeight: 600, color: "#c7d2fe", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.employee_name}</div>
+                      <div style={{ fontSize: 9, color: "#6b7280", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtShiftRange(s)}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+
+            if (!hasSections) {
+              return <Col label="On Shift" color="#4b5563" entries={schedule} />;
+            }
+
+            return (
+              <div style={{ display: "flex", gap: 10 }}>
+                {ems.length > 0 && <Col label="EMS" color="rgba(129,140,248,0.9)" entries={ems} />}
+                {showOps.length > 0 && <Col label="Show Ops" color="rgba(251,191,36,0.9)" entries={showOps} />}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Clock */}
