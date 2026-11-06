@@ -139,11 +139,19 @@ export default function ShowTechHome() {
         const projects = (pr?.ok ? (pr?.data?.projects || pr?.projects || []) : [])
           .filter((p: any) => !isClosed(p))
           .map((p: any) => ({ ...p, _type: "project" }));
-        setItems([...tickets, ...projects].sort((a, b) =>
+        const xmasTickets: any[] = xr?.tickets || [];
+        const openXmas = xmasTickets
+          .filter((t: any) => t.status === "open")
+          .map((t: any) => ({
+            ...t,
+            _type: "xmas",
+            title: t.location_friendly || `Christmas Ticket #${t.id}`,
+            location: t.location_friendly || "",
+          }));
+        setOpenXmasCount(openXmas.length);
+        setItems([...tickets, ...projects, ...openXmas].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         ));
-        const xmasTickets: any[] = xr?.tickets || [];
-        setOpenXmasCount(xmasTickets.filter((t: any) => t.status === "open").length);
       } catch {}
       setLoading(false);
     }
@@ -176,24 +184,30 @@ export default function ShowTechHome() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {items.slice(0, 8).map((item: any) => (
-              <Link
-                key={item.id}
-                to={item._type === "ticket" ? `/tickets/${item.id}` : `/projects/${item.id}`}
-                className="card"
-                style={{ padding: "12px 14px", display: "block", textDecoration: "none",
-                  borderLeft: "3px solid rgba(92,107,255,0.5)" }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontSize: 11, color: "var(--muted2)" }}>
-                    {item._type === "ticket" ? "🎫 Ticket" : "📐 Project"}
-                  </span>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{item.title}</div>
-                <div style={{ fontSize: 11, color: "var(--muted2)" }}>📍 {item.location}{item.tag ? ` · ${item.tag}` : ""}</div>
-              </Link>
-            ))}
-            {items.length > 8 && (
+            {items.slice(0, 10).map((item: any) => {
+              const isXmas = item._type === "xmas";
+              const to = isXmas ? `/christmas/${item.id}` : item._type === "ticket" ? `/tickets/${item.id}` : `/projects/${item.id}`;
+              const borderColor = isXmas ? "rgba(46,232,160,0.55)" : "rgba(92,107,255,0.5)";
+              const typeLabel = isXmas ? "🎄 Christmas" : item._type === "ticket" ? "🎫 Ticket" : "📐 Project";
+              return (
+                <Link
+                  key={`${item._type}-${item.id}`}
+                  to={to}
+                  className="card"
+                  style={{ padding: "12px 14px", display: "block", textDecoration: "none",
+                    borderLeft: `3px solid ${borderColor}` }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontSize: 11, color: "var(--muted2)" }}>{typeLabel}</span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{item.title}</div>
+                  {item.location && (
+                    <div style={{ fontSize: 11, color: "var(--muted2)" }}>📍 {item.location}{item.tag ? ` · ${item.tag}` : ""}</div>
+                  )}
+                </Link>
+              );
+            })}
+            {items.length > 10 && (
               <Link to="/tickets" style={{ fontSize: 13, color: "#B0B8FF", textAlign: "center", padding: "8px" }}>
                 View all {items.length} items →
               </Link>
