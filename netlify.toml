@@ -60,3 +60,8 @@
 # Posts today's events + PDF links to GroupMe. Silent if no events.
 [functions."beo-morning-alert"]
   schedule = "0 10 * * *"
+
+# Scheduled: Christmas ticket daily stats — daily at 4 AM ET (9 AM UTC)
+# Posts open/closed/total counts + priority reminder to GroupMe.
+[functions."xmas-daily-report"]
+  schedule = "0 9 * * *"

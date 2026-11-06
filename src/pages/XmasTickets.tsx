@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 // Leaflet loaded from CDN — types declared minimally
 declare const L: any;
@@ -17,9 +17,12 @@ function fmtDate(iso: string) {
 }
 
 export default function XmasTickets() {
+  const [searchParams] = useSearchParams();
   const [tickets, setTickets]   = useState<any[]>([]);
   const [loading, setLoading]   = useState(true);
-  const [filter, setFilter]     = useState<"all" | "open" | "fixed">("all");
+  const [filter, setFilter]     = useState<"all" | "open" | "fixed">(
+    (searchParams.get("filter") as any) || "all"
+  );
   const [search, setSearch]     = useState("");
   const [mapReady, setMapReady] = useState(false);
   const mapRef   = useRef<HTMLDivElement>(null);
@@ -151,11 +154,11 @@ export default function XmasTickets() {
       ) : (
         <div className="cards">
           {filtered.map(t => (
-            <div key={t.id} style={{ textDecoration: "none" }}>
+            <Link key={t.id} to={`/christmas/${t.id}`} style={{ textDecoration: "none" }}
+              onClick={() => focusOnMap(t)}>
               <div
                 className="item-card"
-                style={{ borderColor: selectedId === t.id ? "var(--primary)" : undefined }}
-                onClick={() => focusOnMap(t)}
+                style={{ borderColor: selectedId === t.id ? "var(--primary)" : undefined, cursor: "pointer" }}
               >
                 <div className="item-top">
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -181,14 +184,10 @@ export default function XmasTickets() {
                     }}>
                       {t.status === "fixed" ? "✓ Fixed" : "Open"}
                     </span>
-                    <Link to={`/christmas/${t.id}`} onClick={e => e.stopPropagation()}
-                      style={{ fontSize: 11, color: "var(--primary2)", textDecoration: "none" }}>
-                      View →
-                    </Link>
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
