@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listTickets, listProjects } from "../lib/api";
 import { getProfile } from "../lib/auth";
 
 const BRIEFING_KEY = "swoems_st_briefing_dismissed";
@@ -53,16 +52,6 @@ function ShiftBriefing({ onDismiss, openCount }: { onDismiss: () => void; openCo
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Walk the park</div>
               <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
                 Walking the entire park is required during Christmas shifts. Log any issues with Christmas décor under the <strong style={{ color: "#7EEFC4" }}>Christmas dashboard</strong>.
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 18, flexShrink: 0 }}>🔧</span>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Other park issues</div>
-              <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
-                Any issues outside of Christmas décor should be logged under <strong style={{ color: "#B0B8FF" }}>Log a Work Order</strong>.
               </div>
             </div>
           </div>
@@ -128,17 +117,7 @@ export default function ShowTechHome() {
 
     async function load() {
       try {
-        const [tr, pr, xr] = await Promise.all([
-          listTickets({ includeClosed: false }) as any,
-          listProjects({ includeClosed: false }) as any,
-          fetch("/api/xmas-list-tickets").then(r => r.json()),
-        ]);
-        const tickets = (tr?.ok ? (tr?.data?.tickets || tr?.tickets || []) : [])
-          .filter((t: any) => !isClosed(t))
-          .map((t: any) => ({ ...t, _type: "ticket" }));
-        const projects = (pr?.ok ? (pr?.data?.projects || pr?.projects || []) : [])
-          .filter((p: any) => !isClosed(p))
-          .map((p: any) => ({ ...p, _type: "project" }));
+        const xr = await fetch("/api/xmas-list-tickets").then(r => r.json());
         const xmasTickets: any[] = xr?.tickets || [];
         const openXmas = xmasTickets
           .filter((t: any) => t.status === "open")
@@ -149,7 +128,7 @@ export default function ShowTechHome() {
             location: t.location_friendly || "",
           }));
         setOpenXmasCount(openXmas.length);
-        setItems([...tickets, ...projects, ...openXmas].sort((a, b) =>
+        setItems(openXmas.sort((a: any, b: any) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         ));
       } catch {}
@@ -173,14 +152,14 @@ export default function ShowTechHome() {
       {/* Open items */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 8 }}>
-          Open Items ({loading ? "…" : items.length})
+          Open Christmas Tickets ({loading ? "…" : items.length})
         </div>
         {loading ? (
           <div className="muted" style={{ fontSize: 13 }}>Loading…</div>
         ) : items.length === 0 ? (
           <div className="card" style={{ padding: "20px", textAlign: "center" }}>
             <div style={{ fontSize: 22, marginBottom: 6 }}>✓</div>
-            <div style={{ fontSize: 13, color: "var(--muted)" }}>No open items assigned to Show Tech.</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>No open Christmas tickets.</div>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -208,8 +187,8 @@ export default function ShowTechHome() {
               );
             })}
             {items.length > 10 && (
-              <Link to="/tickets" style={{ fontSize: 13, color: "#B0B8FF", textAlign: "center", padding: "8px" }}>
-                View all {items.length} items →
+              <Link to="/christmas" style={{ fontSize: 13, color: "#7EEFC4", textAlign: "center", padding: "8px" }}>
+                View all {items.length} tickets →
               </Link>
             )}
           </div>
@@ -218,16 +197,6 @@ export default function ShowTechHome() {
 
       {/* Quick actions */}
       <div className="home-grid">
-        <Link to="/tickets/new" className="home-tile" style={{ background: "rgba(92,107,255,0.12)" }}>
-          <div className="tile-icon" style={{ background: "rgba(92,107,255,0.2)" }}>🎫</div>
-          <div className="tile-title">Log a Work Order</div>
-          <div className="tile-desc">Create a new ticket</div>
-        </Link>
-        <Link to="/tickets" className="home-tile" style={{ background: "rgba(46,232,160,0.08)" }}>
-          <div className="tile-icon" style={{ background: "rgba(46,232,160,0.15)" }}>📋</div>
-          <div className="tile-title">Work Orders</div>
-          <div className="tile-desc">View all show tech work orders</div>
-        </Link>
         <Link to="/shift-log" className="home-tile" style={{ background: "rgba(168,144,255,0.1)" }}>
           <div className="tile-icon" style={{ background: "rgba(168,144,255,0.2)" }}>📓</div>
           <div className="tile-title">Shift Log</div>

@@ -17,17 +17,30 @@ async function compressImage(file: File, maxDim = 1600, quality = 0.78): Promise
   return new Promise(resolve => canvas.toBlob(b => resolve(b!), "image/jpeg", quality));
 }
 
-async function getCoordsSafe(timeoutMs = 6000): Promise<{ lat: number; lon: number } | null> {
-  if (!navigator.geolocation) return null;
-  return new Promise(resolve => {
-    let done = false;
-    const timer = setTimeout(() => { if (!done) { done = true; resolve(null); } }, timeoutMs);
-    navigator.geolocation.getCurrentPosition(
-      pos => { if (!done) { done = true; clearTimeout(timer); resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }); } },
-      ()  => { if (!done) { done = true; clearTimeout(timer); resolve(null); } },
-      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 60000 }
-    );
+function getPositionOnce(opts: PositionOptions): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, opts);
   });
+}
+
+async function getCoordsSafe(): Promise<{ lat: number; lon: number } | null> {
+  if (!navigator.geolocation) return null;
+  // Android often fails high-accuracy on first try (GPS cold start, missing FINE_LOCATION).
+  // Strategy: try high-accuracy with a generous timeout, then immediately fall back to
+  // network/IP-based low-accuracy. Either way we get a usable coordinate.
+  const attempts: PositionOptions[] = [
+    { enableHighAccuracy: true,  timeout: 10000, maximumAge: 30000 },
+    { enableHighAccuracy: false, timeout: 8000,  maximumAge: 60000 },
+  ];
+  for (const opts of attempts) {
+    try {
+      const pos = await getPositionOnce(opts);
+      return { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    } catch {
+      // try next option
+    }
+  }
+  return null;
 }
 
 function fmtDate(iso: string) {
@@ -219,7 +232,7 @@ export default function XmasTicketNew() {
     try {
       setStep("Getting location & uploading photo…");
       const [coords, compressed] = await Promise.all([
-        getCoordsSafe(6000),
+        getCoordsSafe(),
         compressImage(photo),
       ]);
 
