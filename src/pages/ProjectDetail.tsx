@@ -12,7 +12,6 @@ import {
   reopenProject,
 } from "../lib/api";
 import { getProfile, getRole } from "../lib/auth";
-import ScheduleReviewButton from "../components/ScheduleReviewButton";
 
 type Project = any;
 
@@ -283,7 +282,6 @@ export default function ProjectDetail() {
           {!isClosed && (
             <div className="btn-row" style={{ marginBottom: 16 }}>
               <button className="btn small danger" onClick={handleClose} disabled={busy}>Close project</button>
-              <ScheduleReviewButton itemType="project" itemId={projectId} itemTitle={project?.title || ""} />
             </div>
           )}
 

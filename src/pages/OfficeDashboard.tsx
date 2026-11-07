@@ -33,17 +33,6 @@ function fmtShift(t: string | null) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")}${ampm}`;
 }
 
-function fmtShiftRange(s: any): string {
-  // all_shifts is stored as "HH:MM - HH:MM" or similar text
-  if (s.all_shifts) {
-    // Parse and reformat if it looks like "7:00 - 15:30"
-    const match = s.all_shifts.match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/);
-    if (match) return `${fmtShift(match[1])} – ${fmtShift(match[2])}`;
-    return s.all_shifts;
-  }
-  const parts = [fmtShift(s.shift_start), fmtShift(s.shift_end)].filter(Boolean);
-  return parts.join(" – ");
-}
 
 async function fetchDashboard() {
   const res = await fetch("/api/office-dashboard");
@@ -193,7 +182,6 @@ export default function OfficeDashboard() {
   const groupme      = data?.groupme || [];
   const closedToday  = data?.closed_today || [];
   const shiftLog     = data?.shift_log || [];
-  const schedule     = data?.schedule || [];
   const needsUpdate  = data?.needs_update || [];
   const tagBreakdown = stats.tag_breakdown || {};
   const totalOpen    = stats.open || 0;
@@ -280,45 +268,6 @@ export default function OfficeDashboard() {
               })}
             </div>
           </div>
-        </div>
-
-        {/* On Shift Today */}
-        <div style={{ padding: "8px 14px", borderRight: "1px solid rgba(255,255,255,0.07)", minWidth: 200, maxWidth: 280, overflowY: "auto", maxHeight: "100%" }}>
-          <div style={{ fontSize: 9, color: "#4b5563", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>
-            📅 On Shift Today ({schedule.length})
-          </div>
-          {schedule.length === 0 ? (
-            <span style={{ fontSize: 10, color: "#374151" }}>No schedule uploaded</span>
-          ) : (() => {
-            const ems = schedule.filter((s: any) => s.section !== "show_ops");
-            const showOps = schedule.filter((s: any) => s.section === "show_ops");
-            const hasSections = schedule.some((s: any) => s.section);
-
-            function Col({ label, color, entries }: { label: string; color: string; entries: any[] }) {
-              return (
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color, marginBottom: 3 }}>{label}</div>
-                  {entries.map((s: any, i: number) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 4, padding: "1px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                      <div style={{ fontSize: 9, fontWeight: 600, color: "#c7d2fe", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.employee_name}</div>
-                      <div style={{ fontSize: 9, color: "#6b7280", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtShiftRange(s)}</div>
-                    </div>
-                  ))}
-                </div>
-              );
-            }
-
-            if (!hasSections) {
-              return <Col label="On Shift" color="#4b5563" entries={schedule} />;
-            }
-
-            return (
-              <div style={{ display: "flex", gap: 10 }}>
-                {ems.length > 0 && <Col label="EMS" color="rgba(129,140,248,0.9)" entries={ems} />}
-                {showOps.length > 0 && <Col label="Show Ops" color="rgba(251,191,36,0.9)" entries={showOps} />}
-              </div>
-            );
-          })()}
         </div>
 
         {/* Clock */}
