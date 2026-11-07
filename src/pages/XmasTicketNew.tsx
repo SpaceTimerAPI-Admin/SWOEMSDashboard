@@ -25,11 +25,26 @@ function getPositionOnce(opts: PositionOptions): Promise<GeolocationPosition> {
 
 async function getCoordsSafe(): Promise<{ lat: number; lon: number } | null> {
   if (!navigator.geolocation) return null;
-  // Android often fails high-accuracy on first try (GPS cold start, missing FINE_LOCATION).
-  // Strategy: try high-accuracy with a generous timeout, then immediately fall back to
-  // network/IP-based low-accuracy. Either way we get a usable coordinate.
+
+  // On Android Chrome, if permission hasn't been granted yet, getCurrentPosition
+  // fires the error callback immediately instead of prompting the user.
+  // Calling permissions.query first forces the browser to show the prompt before
+  // we attempt to read coordinates, so Android behaves like iOS.
+  try {
+    if (navigator.permissions) {
+      const status = await navigator.permissions.query({ name: "geolocation" });
+      if (status.state === "denied") return null; // user has explicitly blocked it
+      // "prompt" or "granted" — proceed; the prompt will show on "prompt"
+    }
+  } catch {
+    // permissions API not available on this browser — fall through and try anyway
+  }
+
+  // Try high-accuracy first (GPS chip), then fall back to network/IP location.
+  // High-accuracy can still time out on Android on a cold GPS start, so the
+  // fallback ensures we always get something.
   const attempts: PositionOptions[] = [
-    { enableHighAccuracy: true,  timeout: 10000, maximumAge: 30000 },
+    { enableHighAccuracy: true,  timeout: 12000, maximumAge: 30000 },
     { enableHighAccuracy: false, timeout: 8000,  maximumAge: 60000 },
   ];
   for (const opts of attempts) {
@@ -230,7 +245,7 @@ export default function XmasTicketNew() {
 
     setLoading(true);
     try {
-      setStep("Getting location & uploading photo…");
+      setStep("Allow location access if prompted, then uploading photo…");
       const [coords, compressed] = await Promise.all([
         getCoordsSafe(),
         compressImage(photo),
