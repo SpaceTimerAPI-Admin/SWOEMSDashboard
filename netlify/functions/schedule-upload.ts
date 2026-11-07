@@ -58,8 +58,8 @@ export const handler: Handler = async (event) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 4000,
+        model: "claude-sonnet-4-6",
+        max_tokens: 6000,
         messages: [
           {
             role: "user",
@@ -67,29 +67,45 @@ export const handler: Handler = async (event) => {
               contentBlock,
               {
                 type: "text",
-                text: `Today is ${new Date().toISOString().slice(0, 10)} and the year is ${new Date().getFullYear()}. Extract the EMS work schedule from this image into a JSON array. Start your response with [ and end with ]. No other text.
+                text: `Today is ${new Date().toISOString().slice(0, 10)}. The year is ${new Date().getFullYear()}. Extract every working shift from this EMS schedule image into a JSON array. Output ONLY valid JSON starting with [ and ending with ]. No explanation, no markdown.
 
-CRITICAL: All dates MUST use year ${new Date().getFullYear()}. Read month/day from the image header row labeled "Date". Do NOT use any other year.
+CRITICAL RULES — read carefully:
 
-Schedule structure:
-- Row 1 "Day": day names (Thurs, Friday, Saturday, Sunday, Monday, Tuesday, Wednesday)
-- Row 2 "Date": date numbers like "29-Oct", "30-Oct" — combine with year ${new Date().getFullYear()} to get YYYY-MM-DD
-- Row 3 "OP Hours": two time cells per day (operating window) — IGNORE these, they are not shift times
-- Row 4: event name — IGNORE
-- Then three employee sections separated by bold/dark header rows:
-  "PART TIME" → section = "ems_part_time"
-  "Full Time" → section = "ems_full_time"
-  "Show Ops"  → section = "show_ops"
+1. DATES: Header row "Date" shows values like "5-Nov", "12-Nov". Combine with year ${new Date().getFullYear()} → "2026-11-05". Never use any other year.
 
-For each employee (name in leftmost column, format "LASTNAME, FIRSTNAME"):
-- They have TWO rows: row 1 = shift times, row 2 = role label (Opener, Closer, SUP, etc.) — IGNORE row 2
-- Each day has TWO time cells side by side: left = shift_start, right = shift_end
-- "X" in both cells = day off → skip that day entirely
-- Far-right "Notes" column = shift_note for the whole week (null if blank)
-- Convert name "LASTNAME, FIRSTNAME" → "Firstname L." (first name + last initial + period)
+2. HEADER ROWS TO IGNORE (they are NOT employee rows):
+   - Row labeled "Day" (day names)
+   - Row labeled "Date" (date values)
+   - Row labeled "OP Hours" (park operating hours — NOT employee shifts)
+   - Any row with an event name under OP Hours
+   - Section headers: "PART TIME", "Full Time", "Show Ops"
 
-Output one JSON object per (employee, working day):
-[{"employee_name":"Firstname L.","work_date":"${new Date().getFullYear()}-MM-DD","shift_start":"h:mmap","shift_end":"h:mmap","all_shifts":"h:mmap - h:mmap","section":"ems_part_time","shift_note":null}]`,
+3. EMPLOYEE SECTIONS:
+   - "PART TIME" section → section = "ems_part_time"
+   - "Full Time" section → section = "ems_full_time"
+   - "Show Ops" section → section = "show_ops"
+
+4. EACH EMPLOYEE has EXACTLY TWO rows in the grid:
+   - Row A (times row): contains shift start/end times or "X X"
+   - Row B (label row): contains text like "Opener", "Closer", "SUP", "Christmas Lead" — IGNORE for times
+
+5. READING EACH DAY'S CELL for an employee:
+   - Each day column has TWO time cells side by side: LEFT = shift_start, RIGHT = shift_end
+   - If BOTH cells contain "X" → employee is OFF that day → DO NOT output a record for that day
+   - If cells contain a time range like "6:00am" and "2:30pm" → that is one shift
+   - Only use times from that employee's own row — do NOT borrow times from adjacent employees' rows
+
+6. NAME FORMAT: Names appear as "LASTNAME, FIRSTNAME" in the leftmost column.
+   Convert to: "Firstname L." — first name + space + last name initial + period.
+   Examples: "MCHugh, Anthony" → "Anthony M.", "Sleeper, Connor" → "Connor S.", "Wang, Lori" → "Lori W."
+   For "Show Ops" names that appear as "FIRSTNAME, LASTNAME" or "Firstname Lastname", apply same rule.
+
+7. NOTES COLUMN: Far-right column labeled "Notes" — if text exists for the employee's row, use as shift_note (string). Otherwise null.
+
+8. TIME FORMAT: Use exactly as printed — e.g. "6:00am", "2:30pm", "10:00pm", "12:00am". Keep lowercase am/pm.
+
+Output format — one object per (employee, working day):
+{"employee_name":"Firstname L.","work_date":"YYYY-MM-DD","shift_start":"h:mmam","shift_end":"h:mmpm","all_shifts":"h:mmam–h:mmpm","section":"ems_part_time","shift_note":null}`,
               },
             ],
           },
@@ -169,7 +185,8 @@ Output one JSON object per (employee, working day):
       });
     }
 
-    // Deduplicate — merge same person+date (handles split shifts returned separately)
+    // Deduplicate — keep first occurrence per person+date (Sonnet returns one record per shift;
+    // if somehow duplicated, prefer the entry with both start and end populated)
     const mergeMap = new Map<string, any>();
     for (const e of filtered) {
       const key = `${e.work_date}::${e.employee_name}`;
@@ -177,20 +194,16 @@ Output one JSON object per (employee, working day):
         mergeMap.set(key, { ...e });
       } else {
         const existing = mergeMap.get(key);
-        if (e.shift_start && (!existing.shift_start || e.shift_start < existing.shift_start)) {
-          existing.shift_start = e.shift_start;
+        // Only replace if new entry has more complete data (both times vs one)
+        const existingComplete = existing.shift_start && existing.shift_end;
+        const newComplete = e.shift_start && e.shift_end;
+        if (!existingComplete && newComplete) {
+          mergeMap.set(key, { ...e });
+        } else {
+          // Keep non-null section and shift_note
+          if (!existing.section && e.section) existing.section = e.section;
+          if (!existing.shift_note && e.shift_note) existing.shift_note = e.shift_note;
         }
-        if (e.shift_end && (!existing.shift_end || e.shift_end > existing.shift_end)) {
-          existing.shift_end = e.shift_end;
-        }
-        if (e.all_shifts && existing.all_shifts && e.all_shifts !== existing.all_shifts) {
-          existing.all_shifts = `${existing.all_shifts} / ${e.all_shifts}`;
-        } else if (e.all_shifts && !existing.all_shifts) {
-          existing.all_shifts = e.all_shifts;
-        }
-        // Keep non-null section and shift_note
-        if (!existing.section && e.section) existing.section = e.section;
-        if (!existing.shift_note && e.shift_note) existing.shift_note = e.shift_note;
       }
     }
     const deduped = Array.from(mergeMap.values());
