@@ -7,7 +7,6 @@ import ResetPin from "./pages/ResetPin";
 import Home from "./pages/Home";
 import ShowTechHome from "./pages/ShowTechHome";
 import Admin from "./pages/Admin";
-import AdminSchedule from "./pages/AdminSchedule";
 import AdminQR from "./pages/AdminQR";
 import AdminElijah from "./pages/AdminElijah";
 import ShowTechRegister from "./pages/ShowTechRegister";
@@ -17,7 +16,6 @@ import TicketDetail from "./pages/TicketDetail";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import ShiftLog from "./pages/ShiftLog";
-import Schedule from "./pages/Schedule";
 import Events from "./pages/Events";
 import EventDetail from "./pages/EventDetail";
 import EOD from "./pages/EOD";
@@ -124,7 +122,6 @@ export default function App() {
         <Route path="/" element={<RequireAuth><HomeComponent /></RequireAuth>} />
 
         <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
-        <Route path="/admin/schedule" element={<RequireAdmin><AdminSchedule /></RequireAdmin>} />
         <Route path="/admin/qr" element={<RequireAdmin><AdminQR /></RequireAdmin>} />
         <Route path="/admin/elijah" element={<RequireAdmin><AdminElijah /></RequireAdmin>} />
         <Route path="/admin/report" element={<RequireAdmin><TicketReport /></RequireAdmin>} />
@@ -138,7 +135,6 @@ export default function App() {
         <Route path="/projects/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
 
         <Route path="/shift-log" element={<RequireAuth><ShiftLog /></RequireAuth>} />
-        <Route path="/schedule" element={<RequireAuth><Schedule /></RequireAuth>} />
         <Route path="/events" element={<RequireAuth><Events /></RequireAuth>} />
         <Route path="/events/:id" element={<RequireAuth><EventDetail /></RequireAuth>} />
 

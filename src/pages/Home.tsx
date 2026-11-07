@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listTickets, listProjects, getTodaySchedule, getTodayBeo, getDocsUrl } from "../lib/api";
+import { listTickets, listProjects, getTodayBeo, getDocsUrl } from "../lib/api";
 import { getProfile, getRole } from "../lib/auth";
 
 const DISMISSED_KEY = "swoems_dismissed_ticket_reminders";
@@ -79,10 +79,6 @@ export default function Home() {
   // Ticket reminder popup
   const [reminderTickets, setReminderTickets] = useState<any[]>([]);
 
-  // Schedule state
-  const [scheduleEntries, setScheduleEntries] = useState<any[] | null>(null);
-  const [scheduleDate, setScheduleDate] = useState<string>("");
-
   // Today's BEO events
   const [todayEvents, setTodayEvents] = useState<any[]>([]);
 
@@ -90,10 +86,9 @@ export default function Home() {
     if (!profile?.id) return;
     async function loadAll() {
       try {
-        const [tr, pr, sr, br] = await Promise.all([
+        const [tr, pr, br] = await Promise.all([
           listTickets({ includeClosed: false }) as any,
           listProjects({ includeClosed: false }) as any,
-          getTodaySchedule() as any,
           getTodayBeo() as any,
         ]);
 
@@ -121,21 +116,12 @@ export default function Home() {
           setReminderTickets(newReminders);
         }
 
-        // Today's schedule
-        if (sr?.ok) {
-          const data = sr.data ?? sr;
-          setScheduleEntries(data.entries || []);
-          setScheduleDate(data.date || "");
-        } else {
-          setScheduleEntries([]);
-        }
-
         // Today's events
         if (br?.ok) {
           setTodayEvents((br.data ?? br).events || []);
         }
       } catch {
-        setScheduleEntries([]);
+        // ignore
       }
     }
     void loadAll();
@@ -145,12 +131,6 @@ export default function Home() {
     dismissTicket(id);
     setReminderTickets(prev => prev.filter(t => String(t.id) !== id));
   }
-
-  const todayDisplay = scheduleDate
-    ? new Date(scheduleDate + "T12:00:00").toLocaleDateString("en-US", {
-        weekday: "long", month: "long", day: "numeric",
-      })
-    : new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   return (
     <div className="page fade-up">
@@ -316,60 +296,6 @@ export default function Home() {
         </Link>
       )}
 
-      {/* Today's Shift */}
-      <div className="card" style={{ padding: "12px 14px", marginTop: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)" }}>
-            👥 On Shift Today
-          </div>
-          <div style={{ fontSize: 11, color: "var(--muted2)" }}>{todayDisplay}</div>
-        </div>
-
-        {scheduleEntries === null ? (
-          <div style={{ fontSize: 13, color: "var(--muted2)" }}>Loading…</div>
-        ) : scheduleEntries.length === 0 ? (
-          <div style={{ fontSize: 13, color: "var(--muted2)", fontStyle: "italic" }}>
-            No schedule for today.{" "}
-            <Link to="/settings" style={{ color: "var(--muted)", textDecoration: "underline" }}>
-              Upload one in Settings.
-            </Link>
-          </div>
-        ) : (() => {
-          const ems = scheduleEntries.filter((e: any) => e.section !== "show_ops");
-          const showOps = scheduleEntries.filter((e: any) => e.section === "show_ops");
-          const hasSections = scheduleEntries.some((e: any) => e.section);
-
-          function Col({ label, color, entries }: { label: string; color: string; entries: any[] }) {
-            return (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color, marginBottom: 4 }}>{label}</div>
-                {entries.map((e: any, i: number) => {
-                  const time = e.all_shifts || (e.shift_start && e.shift_end ? `${e.shift_start}–${e.shift_end}` : null);
-                  return (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 4, padding: "2px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.employee_name}</div>
-                      <div style={{ fontSize: 10, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>{time || "—"}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          }
-
-          if (!hasSections) {
-            return (
-              <Col label="On Shift" color="var(--muted2)" entries={scheduleEntries} />
-            );
-          }
-
-          return (
-            <div style={{ display: "flex", gap: 14 }}>
-              {ems.length > 0 && <Col label="EMS" color="rgba(92,107,255,0.9)" entries={ems} />}
-              {showOps.length > 0 && <Col label="Show Ops" color="rgba(255,182,39,0.9)" entries={showOps} />}
-            </div>
-          );
-        })()}
-      </div>
       {assigned.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{
