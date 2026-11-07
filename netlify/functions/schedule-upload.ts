@@ -58,8 +58,8 @@ export const handler: Handler = async (event) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 4000,
+        model: "claude-sonnet-4-5",
+        max_tokens: 8000,
         stream: true,
         messages: [
           {
@@ -72,15 +72,33 @@ export const handler: Handler = async (event) => {
 
 RULES:
 1. DATES: Header row "Date" has values like "5-Nov". Combine with ${new Date().getFullYear()} → "2026-11-05". Never use another year.
-2. IGNORE these rows: Day names, Date row, OP Hours row (park operating hours, NOT shifts), event name row, section headers (PART TIME / Full Time / Show Ops).
-3. SECTIONS: "PART TIME"→"ems_part_time", "Full Time"→"ems_full_time", "Show Ops"→"show_ops"
-4. Each employee has TWO rows: row 1=shift times, row 2=role label (Opener/Closer/SUP etc). Only read row 1.
-5. Each day cell has TWO values side by side: LEFT=shift_start, RIGHT=shift_end. If BOTH are "X" → day off, skip. Never use times from another employee's row.
-6. Names: "LASTNAME, FIRSTNAME" → "Firstname L." (e.g. "MCHugh, Anthony"→"Anthony M.", "Sleeper, Connor"→"Connor S.")
-7. Notes column (far right) → shift_note, or null.
-8. Times exactly as printed: "6:00am", "2:30pm", "10:00pm", "12:00am"
 
-One JSON object per working day per employee:
+2. THE FIRST 4 ROWS ARE HEADERS — NEVER treat them as employee data:
+   - Row 1 "Day": day names (Thurs, Friday, etc.)
+   - Row 2 "Date": date values (5-Nov, 6-Nov, etc.)
+   - Row 3 "OP Hours": TWO times per column (e.g. "10:00 AM" and "6:00 PM") — these are PARK OPERATING HOURS, NOT employee shifts. NEVER use these times for any employee.
+   - Row 4: event name (e.g. "Christmas Celebration", "normal operation") — ignore
+
+3. SECTIONS: bold dark header rows divide employees into groups:
+   "PART TIME"→"ems_part_time", "Full Time"→"ems_full_time", "Show Ops"→"show_ops"
+
+4. Each employee has EXACTLY TWO rows:
+   - Row A (times): shift_start and shift_end, or "X" and "X" for day off
+   - Row B (label): "Opener", "Closer", "SUP", "Christmas Lead", etc. — IGNORE this row for times
+
+5. For each employee's day cell:
+   - Two values side by side: LEFT = shift_start, RIGHT = shift_end
+   - If EITHER value is "X" or both are "X" → employee is OFF → skip entirely, do NOT output a record
+   - If the cell is blank or empty → skip that day
+   - ONLY use times that appear in that specific employee's Row A — never borrow from headers or other employees
+
+6. Names: "LASTNAME, FIRSTNAME" → "Firstname L." (e.g. "MCHugh, Anthony"→"Anthony M.", "Sleeper, Connor"→"Connor S.", "Cartelli, Aiden"→"Aiden C.", "Laing, Tayton"→"Tayton L.")
+
+7. Notes column (far right, labeled "Notes") → shift_note string, or null if blank.
+
+8. Times exactly as printed in the employee row: "6:00am", "2:30pm", "10:00pm", "12:00am". Lowercase am/pm.
+
+Output one JSON object per (employee, working day):
 {"employee_name":"Firstname L.","work_date":"YYYY-MM-DD","shift_start":"h:mmam","shift_end":"h:mmpm","all_shifts":"h:mmam–h:mmpm","section":"ems_part_time","shift_note":null}`,
               },
             ],

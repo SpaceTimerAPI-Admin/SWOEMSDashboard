@@ -7,7 +7,7 @@
   node_bundler = "esbuild"
 
 [functions."schedule-upload"]
-  timeout = 60
+  timeout = 90
 
 [functions."ticket-report"]
   timeout = 60
