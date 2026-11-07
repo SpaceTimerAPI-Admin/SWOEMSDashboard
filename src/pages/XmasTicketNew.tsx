@@ -375,7 +375,7 @@ export default function XmasTicketNew() {
                 <span>Tap to take or choose photo</span>
               </button>
             )}
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onPhotoChange} />
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={onPhotoChange} />
           </div>
 
           <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 6, marginBottom: 12 }}>

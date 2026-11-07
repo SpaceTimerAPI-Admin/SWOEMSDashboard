@@ -103,8 +103,6 @@ function ShiftBriefing({ onDismiss, openCount }: { onDismiss: () => void; openCo
 
 export default function ShowTechHome() {
   const profile = getProfile();
-  const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showBriefing, setShowBriefing] = useState(false);
   const [openXmasCount, setOpenXmasCount] = useState<number | null>(null);
 
@@ -119,20 +117,9 @@ export default function ShowTechHome() {
       try {
         const xr = await fetch("/api/xmas-list-tickets").then(r => r.json());
         const xmasTickets: any[] = xr?.tickets || [];
-        const openXmas = xmasTickets
-          .filter((t: any) => t.status === "open")
-          .map((t: any) => ({
-            ...t,
-            _type: "xmas",
-            title: t.location_friendly || `Christmas Ticket #${t.id}`,
-            location: t.location_friendly || "",
-          }));
-        setOpenXmasCount(openXmas.length);
-        setItems(openXmas.sort((a: any, b: any) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        ));
+        const openCount = xmasTickets.filter((t: any) => t.status === "open").length;
+        setOpenXmasCount(openCount);
       } catch {}
-      setLoading(false);
     }
     void load();
   }, []);
@@ -148,52 +135,6 @@ export default function ShowTechHome() {
 
       <div className="page-title">Dashboard</div>
       <div className="page-subtitle">Show Tech Portal</div>
-
-      {/* Open items */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--muted2)", marginBottom: 8 }}>
-          Open Christmas Tickets ({loading ? "…" : items.length})
-        </div>
-        {loading ? (
-          <div className="muted" style={{ fontSize: 13 }}>Loading…</div>
-        ) : items.length === 0 ? (
-          <div className="card" style={{ padding: "20px", textAlign: "center" }}>
-            <div style={{ fontSize: 22, marginBottom: 6 }}>✓</div>
-            <div style={{ fontSize: 13, color: "var(--muted)" }}>No open Christmas tickets.</div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {items.slice(0, 10).map((item: any) => {
-              const isXmas = item._type === "xmas";
-              const to = isXmas ? `/christmas/${item.id}` : item._type === "ticket" ? `/tickets/${item.id}` : `/projects/${item.id}`;
-              const borderColor = isXmas ? "rgba(46,232,160,0.55)" : "rgba(92,107,255,0.5)";
-              const typeLabel = isXmas ? "🎄 Christmas" : item._type === "ticket" ? "🎫 Ticket" : "📐 Project";
-              return (
-                <Link
-                  key={`${item._type}-${item.id}`}
-                  to={to}
-                  className="card"
-                  style={{ padding: "12px 14px", display: "block", textDecoration: "none",
-                    borderLeft: `3px solid ${borderColor}` }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                    <span style={{ fontSize: 11, color: "var(--muted2)" }}>{typeLabel}</span>
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{item.title}</div>
-                  {item.location && (
-                    <div style={{ fontSize: 11, color: "var(--muted2)" }}>📍 {item.location}{item.tag ? ` · ${item.tag}` : ""}</div>
-                  )}
-                </Link>
-              );
-            })}
-            {items.length > 10 && (
-              <Link to="/christmas" style={{ fontSize: 13, color: "#7EEFC4", textAlign: "center", padding: "8px" }}>
-                View all {items.length} tickets →
-              </Link>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Quick actions */}
       <div className="home-grid">
