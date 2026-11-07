@@ -1,13 +1,25 @@
 /**
- * POST /.netlify/functions/schedule-upload-background
- * Called internally by schedule-upload.ts — not exposed to the browser directly.
+ * POST /api/schedule-upload-background
  *
- * Does the actual Anthropic vision call and upserts results into schedule_entries.
- * Updates schedule_upload_jobs row with status=done|error so frontend can poll.
+ * Netlify Background Function — Netlify responds with 202 immediately,
+ * then this handler keeps running (up to 15 min) in the background.
  *
- * Netlify background functions run up to 15 minutes — no timeout risk.
+ * Body: { image_base64, content_type, uploaded_by? }
+ *
+ * Flow:
+ *  1. Creates a job row (status=pending) in schedule_upload_jobs
+ *  2. Returns the job_id to the caller via a synchronous Supabase insert
+ *     — but Netlify has already sent 202 to the browser by this point
+ *  ... wait, background functions can't return data.
+ *
+ * ACTUAL FLOW:
+ *  The *caller* (schedule-upload.ts) creates the job row and fires this
+ *  endpoint without waiting. This function just does the AI work and
+ *  updates the job row when done.
+ *
+ * Body must include job_id (created by schedule-upload.ts).
  */
-import type { Handler } from "@netlify/functions";
+import type { BackgroundHandler } from "@netlify/functions";
 import { supabaseAdmin } from "./_supabase";
 
 interface ScheduleEntry {
@@ -20,7 +32,7 @@ interface ScheduleEntry {
   shift_note: string | null;
 }
 
-export const handler: Handler = async (event) => {
+export const handler: BackgroundHandler = async (event) => {
   const supabase = supabaseAdmin();
 
   let body: any = {};
@@ -33,7 +45,7 @@ export const handler: Handler = async (event) => {
 
   if (!job_id || !image_base64) {
     console.error("[schedule-upload-bg] Missing job_id or image_base64");
-    return { statusCode: 400, body: "Missing params" };
+    return;
   }
 
   async function setJobError(msg: string) {
@@ -45,10 +57,7 @@ export const handler: Handler = async (event) => {
 
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      await setJobError("ANTHROPIC_API_KEY not configured");
-      return { statusCode: 200, body: "done" };
-    }
+    if (!apiKey) { await setJobError("ANTHROPIC_API_KEY not configured"); return; }
 
     const year = new Date().getFullYear();
     const today = new Date().toISOString().slice(0, 10);
@@ -70,14 +79,13 @@ export const handler: Handler = async (event) => {
         model: "claude-sonnet-4-5",
         max_tokens: 8000,
         stream: true,
-        messages: [
-          {
-            role: "user",
-            content: [
-              contentBlock,
-              {
-                type: "text",
-                text: `Today is ${today}. Year: ${year}. Extract every working shift from this EMS schedule image into a JSON array. Output ONLY valid JSON — no markdown, no explanation.
+        messages: [{
+          role: "user",
+          content: [
+            contentBlock,
+            {
+              type: "text",
+              text: `Today is ${today}. Year: ${year}. Extract every working shift from this EMS schedule image into a JSON array. Output ONLY valid JSON — no markdown, no explanation.
 
 RULES:
 1. DATES: Header row "Date" has values like "5-Nov". Combine with ${year} → "${year}-11-05". Never use another year.
@@ -109,10 +117,9 @@ RULES:
 
 Output one JSON object per (employee, working day):
 {"employee_name":"Firstname L.","work_date":"YYYY-MM-DD","shift_start":"h:mmam","shift_end":"h:mmpm","all_shifts":"h:mmam–h:mmpm","section":"ems_part_time","shift_note":null}`,
-              },
-            ],
-          },
-        ],
+            },
+          ],
+        }],
       }),
     });
 
@@ -120,14 +127,13 @@ Output one JSON object per (employee, working day):
       const err = await claudeRes.text();
       console.error("[schedule-upload-bg] Claude API error:", err);
       await setJobError(`Vision API error: ${claudeRes.status}`);
-      return { statusCode: 200, body: "done" };
+      return;
     }
 
-    // Consume SSE stream — this is a background function so we can wait as long as needed
+    // Consume SSE stream — background function, no timeout risk
     let rawText = "";
     const streamText = await claudeRes.text();
-    const lines = streamText.split("\n");
-    for (const line of lines) {
+    for (const line of streamText.split("\n")) {
       if (!line.startsWith("data: ")) continue;
       const data = line.slice(6).trim();
       if (data === "[DONE]") break;
@@ -136,28 +142,22 @@ Output one JSON object per (employee, working day):
         if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
           rawText += evt.delta.text;
         }
-      } catch { /* skip malformed SSE lines */ }
+      } catch { /* skip malformed lines */ }
     }
 
-    if (!rawText) {
-      await setJobError("Vision API returned empty response.");
-      return { statusCode: 200, body: "done" };
-    }
+    if (!rawText) { await setJobError("Vision API returned empty response."); return; }
 
-    // Parse JSON array from rawText
+    // Parse JSON array
     let entries: ScheduleEntry[] = [];
     try {
       let cleaned = rawText.replace(/```json|```/g, "").trim();
       if (!cleaned.startsWith("[")) cleaned = "[" + cleaned;
       if (!cleaned.endsWith("]")) {
         const lastBrace = cleaned.lastIndexOf("}");
-        if (lastBrace !== -1) cleaned = cleaned.slice(0, lastBrace + 1) + "]";
-        else cleaned += "]";
+        cleaned = lastBrace !== -1 ? cleaned.slice(0, lastBrace + 1) + "]" : cleaned + "]";
       }
       let parsed: any = null;
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch {
+      try { parsed = JSON.parse(cleaned); } catch {
         const match = cleaned.match(/\[[\s\S]*\]/);
         if (match) parsed = JSON.parse(match[0]);
       }
@@ -166,37 +166,29 @@ Output one JSON object per (employee, working day):
     } catch {
       console.error("[schedule-upload-bg] JSON parse error. Raw:", rawText.slice(0, 600));
       await setJobError("Could not parse schedule response. Try a clearer photo.");
-      return { statusCode: 200, body: "done" };
+      return;
     }
 
-    // Validate entries
-    const valid = entries.filter(
-      (e) => e.employee_name && e.work_date && /^\d{4}-\d{2}-\d{2}$/.test(e.work_date)
+    const valid = entries.filter(e =>
+      e.employee_name && e.work_date && /^\d{4}-\d{2}-\d{2}$/.test(e.work_date)
     );
-    if (valid.length === 0) {
-      await setJobError("No valid schedule entries found.");
-      return { statusCode: 200, body: "done" };
-    }
+    if (valid.length === 0) { await setJobError("No valid schedule entries found."); return; }
 
-    // Date sanity filter — allow up to 30 days from today; if all out of range, pick the closest week
+    // Date sanity filter
     const todayMs = Date.now();
     const thirtyDayMs = 30 * 24 * 60 * 60 * 1000;
-    let filtered = valid.filter(
-      (e) => Math.abs(new Date(e.work_date + "T12:00:00").getTime() - todayMs) <= thirtyDayMs
+    let filtered = valid.filter(e =>
+      Math.abs(new Date(e.work_date + "T12:00:00").getTime() - todayMs) <= thirtyDayMs
     );
     if (filtered.length === 0) {
-      const allMs = valid.map((e) => new Date(e.work_date + "T12:00:00").getTime());
-      const closest = allMs.reduce((a, b) =>
-        Math.abs(a - todayMs) < Math.abs(b - todayMs) ? a : b
-      );
-      filtered = valid.filter(
-        (e) =>
-          Math.abs(new Date(e.work_date + "T12:00:00").getTime() - closest) <=
-          7 * 24 * 60 * 60 * 1000
+      const allMs = valid.map(e => new Date(e.work_date + "T12:00:00").getTime());
+      const closest = allMs.reduce((a, b) => Math.abs(a - todayMs) < Math.abs(b - todayMs) ? a : b);
+      filtered = valid.filter(e =>
+        Math.abs(new Date(e.work_date + "T12:00:00").getTime() - closest) <= 7 * 24 * 60 * 60 * 1000
       );
     }
 
-    // Dedup: keep first complete record per person+date
+    // Dedup
     const mergeMap = new Map<string, any>();
     for (const e of filtered) {
       const key = `${e.work_date}::${e.employee_name}`;
@@ -206,9 +198,8 @@ Output one JSON object per (employee, working day):
         const existing = mergeMap.get(key);
         const existingComplete = existing.shift_start && existing.shift_end;
         const newComplete = e.shift_start && e.shift_end;
-        if (!existingComplete && newComplete) {
-          mergeMap.set(key, { ...e });
-        } else {
+        if (!existingComplete && newComplete) mergeMap.set(key, { ...e });
+        else {
           if (!existing.section && e.section) existing.section = e.section;
           if (!existing.shift_note && e.shift_note) existing.shift_note = e.shift_note;
         }
@@ -217,27 +208,18 @@ Output one JSON object per (employee, working day):
     const deduped = Array.from(mergeMap.values());
     const uploadedDates = [...new Set(deduped.map((e: any) => e.work_date))].sort();
 
-    // Remove old entries for covered dates (but keep employees not in this upload)
+    // Clear old entries then upsert
     for (const date of uploadedDates) {
-      const presentEmployees = deduped
-        .filter((e: any) => e.work_date === date)
-        .map((e: any) => e.employee_name);
+      const presentEmployees = deduped.filter((e: any) => e.work_date === date).map((e: any) => e.employee_name);
       if (presentEmployees.length > 0) {
-        await supabase
-          .from("schedule_entries")
-          .delete()
+        await supabase.from("schedule_entries").delete()
           .eq("work_date", date)
-          .not(
-            "employee_name",
-            "in",
-            `(${presentEmployees.map((n: string) => `"${n}"`).join(",")})`
-          );
+          .not("employee_name", "in", `(${presentEmployees.map((n: string) => `"${n}"`).join(",")})`);
       } else {
         await supabase.from("schedule_entries").delete().eq("work_date", date);
       }
     }
 
-    // Build rows
     const baseRow = (e: any) => ({
       work_date: e.work_date,
       employee_name: e.employee_name,
@@ -258,41 +240,23 @@ Output one JSON object per (employee, working day):
       .from("schedule_entries")
       .upsert(fullRows, { onConflict: "work_date,employee_name" });
 
-    // Fallback: drop extra columns if schema doesn't have them yet
-    if (
-      upsertError &&
-      (upsertError.message.includes("section") ||
-        upsertError.message.includes("shift_note") ||
-        upsertError.message.includes("column"))
-    ) {
-      const fallback = await supabase
-        .from("schedule_entries")
-        .upsert(deduped.map(baseRow), { onConflict: "work_date,employee_name" });
+    if (upsertError && (upsertError.message.includes("section") || upsertError.message.includes("shift_note") || upsertError.message.includes("column"))) {
+      const fallback = await supabase.from("schedule_entries").upsert(deduped.map(baseRow), { onConflict: "work_date,employee_name" });
       upsertError = fallback.error;
     }
 
-    if (upsertError) {
-      await setJobError(upsertError.message);
-      return { statusCode: 200, body: "done" };
-    }
+    if (upsertError) { await setJobError(upsertError.message); return; }
 
-    // Mark job done
-    await supabase
-      .from("schedule_upload_jobs")
-      .update({
-        status: "done",
-        result: { ok: true, count: deduped.length, dates: uploadedDates },
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", job_id);
+    // Mark done
+    await supabase.from("schedule_upload_jobs").update({
+      status: "done",
+      result: { ok: true, count: deduped.length, dates: uploadedDates },
+      updated_at: new Date().toISOString(),
+    }).eq("id", job_id);
 
-    console.log(
-      `[schedule-upload-bg] Done — ${deduped.length} shifts across ${uploadedDates.length} dates`
-    );
-    return { statusCode: 200, body: "done" };
+    console.log(`[schedule-upload-bg] Done — ${deduped.length} shifts across ${uploadedDates.length} dates`);
   } catch (e: any) {
-    console.error("[schedule-upload-bg] Uncaught error:", e?.message);
+    console.error("[schedule-upload-bg] Error:", e?.message);
     await setJobError(e?.message || "Server error");
-    return { statusCode: 200, body: "done" };
   }
 };

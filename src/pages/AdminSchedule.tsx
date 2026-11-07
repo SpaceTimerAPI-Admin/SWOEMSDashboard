@@ -192,8 +192,12 @@ export default function AdminSchedule() {
       });
       if (!kickoff?.ok) throw new Error(kickoff?.error || "Failed to start upload");
 
-      const jobId: string = kickoff.job_id ?? (kickoff.data ?? kickoff).job_id;
-      if (!jobId) throw new Error("No job ID returned");
+      // apiFetch wraps response as { ok, data } — job_id lives in data
+      const jobId: string = (kickoff as any).data?.job_id ?? (kickoff as any).job_id ?? "";
+      if (!jobId) {
+        console.error("[schedule-upload] No job_id in response:", JSON.stringify(kickoff));
+        throw new Error("No job ID returned — check Netlify logs");
+      }
 
       // Step 2: poll until done or error (up to ~3 minutes, every 3s)
       const MAX_POLLS = 60;
