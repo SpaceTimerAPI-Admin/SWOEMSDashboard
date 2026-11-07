@@ -6,8 +6,10 @@
 [functions]
   node_bundler = "esbuild"
 
-[functions."schedule-upload"]
-  timeout = 90
+# schedule-upload returns 202 immediately — no long timeout needed
+# schedule-upload-background does the AI work async (up to 15 min Netlify limit)
+[functions."schedule-upload-background"]
+  timeout = 900
 
 [functions."ticket-report"]
   timeout = 60

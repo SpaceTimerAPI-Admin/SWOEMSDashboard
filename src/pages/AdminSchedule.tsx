@@ -141,14 +141,14 @@ export default function AdminSchedule() {
     setAddForm({ employee_name: "", shift_start: "", shift_end: "" });
   }
 
-  /** Resize image to max 1600px on longest side, JPEG quality 0.85 */
+  /** Resize image to max 2400px on longest side, JPEG quality 0.92 for better OCR accuracy */
   function resizeImage(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(url);
-        const MAX = 1600;
+        const MAX = 2400;
         let { width, height } = img;
         if (width > MAX || height > MAX) {
           if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
@@ -159,7 +159,7 @@ export default function AdminSchedule() {
         canvas.height = height;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
         resolve(dataUrl.split(",")[1]);
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
@@ -174,7 +174,7 @@ export default function AdminSchedule() {
     setAiStatus(null);
     setAiUploading(true);
     try {
-      // PDFs sent as-is; images resized to max 1600px to stay well under Netlify's 6MB body limit
+      // PDFs sent as-is; images resized
       const isPdf = file.type === "application/pdf";
       const base64 = isPdf
         ? await new Promise<string>((res, rej) => {
@@ -185,18 +185,40 @@ export default function AdminSchedule() {
           })
         : await resizeImage(file);
 
-      const result: any = await uploadSchedule({
+      // Step 1: kick off upload — returns job_id immediately (no timeout risk)
+      const kickoff: any = await uploadSchedule({
         image_base64: base64,
         content_type: isPdf ? "application/pdf" : "image/jpeg",
       });
-      if (!result?.ok) throw new Error(result?.error || "Failed to read schedule");
-      const data = result.data ?? result;
-      const dates: string[] = data.dates || [];
-      const friendly = dates.map((d: string) =>
-        new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
-      );
-      setAiStatus({ ok: true, msg: `✓ Imported ${data.count} shifts across ${dates.length} day${dates.length !== 1 ? "s" : ""}: ${friendly.join(", ")}` });
-      await load(weekStart);
+      if (!kickoff?.ok) throw new Error(kickoff?.error || "Failed to start upload");
+
+      const jobId: string = kickoff.job_id ?? (kickoff.data ?? kickoff).job_id;
+      if (!jobId) throw new Error("No job ID returned");
+
+      // Step 2: poll until done or error (up to ~3 minutes, every 3s)
+      const MAX_POLLS = 60;
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        const statusRes = await fetch(`/api/schedule-job-status?id=${jobId}`);
+        const statusData: any = await statusRes.json();
+        if (!statusData?.ok) continue;
+
+        if (statusData.status === "done") {
+          const result = statusData.result || {};
+          const dates: string[] = result.dates || [];
+          const friendly = dates.map((d: string) =>
+            new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+          );
+          setAiStatus({ ok: true, msg: `✓ Imported ${result.count ?? "?"} shifts across ${dates.length} day${dates.length !== 1 ? "s" : ""}: ${friendly.join(", ")}` });
+          await load(weekStart);
+          return;
+        }
+        if (statusData.status === "error") {
+          throw new Error(statusData.error || "AI parsing failed");
+        }
+        // still pending — keep polling
+      }
+      throw new Error("Timed out waiting for schedule to process. Try again.");
     } catch (err: any) {
       setAiStatus({ ok: false, msg: err?.message || "Upload failed" });
     } finally {
@@ -440,9 +462,12 @@ export default function AdminSchedule() {
                   <input ref={fileInputRef} type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={handleAiUpload} />
                   <div style={{ textAlign: "center", padding: "24px 16px" }}>
                     <div style={{ fontSize: 36, marginBottom: 12 }}>📸</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Upload Schedule Photo or PDF</div>
-                    <div style={{ fontSize: 13, color: "var(--muted2)", marginBottom: 20, lineHeight: 1.5 }}>
-                      AI will automatically read the names, dates, and shift times from the image and add them to the schedule.
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Upload Schedule Photo</div>
+                    <div style={{ fontSize: 13, color: "var(--muted2)", marginBottom: 12, lineHeight: 1.6 }}>
+                      For best results, <strong style={{ color: "var(--text)" }}>crop to one section at a time</strong> — Part Time, Full Time, or Show Ops — and include the Date header row at the top. Upload each section separately.
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(255,182,39,0.85)", background: "rgba(255,182,39,0.08)", border: "1px solid rgba(255,182,39,0.2)", borderRadius: 8, padding: "8px 12px", marginBottom: 16, lineHeight: 1.5, textAlign: "left" }}>
+                      ⚠️ Always verify the imported shifts using the schedule view below, and use Manual Entry to fix any errors.
                     </div>
                     <button
                       className="btn primary"
@@ -450,7 +475,7 @@ export default function AdminSchedule() {
                       disabled={aiUploading}
                       style={{ marginBottom: aiStatus ? 14 : 0 }}
                     >
-                      {aiUploading ? <><span className="spinner" /> Reading schedule…</> : "Choose Photo or PDF"}
+                      {aiUploading ? <><span className="spinner" /> Processing… (may take ~30 sec)</> : "Choose Photo or PDF"}
                     </button>
                     {aiStatus && (
                       <div style={{

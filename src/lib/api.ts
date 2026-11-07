@@ -316,7 +316,7 @@ export async function assignProject(id: string, assigned_to: string | null): Pro
 export async function uploadSchedule(payload: {
   image_base64: string;
   content_type: string;
-}): Promise<ApiResult<{ count: number; dates: string[]; entries: any[] }>> {
+}): Promise<ApiResult<{ job_id: string }>> {
   return apiFetch("/api/schedule-upload", { method: "POST", body: payload });
 }
 
