@@ -85,10 +85,6 @@ One JSON object per working day per employee:
               },
             ],
           },
-          {
-            role: "assistant",
-            content: "[",
-          },
         ],
       }),
     });
@@ -132,22 +128,38 @@ One JSON object per working day per employee:
 
     let entries: ScheduleEntry[] = [];
     try {
-      // The assistant was prefilled with "[" so the response continues from there.
-      // Reconstruct the full array string and parse it.
-      const reconstructed = "[" + rawText;
-      const cleaned = reconstructed.replace(/```json|```/g, "").trim();
-      // Try full parse first, then fall back to regex extraction
+      // Strip any markdown fences
+      let cleaned = rawText.replace(/```json|```/g, "").trim();
+
+      // With streaming + assistant prefill "[", the prefill character is NOT included
+      // in text_delta events — so rawText continues from after "[".
+      // Prepend "[" only if rawText doesn't already start with "[".
+      if (!cleaned.startsWith("[")) {
+        cleaned = "[" + cleaned;
+      }
+
+      // Ensure it ends with "]" (truncation guard)
+      if (!cleaned.endsWith("]")) {
+        // Find last complete object and close the array
+        const lastBrace = cleaned.lastIndexOf("}");
+        if (lastBrace !== -1) cleaned = cleaned.slice(0, lastBrace + 1) + "]";
+        else cleaned = cleaned + "]";
+      }
+
+      console.log("[schedule-upload] Attempting parse, first 300 chars:", cleaned.slice(0, 300));
+
       let parsed: any = null;
       try {
         parsed = JSON.parse(cleaned);
       } catch {
+        // Last resort: regex extract the array
         const match = cleaned.match(/\[[\s\S]*\]/);
         if (match) parsed = JSON.parse(match[0]);
       }
       if (!Array.isArray(parsed)) throw new Error("Not an array");
       entries = parsed;
     } catch {
-      console.error("[schedule-upload] Failed to parse Claude response:", rawText.slice(0, 500));
+      console.error("[schedule-upload] Failed to parse Claude response, raw:", rawText.slice(0, 600));
       return json({ ok: false, error: "Could not parse schedule. Try a clearer photo." }, 422);
     }
 
