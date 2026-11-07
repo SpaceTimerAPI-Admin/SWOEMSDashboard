@@ -185,44 +185,19 @@ export default function AdminSchedule() {
           })
         : await resizeImage(file);
 
-      // Step 1: kick off upload — returns job_id immediately (no timeout risk)
-      const kickoff: any = await uploadSchedule({
+      const result: any = await uploadSchedule({
         image_base64: base64,
         content_type: isPdf ? "application/pdf" : "image/jpeg",
       });
-      if (!kickoff?.ok) throw new Error(kickoff?.error || "Failed to start upload");
+      if (!result?.ok) throw new Error((result as any)?.error || "Failed to read schedule");
 
-      // apiFetch wraps response as { ok, data } — job_id lives in data
-      const jobId: string = (kickoff as any).data?.job_id ?? (kickoff as any).job_id ?? "";
-      if (!jobId) {
-        console.error("[schedule-upload] No job_id in response:", JSON.stringify(kickoff));
-        throw new Error("No job ID returned — check Netlify logs");
-      }
-
-      // Step 2: poll until done or error (up to ~3 minutes, every 3s)
-      const MAX_POLLS = 60;
-      for (let i = 0; i < MAX_POLLS; i++) {
-        await new Promise(r => setTimeout(r, 3000));
-        const statusRes = await fetch(`/api/schedule-job-status?id=${jobId}`);
-        const statusData: any = await statusRes.json();
-        if (!statusData?.ok) continue;
-
-        if (statusData.status === "done") {
-          const result = statusData.result || {};
-          const dates: string[] = result.dates || [];
-          const friendly = dates.map((d: string) =>
-            new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
-          );
-          setAiStatus({ ok: true, msg: `✓ Imported ${result.count ?? "?"} shifts across ${dates.length} day${dates.length !== 1 ? "s" : ""}: ${friendly.join(", ")}` });
-          await load(weekStart);
-          return;
-        }
-        if (statusData.status === "error") {
-          throw new Error(statusData.error || "AI parsing failed");
-        }
-        // still pending — keep polling
-      }
-      throw new Error("Timed out waiting for schedule to process. Try again.");
+      const data = (result as any).data ?? result;
+      const dates: string[] = data.dates || [];
+      const friendly = dates.map((d: string) =>
+        new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+      );
+      setAiStatus({ ok: true, msg: `✓ Imported ${data.count} shifts across ${dates.length} day${dates.length !== 1 ? "s" : ""}: ${friendly.join(", ")}` });
+      await load(weekStart);
     } catch (err: any) {
       setAiStatus({ ok: false, msg: err?.message || "Upload failed" });
     } finally {
@@ -479,7 +454,7 @@ export default function AdminSchedule() {
                       disabled={aiUploading}
                       style={{ marginBottom: aiStatus ? 14 : 0 }}
                     >
-                      {aiUploading ? <><span className="spinner" /> Processing… (may take ~30 sec)</> : "Choose Photo or PDF"}
+                      {aiUploading ? <><span className="spinner" /> Reading schedule…</> : "Choose Photo or PDF"}
                     </button>
                     {aiStatus && (
                       <div style={{
