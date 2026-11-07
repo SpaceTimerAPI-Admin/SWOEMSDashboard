@@ -58,8 +58,9 @@ export const handler: Handler = async (event) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
-        max_tokens: 6000,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 4000,
+        stream: true,
         messages: [
           {
             role: "user",
@@ -67,44 +68,19 @@ export const handler: Handler = async (event) => {
               contentBlock,
               {
                 type: "text",
-                text: `Today is ${new Date().toISOString().slice(0, 10)}. The year is ${new Date().getFullYear()}. Extract every working shift from this EMS schedule image into a JSON array. Output ONLY valid JSON starting with [ and ending with ]. No explanation, no markdown.
+                text: `Today is ${new Date().toISOString().slice(0, 10)}. Year: ${new Date().getFullYear()}. Extract every working shift from this EMS schedule image into a JSON array. Output ONLY valid JSON — no markdown, no explanation.
 
-CRITICAL RULES — read carefully:
+RULES:
+1. DATES: Header row "Date" has values like "5-Nov". Combine with ${new Date().getFullYear()} → "2026-11-05". Never use another year.
+2. IGNORE these rows: Day names, Date row, OP Hours row (park operating hours, NOT shifts), event name row, section headers (PART TIME / Full Time / Show Ops).
+3. SECTIONS: "PART TIME"→"ems_part_time", "Full Time"→"ems_full_time", "Show Ops"→"show_ops"
+4. Each employee has TWO rows: row 1=shift times, row 2=role label (Opener/Closer/SUP etc). Only read row 1.
+5. Each day cell has TWO values side by side: LEFT=shift_start, RIGHT=shift_end. If BOTH are "X" → day off, skip. Never use times from another employee's row.
+6. Names: "LASTNAME, FIRSTNAME" → "Firstname L." (e.g. "MCHugh, Anthony"→"Anthony M.", "Sleeper, Connor"→"Connor S.")
+7. Notes column (far right) → shift_note, or null.
+8. Times exactly as printed: "6:00am", "2:30pm", "10:00pm", "12:00am"
 
-1. DATES: Header row "Date" shows values like "5-Nov", "12-Nov". Combine with year ${new Date().getFullYear()} → "2026-11-05". Never use any other year.
-
-2. HEADER ROWS TO IGNORE (they are NOT employee rows):
-   - Row labeled "Day" (day names)
-   - Row labeled "Date" (date values)
-   - Row labeled "OP Hours" (park operating hours — NOT employee shifts)
-   - Any row with an event name under OP Hours
-   - Section headers: "PART TIME", "Full Time", "Show Ops"
-
-3. EMPLOYEE SECTIONS:
-   - "PART TIME" section → section = "ems_part_time"
-   - "Full Time" section → section = "ems_full_time"
-   - "Show Ops" section → section = "show_ops"
-
-4. EACH EMPLOYEE has EXACTLY TWO rows in the grid:
-   - Row A (times row): contains shift start/end times or "X X"
-   - Row B (label row): contains text like "Opener", "Closer", "SUP", "Christmas Lead" — IGNORE for times
-
-5. READING EACH DAY'S CELL for an employee:
-   - Each day column has TWO time cells side by side: LEFT = shift_start, RIGHT = shift_end
-   - If BOTH cells contain "X" → employee is OFF that day → DO NOT output a record for that day
-   - If cells contain a time range like "6:00am" and "2:30pm" → that is one shift
-   - Only use times from that employee's own row — do NOT borrow times from adjacent employees' rows
-
-6. NAME FORMAT: Names appear as "LASTNAME, FIRSTNAME" in the leftmost column.
-   Convert to: "Firstname L." — first name + space + last name initial + period.
-   Examples: "MCHugh, Anthony" → "Anthony M.", "Sleeper, Connor" → "Connor S.", "Wang, Lori" → "Lori W."
-   For "Show Ops" names that appear as "FIRSTNAME, LASTNAME" or "Firstname Lastname", apply same rule.
-
-7. NOTES COLUMN: Far-right column labeled "Notes" — if text exists for the employee's row, use as shift_note (string). Otherwise null.
-
-8. TIME FORMAT: Use exactly as printed — e.g. "6:00am", "2:30pm", "10:00pm", "12:00am". Keep lowercase am/pm.
-
-Output format — one object per (employee, working day):
+One JSON object per working day per employee:
 {"employee_name":"Firstname L.","work_date":"YYYY-MM-DD","shift_start":"h:mmam","shift_end":"h:mmpm","all_shifts":"h:mmam–h:mmpm","section":"ems_part_time","shift_note":null}`,
               },
             ],
@@ -123,21 +99,36 @@ Output format — one object per (employee, working day):
       return json({ ok: false, error: `Vision API error: ${claudeRes.status}` }, 500);
     }
 
-    const responseText = await claudeRes.text();
-
-    if (responseText.trim().startsWith("<") || responseText.includes("Inactivity Timeout")) {
-      console.error("[schedule-upload] Gateway timeout or HTML error returned");
-      return json({ ok: false, error: "The request timed out. Try uploading a photo of the schedule instead of a PDF, or crop the image closer to the schedule." }, 504);
-    }
-
-    let claudeData: any;
+    // Consume SSE stream — collect all text_delta events into rawText
+    let rawText = "";
     try {
-      claudeData = JSON.parse(responseText);
-    } catch {
-      console.error("[schedule-upload] Failed to parse Claude API response as JSON. First 500 chars:", responseText.slice(0, 500));
-      return json({ ok: false, error: "Vision API returned an unexpected response. Try again." }, 500);
+      const streamText = await claudeRes.text();
+      if (streamText.trim().startsWith("<") || streamText.includes("Inactivity Timeout")) {
+        console.error("[schedule-upload] Gateway timeout returned");
+        return json({ ok: false, error: "The request timed out. Try a clearer or closer-cropped photo." }, 504);
+      }
+      // Parse SSE lines
+      const lines = streamText.split("\n");
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") break;
+        try {
+          const evt = JSON.parse(data);
+          if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+            rawText += evt.delta.text;
+          }
+        } catch { /* skip malformed SSE lines */ }
+      }
+    } catch (streamErr: any) {
+      console.error("[schedule-upload] Stream read error:", streamErr?.message);
+      return json({ ok: false, error: "Stream read failed. Try again." }, 500);
     }
-    const rawText = claudeData?.content?.[0]?.text || "";
+
+    if (!rawText) {
+      console.error("[schedule-upload] Empty response from Claude");
+      return json({ ok: false, error: "Vision API returned an empty response. Try again." }, 500);
+    }
 
     let entries: ScheduleEntry[] = [];
     try {
