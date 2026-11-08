@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { getRole } from "../lib/auth";
 
@@ -45,7 +45,8 @@ const XmasIcon = () => (
 );
 
 export default function BottomNav() {
-  const role = getRole();
+  const [role, setRole] = useState(() => getRole());
+  useEffect(() => { setRole(getRole()); }, []);
   const isShowTech = role === "show_tech";
 
   return (
