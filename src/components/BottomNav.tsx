@@ -56,20 +56,28 @@ export default function BottomNav() {
           Home
         </NavLink>
         {isShowTech ? (
-          <NavLink to="/christmas" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-            <XmasIcon />
-            Christmas
-          </NavLink>
+          <>
+            <NavLink to="/christmas" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+              <XmasIcon />
+              Christmas
+            </NavLink>
+            <NavLink to="/shift-log" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+              <ShiftLogIcon />
+              Shift Log
+            </NavLink>
+          </>
         ) : (
-          <NavLink to="/tickets" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-            <TicketIcon />
-            Work Orders
-          </NavLink>
+          <>
+            <NavLink to="/tickets" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+              <TicketIcon />
+              Work Orders
+            </NavLink>
+            <NavLink to="/eod" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+              <EodIcon />
+              Activity
+            </NavLink>
+          </>
         )}
-        <NavLink to="/eod" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-          <EodIcon />
-          Activity
-        </NavLink>
         <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           <SettingsIcon />
           Settings
