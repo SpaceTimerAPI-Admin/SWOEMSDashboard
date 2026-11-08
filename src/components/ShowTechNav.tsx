@@ -11,17 +11,17 @@ export default function ShowTechNav() {
           </svg>
           Home
         </NavLink>
-        <NavLink to="/tickets" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+        <NavLink to="/christmas" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/>
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
-          Work Orders
+          Christmas
         </NavLink>
         <NavLink to="/shift-log" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
           </svg>
-          Log
+          Shift Log
         </NavLink>
         <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
