@@ -91,8 +91,9 @@ export default function XmasTickets() {
   const markerLayer  = useRef<any>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  // Load Leaflet CSS + JS once
+  // Load Leaflet CSS + JS only after location is granted (map div isn't mounted until then)
   useEffect(() => {
+    if (!locationGranted) return;
     if (document.getElementById("leaflet-css")) { setMapReady(true); return; }
     const css = document.createElement("link");
     css.id = "leaflet-css";
@@ -103,7 +104,7 @@ export default function XmasTickets() {
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = () => setMapReady(true);
     document.head.appendChild(script);
-  }, []);
+  }, [locationGranted]);
 
   useEffect(() => { void load(); }, []);
 
@@ -115,15 +116,16 @@ export default function XmasTickets() {
     } finally { setLoading(false); }
   }
 
-  // Init map when Leaflet is ready and container exists
+  // Init map when Leaflet is ready and container exists (depends on locationGranted so it
+  // re-runs after the LocationGate unmounts and the map div is actually in the DOM)
   useEffect(() => {
-    if (!mapReady || !mapRef.current || leafletMap.current) return;
+    if (!locationGranted || !mapReady || !mapRef.current || leafletMap.current) return;
     leafletMap.current = L.map(mapRef.current).setView([28.41, -81.46], 14);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19, attribution: "© OpenStreetMap contributors"
     }).addTo(leafletMap.current);
     markerLayer.current = L.layerGroup().addTo(leafletMap.current);
-  }, [mapReady]);
+  }, [mapReady, locationGranted]);
 
   // Update markers when tickets or filter changes
   useEffect(() => {
