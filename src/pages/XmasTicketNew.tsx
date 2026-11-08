@@ -26,19 +26,9 @@ function getPositionOnce(opts: PositionOptions): Promise<GeolocationPosition> {
 async function getCoordsSafe(): Promise<{ lat: number; lon: number } | null> {
   if (!navigator.geolocation) return null;
 
-  // On Android Chrome, if permission hasn't been granted yet, getCurrentPosition
-  // fires the error callback immediately instead of prompting the user.
-  // Calling permissions.query first forces the browser to show the prompt before
-  // we attempt to read coordinates, so Android behaves like iOS.
-  try {
-    if (navigator.permissions) {
-      const status = await navigator.permissions.query({ name: "geolocation" });
-      if (status.state === "denied") return null; // user has explicitly blocked it
-      // "prompt" or "granted" — proceed; the prompt will show on "prompt"
-    }
-  } catch {
-    // permissions API not available on this browser — fall through and try anyway
-  }
+  // Always attempt getCurrentPosition — even if permission was previously denied,
+  // the browser will re-prompt on Android when called directly. Never bail out early
+  // based on the permissions API state, because that prevents the re-prompt.
 
   // Try high-accuracy first (GPS chip), then fall back to network/IP location.
   // High-accuracy can still time out on Android on a cold GPS start, so the
