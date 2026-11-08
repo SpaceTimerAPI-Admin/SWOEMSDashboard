@@ -37,7 +37,16 @@ export const handler: Handler = async (event) => {
     const pin_hash = await bcrypt.hash(pin, 10);
     const { data, error } = await supabase
       .from("employees")
-      .insert({ employee_id, name, email, pin_hash, role, is_active: true })
+      .insert({
+        employee_id, name, email, pin_hash, role, is_active: true,
+        // All email reports off by default — admin can enable per-user in settings
+        email_overdue_alert:    false,
+        email_assigned_recap:   false,
+        email_weekly_summary:   false,
+        email_assignment_notify: false,
+        email_sound_recap:      false,
+        email_lighting_recap:   false,
+      })
       .select("id, employee_id, name, email, role, is_active")
       .single();
 
