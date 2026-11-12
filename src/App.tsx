@@ -30,6 +30,7 @@ import OfficeDashboard from "./pages/OfficeDashboard";
 import XmasTickets from "./pages/XmasTickets";
 import XmasTicketNew from "./pages/XmasTicketNew";
 import XmasTicketDetail from "./pages/XmasTicketDetail";
+import FountainAck from "./pages/FountainAck";
 import Inventory from "./pages/Inventory";
 import InventoryNew from "./pages/InventoryNew";
 import InventoryDetail from "./pages/InventoryDetail";
@@ -39,7 +40,7 @@ import AskElijah from "./components/AskElijah";
 import { isAuthed, clearToken, clearProfile, getRole } from "./lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin", "/work-order", "/dashboard"];
-const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings", "/christmas", "/christmas/new"];
+const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings", "/christmas", "/christmas/new", "/fountain-ack"];
 
 /**
  * Global session-expiry handler.
@@ -153,6 +154,8 @@ export default function App() {
         <Route path="/christmas" element={<RequireAuth><XmasTickets /></RequireAuth>} />
         <Route path="/christmas/new" element={<RequireAuth><XmasTicketNew /></RequireAuth>} />
         <Route path="/christmas/:id" element={<RequireAuth><XmasTicketDetail /></RequireAuth>} />
+
+        <Route path="/fountain-ack" element={<RequireAuth><FountainAck /></RequireAuth>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
