@@ -76,8 +76,9 @@ function buildPage(opts: {
   employees: any[];
   siteBaseUrl: string;
   shiftLogEntries: any[];
+  fountainAck: any | null;
 }): string {
-  const { day, tickets, projects, ticketComments, projectComments, employees, siteBaseUrl, shiftLogEntries } = opts;
+  const { day, tickets, projects, ticketComments, projectComments, employees, siteBaseUrl, shiftLogEntries, fountainAck } = opts;
 
   const dateDisplay = new Date(day + "T12:00:00").toLocaleDateString("en-US", {
     timeZone: TZ, weekday: "long", year: "numeric", month: "long", day: "numeric"
@@ -281,6 +282,59 @@ function buildPage(opts: {
   </div>
   ` : ""}
 
+  <!-- Fountain acknowledgment -->
+  <div style="margin-top:32px;margin-bottom:8px">
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:12px">
+      💧 Lake Fountain Check-off
+    </div>
+    ${fountainAck ? (() => {
+      const bayOk  = fountainAck.bay_side_status  !== "issue";
+      const lakeOk = fountainAck.lakeside_status  !== "issue";
+      const allOk  = bayOk && lakeOk;
+      const headerColor = allOk ? "#059669" : "#DC2626";
+      const headerEmoji = allOk ? "✅" : (bayOk || lakeOk ? "⚠️" : "🚨");
+      const headerText  = allOk
+        ? "All fountains ON &amp; functioning"
+        : "Acknowledged — one or more fountains have an issue";
+
+      const fountainRow = (label: string, ok: boolean, note?: string | null) => `
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid #F0F0F0">
+          <span style="font-size:16px;line-height:1.4">${ok ? "✅" : "⚠️"}</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:${ok ? "#059669" : "#DC2626"}">${escapeHtml(label)}: ${ok ? "On &amp; Functioning" : "Issue Reported"}</div>
+            ${!ok && note ? `<div style="font-size:12px;color:#666;margin-top:2px">${escapeHtml(note)}</div>` : ""}
+          </div>
+        </div>`;
+
+      return `
+    <div style="background:#fff;border:1px solid ${allOk ? "#E8E8E8" : "#FECACA"};border-radius:12px;padding:16px 20px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <span style="font-size:28px">${headerEmoji}</span>
+        <div style="font-size:14px;font-weight:700;color:${headerColor}">${headerText}</div>
+      </div>
+      ${fountainRow("Bay Side Fountains",  bayOk,  fountainAck.bay_side_note)}
+      ${fountainRow("Lakeside Fountains",  lakeOk, fountainAck.lakeside_note)}
+      <div style="font-size:12px;color:#999;margin-top:12px;padding-top:10px;border-top:1px solid #F0F0F0">
+        Signed by <strong>${escapeHtml(fountainAck.employee_name)}</strong>
+        (${escapeHtml(fountainAck.employee_id_text)})
+        at ${fmtDateTime(fountainAck.acked_at)}
+        ${fountainAck.lat != null && fountainAck.lon != null
+          ? `· <a href="https://maps.google.com/?q=${fountainAck.lat},${fountainAck.lon}" target="_blank" style="color:#059669">📍 View location</a>`
+          : "· <span style=\"color:#bbb\">No GPS</span>"
+        }
+      </div>
+    </div>`;
+    })() : `
+    <div style="background:#fff;border:1px solid #FECACA;border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:14px">
+      <span style="font-size:28px">⚠️</span>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#DC2626">Not acknowledged today</div>
+        <div style="font-size:13px;color:#666;margin-top:4px">No one signed off on the lake fountains for this business day.</div>
+      </div>
+    </div>
+    `}
+  </div>
+
   <div class="footer">SeaWorld Entertainment Maintenance · EOD Report · ${escapeHtml(dateDisplay)}</div>
 </div>
 </body>
@@ -302,7 +356,7 @@ export const handler: Handler = async (event) => {
 
     const { start, end } = businessDayRange(day);
 
-    const [ticketsRes, ticketsClosedRes, ticketCommentsRes, projectsRes, projectsClosedRes, projectCommentsRes, employeesRes, shiftLogRes] = await Promise.all([
+    const [ticketsRes, ticketsClosedRes, ticketCommentsRes, projectsRes, projectsClosedRes, projectCommentsRes, employeesRes, shiftLogRes, fountainAckRes] = await Promise.all([
       supabase.from("tickets").select("*").gte("created_at", start).lte("created_at", end),
       supabase.from("tickets").select("*").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
       supabase.from("ticket_comments").select("*").gte("created_at", start).lte("created_at", end),
@@ -314,6 +368,12 @@ export const handler: Handler = async (event) => {
         .select("id, note, created_at, employee_id, employees!shift_log_entries_employee_id_fkey(name)")
         .gte("created_at", start).lte("created_at", end)
         .order("created_at", { ascending: true }),
+      supabase.from("fountain_acknowledgments")
+        .select("id, employee_id_text, employee_name, acked_at, lat, lon, bay_side_status, bay_side_note, lakeside_status, lakeside_note")
+        .gte("acked_at", start).lte("acked_at", end)
+        .order("acked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     // Deduplicate tickets (created + closed + commented-on today)
@@ -347,6 +407,7 @@ export const handler: Handler = async (event) => {
       employees: employeesRes.data || [],
       siteBaseUrl: (process.env.SITE_BASE_URL || "").replace(/\/$/, ""),
       shiftLogEntries,
+      fountainAck: fountainAckRes.data || null,
     });
 
     return {
