@@ -23,9 +23,6 @@ import { todayBusinessDay, businessDayRange } from "./_eod-day";
 const TZ = "America/New_York";
 const SITE_BASE_URL = (process.env.SITE_BASE_URL || "https://www.swoems.com").replace(/\/$/, "");
 
-// First live date — won't post before this date (YYYY-MM-DD ET)
-const LIVE_DATE = "2026-11-13";
-
 function etHour(): number {
   return Number(
     new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", hour12: false })
@@ -36,12 +33,6 @@ function etHour(): number {
 
 export const handler: Handler = async () => {
   try {
-    const todayET = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
-    if (todayET < LIVE_DATE) {
-      console.log(`[fountain-reminder] Before live date (${todayET} < ${LIVE_DATE}). Skipping.`);
-      return { statusCode: 200, body: "Before live date." };
-    }
-
     const hour = etHour();
 
     // Only remind between 8 AM and 6 PM ET (after the morning alert, before EOD)

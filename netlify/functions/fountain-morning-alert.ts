@@ -15,17 +15,8 @@ import { postGroupMe } from "./_groupme";
 
 const SITE_BASE_URL = (process.env.SITE_BASE_URL || "https://www.swoems.com").replace(/\/$/, "");
 
-// First live date — won't post before this date (YYYY-MM-DD ET)
-const LIVE_DATE = "2026-11-13";
-
 export const handler: Handler = async () => {
   try {
-    const todayET = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-    if (todayET < LIVE_DATE) {
-      console.log(`[fountain-morning-alert] Before live date (${todayET} < ${LIVE_DATE}). Skipping.`);
-      return { statusCode: 200, body: "Before live date." };
-    }
-
     const todayLabel = new Date().toLocaleDateString("en-US", {
       timeZone: "America/New_York", weekday: "long", month: "long", day: "numeric",
     });
