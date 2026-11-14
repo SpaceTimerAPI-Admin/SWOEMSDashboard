@@ -53,7 +53,17 @@ export const handler: Handler = async (event) => {
 
     const { error: insertErr } = await supabase
       .from("employees")
-      .insert({ employee_id, name, email, pin_hash, role: "show_tech", is_active: true });
+      .insert({
+        employee_id, name, email, pin_hash, role: "show_tech", is_active: true,
+        // Show Techs never get report emails — set every flag off explicitly
+        // instead of relying on the database column defaults.
+        email_overdue_alert:     false,
+        email_assigned_recap:    false,
+        email_weekly_summary:    false,
+        email_assignment_notify: false,
+        email_sound_recap:       false,
+        email_lighting_recap:    false,
+      });
 
     if (insertErr) return json({ ok: false, error: insertErr.message }, 500);
 
