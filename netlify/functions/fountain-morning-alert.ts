@@ -10,12 +10,14 @@
  *   For summer accuracy use "0 12 * * *". Splitting the diff: "0 12 * * *" is better
  *   since the fountains run seasonally and this will be active in summer months.
  */
-import type { Handler } from "@netlify/functions";
+import { schedule } from "@netlify/functions";
 import { postGroupMe } from "./_groupme";
 
 const SITE_BASE_URL = (process.env.SITE_BASE_URL || "https://www.swoems.com").replace(/\/$/, "");
 
-export const handler: Handler = async () => {
+// Schedule is declared HERE (in code) as well as in netlify.toml, so it cannot be lost
+// if netlify.toml is not updated. 13:00 UTC = 8:00 AM EST.
+export const handler = schedule("0 13 * * *", async () => {
   try {
     const todayLabel = new Date().toLocaleDateString("en-US", {
       timeZone: "America/New_York", weekday: "long", month: "long", day: "numeric",
@@ -39,4 +41,4 @@ export const handler: Handler = async () => {
     console.error("[fountain-morning-alert] Error:", e?.message);
     return { statusCode: 500, body: e?.message || "Error" };
   }
-};
+});

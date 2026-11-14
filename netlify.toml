@@ -65,3 +65,12 @@
 # Posts open/closed/total counts + priority reminder to GroupMe.
 [functions."xmas-daily-report"]
   schedule = "0 9 * * *"
+
+# Scheduled: Lake fountain morning check — daily at 8 AM ET (13:00 UTC, EST)
+[functions."fountain-morning-alert"]
+  schedule = "0 13 * * *"
+
+# Scheduled: Lake fountain reminder — every 30 min, 8 AM to 6 PM ET.
+# Function checks the ET hour itself and skips outside that window.
+[functions."fountain-reminder"]
+  schedule = "0,30 12-22 * * *"

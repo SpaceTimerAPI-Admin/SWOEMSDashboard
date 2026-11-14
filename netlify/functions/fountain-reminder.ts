@@ -15,7 +15,7 @@
  *   We use "0,30 12-22 * * *" to cover both — outside the window this function
  *   checks the ET hour and exits silently.
  */
-import type { Handler } from "@netlify/functions";
+import { schedule } from "@netlify/functions";
 import { supabaseAdmin } from "./_supabase";
 import { postGroupMe } from "./_groupme";
 import { todayBusinessDay, businessDayRange } from "./_eod-day";
@@ -31,7 +31,9 @@ function etHour(): number {
   );
 }
 
-export const handler: Handler = async () => {
+// Schedule is declared HERE (in code) as well as in netlify.toml.
+// Every 30 min, 12:00-22:30 UTC; the ET-hour check below limits it to 8 AM - 6 PM ET.
+export const handler = schedule("0,30 12-22 * * *", async () => {
   try {
     const hour = etHour();
 
@@ -74,4 +76,4 @@ export const handler: Handler = async () => {
     console.error("[fountain-reminder] Error:", e?.message);
     return { statusCode: 500, body: e?.message || "Error" };
   }
-};
+});

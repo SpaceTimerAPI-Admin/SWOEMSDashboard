@@ -109,9 +109,14 @@ export const handler: Handler = async (event) => {
 
     if (error) return json({ ok: false, error: error.message }, 500);
 
-    // Post GroupMe announcement (fire-and-forget — don't block the response)
-    const msg = buildGroupMeMessage(data);
-    postGroupMe(msg).catch(() => { /* silent — GroupMe failure shouldn't break the sign-off */ });
+    // Post GroupMe announcement. MUST be awaited: Netlify freezes the function the
+    // moment it returns, so an un-awaited post never actually gets sent.
+    try {
+      await postGroupMe(buildGroupMeMessage(data));
+    } catch (e: any) {
+      // GroupMe failure shouldn't break the sign-off, but log it so it's visible.
+      console.error("[fountain-ack-submit] GroupMe post failed:", e?.message);
+    }
 
     return json({ ok: true, ack: data });
   } catch (e: any) {
