@@ -77,7 +77,7 @@ export default function AdminElijah() {
       <Link to="/admin" style={{ fontSize: 13, color: "var(--muted)", textDecoration: "none" }}>← Admin</Link>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, marginBottom: 20 }}>
         <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", border: "2px solid rgba(92,107,255,0.4)", flexShrink: 0 }}>
-          <img src="/assets/elijah-avatar.png" alt="Elijah" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }} />
+          <img src="https://oacaalbeepnksbdmupse.supabase.co/storage/v1/object/public/ticket-photos/Tropical%20Vacation%20Portrait%20with%20Cocktail.png" alt="Elijah" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }} />
         </div>
         <div>
           <div className="page-title" style={{ marginBottom: 0 }}>Elijah Chat History</div>
@@ -235,7 +235,7 @@ export default function AdminElijah() {
                     {/* A */}
                     <div style={{ display: "flex", gap: 8 }}>
                       <div style={{ width: 26, height: 26, borderRadius: "50%", overflow: "hidden", flexShrink: 0 }}>
-                        <img src="/assets/elijah-avatar.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }} />
+                        <img src="https://oacaalbeepnksbdmupse.supabase.co/storage/v1/object/public/ticket-photos/Tropical%20Vacation%20Portrait%20with%20Cocktail.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }} />
                       </div>
                       <div style={{
                         flex: 1, padding: "10px 14px", borderRadius: "4px 14px 14px 14px",

@@ -23,7 +23,7 @@ type Conversation = {
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const AVATAR_URL = "/assets/elijah-avatar.png";
+const AVATAR_URL = "https://oacaalbeepnksbdmupse.supabase.co/storage/v1/object/public/ticket-photos/Tropical%20Vacation%20Portrait%20with%20Cocktail.png";
 const STORAGE_KEY = "elijah_conversations_v2";
 const MAX_CONVOS = 20;
 
