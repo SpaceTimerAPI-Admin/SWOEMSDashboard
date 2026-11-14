@@ -316,6 +316,11 @@ export const handler: Handler = async (event) => {
     const session = await requireSession(event);
     if (!session) return unauthorized();
 
+    // Show Techs never receive report emails.
+    if ((session.employee as any)?.role === "show_tech") {
+      return json({ ok: false, error: "Report emails are disabled for Show Tech accounts." }, 403);
+    }
+
     const body = event.body ? JSON.parse(event.body) : {};
     const report_date = String(body.report_date || "").trim();
     const handoff_notes = String(body.handoff_notes || "");
