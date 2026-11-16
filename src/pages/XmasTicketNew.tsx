@@ -230,6 +230,7 @@ export default function XmasTicketNew() {
     e.preventDefault();
     setError(null);
     if (!techName.trim())    return setError("Name is required");
+    if (!location.trim())    return setError("Location is required");
     if (!description.trim()) return setError("Description is required");
     if (!photo)              return setError("Photo is required");
 
@@ -256,8 +257,7 @@ export default function XmasTicketNew() {
 
       const payload = {
         tech_name: techName.trim(),
-        // Location text is optional — fall back to a label so lists/maps never show a blank.
-        location_friendly: location.trim() || (coords ? "GPS pin only" : "Location not given"),
+        location_friendly: location.trim(),
         description: description.trim(),
         photoUrl: uploadRes.publicUrl,
         coords,
@@ -333,7 +333,7 @@ export default function XmasTicketNew() {
           </label>
 
           <label>
-            <div className="field-label">Location <span style={{ color: "var(--muted2)", fontWeight: 400 }}>(optional)</span></div>
+            <div className="field-label">Location <span style={{ color: "var(--danger)" }}>*</span></div>
             <input className="input" value={location} onChange={e => setLocation(e.target.value)}
               placeholder='e.g. "Main Gate Tree", "Entrance Arch"' />
           </label>

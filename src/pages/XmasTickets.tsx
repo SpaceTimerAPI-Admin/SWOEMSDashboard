@@ -16,69 +16,8 @@ function fmtDate(iso: string) {
   });
 }
 
-// ── Location gate ─────────────────────────────────────────────────────────────
-// Shows a fullscreen prompt until the user grants location permission.
-// Calls getCurrentPosition directly — this is what actually triggers the OS
-// prompt on both iOS and Android (permissions.query alone does not).
-function LocationGate({ onGranted }: { onGranted: () => void }) {
-  const [status, setStatus] = useState<"asking" | "denied">("asking");
-
-  function request() {
-    setStatus("asking");
-    navigator.geolocation.getCurrentPosition(
-      () => onGranted(),
-      () => setStatus("denied"),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  }
-
-  useEffect(() => { request(); }, []);
-
-  return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 9999,
-      background: "#0f1117",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 24,
-    }}>
-      <div style={{
-        maxWidth: 360, width: "100%",
-        background: "#1a1b26",
-        borderRadius: 18,
-        border: "1px solid rgba(46,232,160,0.25)",
-        padding: "28px 24px",
-        textAlign: "center",
-      }}>
-        <div style={{ fontSize: 48, marginBottom: 14 }}>📍</div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 8 }}>
-          Location Required
-        </div>
-        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.6, marginBottom: 20 }}>
-          The Christmas dashboard uses your location to find nearby tickets and prevent duplicates.
-          {status === "denied" && (
-            <span style={{ color: "#f87171", display: "block", marginTop: 10 }}>
-              Location was denied. Please tap <strong>Allow</strong> when prompted, or enable it in your browser settings.
-            </span>
-          )}
-        </div>
-        <button
-          onClick={request}
-          style={{
-            width: "100%", padding: "13px 0", borderRadius: 12, border: "none",
-            background: "rgba(46,232,160,0.2)", color: "#7EEFC4",
-            fontSize: 14, fontWeight: 700, cursor: "pointer",
-          }}
-        >
-          {status === "denied" ? "Try Again" : "Allow Location"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function XmasTickets() {
   const [searchParams] = useSearchParams();
-  const [locationGranted, setLocationGranted] = useState(false);
   const [tickets, setTickets]   = useState<any[]>([]);
   const [loading, setLoading]   = useState(true);
   const [filter, setFilter]     = useState<"all" | "open" | "fixed">(
@@ -91,9 +30,9 @@ export default function XmasTickets() {
   const markerLayer  = useRef<any>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  // Load Leaflet CSS + JS only after location is granted (map div isn't mounted until then)
+  // Load Leaflet CSS + JS. No location permission is needed to view the dashboard —
+  // GPS is only requested when a ticket is submitted (see XmasTicketNew).
   useEffect(() => {
-    if (!locationGranted) return;
     if (document.getElementById("leaflet-css")) { setMapReady(true); return; }
     const css = document.createElement("link");
     css.id = "leaflet-css";
@@ -104,7 +43,7 @@ export default function XmasTickets() {
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = () => setMapReady(true);
     document.head.appendChild(script);
-  }, [locationGranted]);
+  }, []);
 
   useEffect(() => { void load(); }, []);
 
@@ -116,16 +55,15 @@ export default function XmasTickets() {
     } finally { setLoading(false); }
   }
 
-  // Init map when Leaflet is ready and container exists (depends on locationGranted so it
-  // re-runs after the LocationGate unmounts and the map div is actually in the DOM)
+  // Init map when Leaflet is ready and container exists
   useEffect(() => {
-    if (!locationGranted || !mapReady || !mapRef.current || leafletMap.current) return;
+    if (!mapReady || !mapRef.current || leafletMap.current) return;
     leafletMap.current = L.map(mapRef.current).setView([28.41, -81.46], 14);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19, attribution: "© OpenStreetMap contributors"
     }).addTo(leafletMap.current);
     markerLayer.current = L.layerGroup().addTo(leafletMap.current);
-  }, [mapReady, locationGranted]);
+  }, [mapReady]);
 
   // Update markers when tickets or filter changes
   useEffect(() => {
@@ -161,10 +99,6 @@ export default function XmasTickets() {
     if (!leafletMap.current || t.lat == null || t.lon == null) return;
     leafletMap.current.setView([t.lat, t.lon], 18);
     setSelectedId(t.id);
-  }
-
-  if (!locationGranted) {
-    return <LocationGate onGranted={() => setLocationGranted(true)} />;
   }
 
   return (
