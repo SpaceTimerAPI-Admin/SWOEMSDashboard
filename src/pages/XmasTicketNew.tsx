@@ -34,8 +34,9 @@ async function getCoordsSafe(): Promise<{ lat: number; lon: number } | null> {
   // High-accuracy can still time out on Android on a cold GPS start, so the
   // fallback ensures we always get something.
   const attempts: PositionOptions[] = [
-    { enableHighAccuracy: true,  timeout: 12000, maximumAge: 30000 },
-    { enableHighAccuracy: false, timeout: 8000,  maximumAge: 60000 },
+    // maximumAge 0 = always take a fresh reading for THIS ticket, never a cached one.
+    { enableHighAccuracy: true,  timeout: 12000, maximumAge: 0 },
+    { enableHighAccuracy: false, timeout: 8000,  maximumAge: 0 },
   ];
   for (const opts of attempts) {
     try {
@@ -229,7 +230,6 @@ export default function XmasTicketNew() {
     e.preventDefault();
     setError(null);
     if (!techName.trim())    return setError("Name is required");
-    if (!location.trim())    return setError("Location is required");
     if (!description.trim()) return setError("Description is required");
     if (!photo)              return setError("Photo is required");
 
@@ -256,7 +256,8 @@ export default function XmasTicketNew() {
 
       const payload = {
         tech_name: techName.trim(),
-        location_friendly: location.trim(),
+        // Location text is optional — fall back to a label so lists/maps never show a blank.
+        location_friendly: location.trim() || (coords ? "GPS pin only" : "Location not given"),
         description: description.trim(),
         photoUrl: uploadRes.publicUrl,
         coords,
@@ -332,7 +333,7 @@ export default function XmasTicketNew() {
           </label>
 
           <label>
-            <div className="field-label">Location <span style={{ color: "var(--danger)" }}>*</span></div>
+            <div className="field-label">Location <span style={{ color: "var(--muted2)", fontWeight: 400 }}>(optional)</span></div>
             <input className="input" value={location} onChange={e => setLocation(e.target.value)}
               placeholder='e.g. "Main Gate Tree", "Entrance Arch"' />
           </label>
@@ -369,7 +370,7 @@ export default function XmasTicketNew() {
           </div>
 
           <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 6, marginBottom: 12 }}>
-            📍 GPS location will be captured automatically if you allow it — helps track where issues are on the map and detect duplicate tickets nearby.
+            📍 Your GPS location is requested every time you submit a ticket — tap Allow when prompted. It pins the issue on the map and detects duplicate tickets nearby.
           </div>
 
           {error && (

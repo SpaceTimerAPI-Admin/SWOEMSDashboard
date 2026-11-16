@@ -17,10 +17,12 @@ exports.handler = async (event) => {
   try { payload = JSON.parse(event.body || "{}"); } catch { return resp(400, { error: "Bad JSON body" }); }
 
   const tech_name        = (payload.tech_name || "").trim();
-  const location_friendly = (payload.location_friendly || "").trim();
-  const description      = (payload.description || "").trim();
   const lat = payload.lat ?? null;
   const lon = payload.lon ?? null;
+  // Location text is optional — fall back to a label so it is never blank.
+  const location_friendly = (payload.location_friendly || "").trim()
+    || (lat != null && lon != null ? "GPS pin only" : "Location not given");
+  const description      = (payload.description || "").trim();
 
   let photo_url = payload.photo_url || null;
   const photo_path = payload.photo_path || payload.path || null;
@@ -29,7 +31,6 @@ exports.handler = async (event) => {
   }
 
   if (!tech_name)          return resp(400, { error: "tech_name is required" });
-  if (!location_friendly)  return resp(400, { error: "location_friendly is required" });
   if (!description)        return resp(400, { error: "description is required" });
   if (!photo_url)          return resp(400, { error: "photo_url is required" });
 
