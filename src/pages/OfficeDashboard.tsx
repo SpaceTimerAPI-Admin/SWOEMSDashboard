@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import ParkHours from "../components/ParkHours";
 
 const REFRESH_MS = 60_000;
 const TZ = "America/New_York";
@@ -269,6 +270,9 @@ export default function OfficeDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Today's park hours */}
+        <ParkHours variant="tv" style={{ padding: "8px 16px", flexShrink: 0 }} />
 
         {/* Clock */}
         <div style={{ padding: "8px 16px", textAlign: "right", flexShrink: 0 }}>

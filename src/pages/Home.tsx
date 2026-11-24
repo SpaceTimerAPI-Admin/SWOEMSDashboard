@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import ParkHours from "../components/ParkHours";
 import { listTickets, listProjects, getTodayBeo, getDocsUrl } from "../lib/api";
 import { getProfile, getRole } from "../lib/auth";
 
@@ -246,6 +247,7 @@ export default function Home() {
       <div style={{ marginBottom: 4 }}>
         <div className="page-title">Dashboard</div>
         <div className="page-subtitle">SeaWorld Entertainment Maintenance</div>
+        <ParkHours />
       </div>
 
       {/* Today's Events Alert */}

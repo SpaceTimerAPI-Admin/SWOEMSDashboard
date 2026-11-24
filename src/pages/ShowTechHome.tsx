@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import ParkHours from "../components/ParkHours";
 import { getProfile } from "../lib/auth";
 
 const BRIEFING_KEY = "swoems_st_briefing_dismissed";
@@ -135,6 +136,7 @@ export default function ShowTechHome() {
 
       <div className="page-title">Dashboard</div>
       <div className="page-subtitle">Show Tech Portal</div>
+      <ParkHours style={{ marginBottom: 12 }} />
 
       {/* Quick actions */}
       <div className="home-grid">

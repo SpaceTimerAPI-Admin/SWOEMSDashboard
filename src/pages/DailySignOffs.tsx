@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getToken, getProfile } from "../lib/auth";
+import ParkHours from "../components/ParkHours";
 
 // ─── GPS helpers ────────────────────────────────────────────────────────────
 
@@ -108,6 +109,7 @@ export default function DailySignOffs() {
       <div style={{ marginBottom: 24 }}>
         <div className="page-title">✅ Daily Sign Offs</div>
         <div className="page-subtitle">{today}</div>
+        <ParkHours />
       </div>
 
       <div className="card" style={{ marginBottom: 20, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
