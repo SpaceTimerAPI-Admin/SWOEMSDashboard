@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import ParkHours from "../components/ParkHours";
-import { getProfile } from "../lib/auth";
+import { getProfile, getToken } from "../lib/auth";
 
 const BRIEFING_KEY = "swoems_st_briefing_dismissed";
 
@@ -13,13 +13,24 @@ function todayKey() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 }
 
-function ShiftBriefing({ onDismiss, openCount }: { onDismiss: () => void; openCount: number | null }) {
+async function authFetch(path: string, opts: RequestInit = {}) {
+  const token = getToken();
+  const res = await fetch(path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  return res.json();
+}
+
+function ShiftBriefing({ onDismiss, openCount, starting, error }: {
+  onDismiss: () => void; openCount: number | null; starting: boolean; error: string;
+}) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 999,
       background: "rgba(0,0,0,0.75)",
       display: "flex", alignItems: "center", justifyContent: "center",
-      padding: "0 16px",
+      padding: "16px", overflowY: "auto",
     }}>
       <div style={{
         width: "100%", maxWidth: 420,
@@ -67,6 +78,19 @@ function ShiftBriefing({ onDismiss, openCount }: { onDismiss: () => void; openCo
             </div>
           </div>
 
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>📋</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Today's Tasks — required</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
+                When you start your shift you are assigned about a quarter of the open Christmas tickets.
+                <strong style={{ color: "#FFB627" }}> Every assigned ticket must be reviewed during today's shift</strong>, and
+                an update must be added to each one stating its <strong style={{ color: "#FFB627" }}>current status</strong> and
+                <strong style={{ color: "#FFB627" }}> what troubleshooting took place</strong>.
+              </div>
+            </div>
+          </div>
+
           {/* Open ticket count + link */}
           <Link to="/christmas?filter=open" onClick={onDismiss} style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -86,15 +110,17 @@ function ShiftBriefing({ onDismiss, openCount }: { onDismiss: () => void; openCo
 
         {/* Footer */}
         <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+          {error && <div style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{error}</div>}
           <button
             onClick={onDismiss}
+            disabled={starting}
             style={{
               width: "100%", padding: "10px", borderRadius: 10, border: "none",
               background: "rgba(46,232,160,0.2)", color: "#7EEFC4",
               fontSize: 13, fontWeight: 700, cursor: "pointer",
             }}
           >
-            Got it — start shift
+            {starting ? "Starting shift…" : "Got it — start shift & assign my tickets"}
           </button>
         </div>
       </div>
@@ -106,6 +132,14 @@ export default function ShowTechHome() {
   const profile = getProfile();
   const [showBriefing, setShowBriefing] = useState(false);
   const [openXmasCount, setOpenXmasCount] = useState<number | null>(null);
+  const [tasks, setTasks] = useState<{ total: number; updated: number } | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState("");
+
+  function applyTasks(res: any) {
+    const list: any[] = res?.tasks || [];
+    setTasks({ total: list.length, updated: list.filter(t => t.updated).length });
+  }
 
   useEffect(() => {
     // Show briefing once per day
@@ -123,16 +157,40 @@ export default function ShowTechHome() {
       } catch {}
     }
     void load();
+
+    // The server knows who is on shift today. If this tech isn't yet, show the briefing
+    // even if it was dismissed on this phone — acknowledging it is what starts the shift.
+    async function loadShift() {
+      try {
+        const res = await authFetch("/api/showtech-tasks");
+        if (!res?.ok) return;
+        if (res.on_shift) applyTasks(res); else setShowBriefing(true);
+      } catch {}
+    }
+    void loadShift();
   }, []);
 
-  function dismissBriefing() {
-    try { localStorage.setItem(BRIEFING_KEY, todayKey()); } catch {}
-    setShowBriefing(false);
+  // Acknowledging the briefing puts the tech "on shift" and assigns their tickets.
+  async function dismissBriefing() {
+    if (starting) return;
+    setStarting(true);
+    setStartError("");
+    try {
+      const res = await authFetch("/api/showtech-shift-start", { method: "POST", body: "{}" });
+      if (!res?.ok) { setStartError(res?.error || "Could not start your shift. Please try again."); return; }
+      applyTasks(res);
+      try { localStorage.setItem(BRIEFING_KEY, todayKey()); } catch {}
+      setShowBriefing(false);
+    } catch {
+      setStartError("Network error. Please try again.");
+    } finally {
+      setStarting(false);
+    }
   }
 
   return (
     <div className="page fade-up">
-      {showBriefing && <ShiftBriefing onDismiss={dismissBriefing} openCount={openXmasCount} />}
+      {showBriefing && <ShiftBriefing onDismiss={dismissBriefing} openCount={openXmasCount} starting={starting} error={startError} />}
 
       <div className="page-title">Dashboard</div>
       <div className="page-subtitle">Show Tech Portal</div>
@@ -140,6 +198,15 @@ export default function ShowTechHome() {
 
       {/* Quick actions */}
       <div className="home-grid">
+        <Link to="/todays-tasks" className="home-tile" style={{ background: "rgba(255,182,39,0.1)" }}>
+          <div className="tile-icon" style={{ background: "rgba(255,182,39,0.2)" }}>📋</div>
+          <div className="tile-title">Today's Tasks</div>
+          <div className="tile-desc">
+            {tasks === null ? "Your assigned tickets for this shift"
+              : tasks.total === 0 ? "No tickets assigned"
+              : `${tasks.updated} of ${tasks.total} tickets updated`}
+          </div>
+        </Link>
         <Link to="/shift-log" className="home-tile" style={{ background: "rgba(168,144,255,0.1)" }}>
           <div className="tile-icon" style={{ background: "rgba(168,144,255,0.2)" }}>📓</div>
           <div className="tile-title">Shift Log</div>
