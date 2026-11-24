@@ -30,7 +30,7 @@ import OfficeDashboard from "./pages/OfficeDashboard";
 import XmasTickets from "./pages/XmasTickets";
 import XmasTicketNew from "./pages/XmasTicketNew";
 import XmasTicketDetail from "./pages/XmasTicketDetail";
-import FountainAck from "./pages/FountainAck";
+import DailySignOffs from "./pages/DailySignOffs";
 import Inventory from "./pages/Inventory";
 import InventoryNew from "./pages/InventoryNew";
 import InventoryDetail from "./pages/InventoryDetail";
@@ -40,7 +40,7 @@ import AskElijah from "./components/AskElijah";
 import { isAuthed, clearToken, clearProfile, getRole } from "./lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/enroll", "/reset-pin", "/work-order", "/dashboard"];
-const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings", "/christmas", "/christmas/new", "/fountain-ack"];
+const ST_ALLOWED = ["/", "/tickets", "/tickets/new", "/shift-log", "/settings", "/christmas", "/christmas/new", "/fountain-ack", "/daily-signoffs"];
 
 /**
  * Global session-expiry handler.
@@ -155,7 +155,9 @@ export default function App() {
         <Route path="/christmas/new" element={<RequireAuth><XmasTicketNew /></RequireAuth>} />
         <Route path="/christmas/:id" element={<RequireAuth><XmasTicketDetail /></RequireAuth>} />
 
-        <Route path="/fountain-ack" element={<RequireAuth><FountainAck /></RequireAuth>} />
+        <Route path="/daily-signoffs" element={<RequireAuth><DailySignOffs /></RequireAuth>} />
+        {/* Old fountain link (still in earlier GroupMe messages) goes to the merged page */}
+        <Route path="/fountain-ack" element={<Navigate to="/daily-signoffs" replace />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

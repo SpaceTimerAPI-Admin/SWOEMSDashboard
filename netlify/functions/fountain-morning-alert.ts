@@ -23,7 +23,7 @@ export const handler = schedule("0 13 * * *", async () => {
       timeZone: "America/New_York", weekday: "long", month: "long", day: "numeric",
     });
 
-    const ackUrl = `${SITE_BASE_URL}/fountain-ack`;
+    const ackUrl = `${SITE_BASE_URL}/daily-signoffs`;
 
     const message = [
       `💧 Good morning! — ${todayLabel}`,

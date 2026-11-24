@@ -148,6 +148,11 @@ export default function ShowTechHome() {
           <div className="tile-title">Christmas</div>
           <div className="tile-desc">Holiday lights & decor tickets</div>
         </Link>
+        <Link to="/daily-signoffs" className="home-tile" style={{ background: "rgba(92,107,255,0.1)" }}>
+          <div className="tile-icon" style={{ background: "rgba(92,107,255,0.2)" }}>✅</div>
+          <div className="tile-title">Daily Sign Offs</div>
+          <div className="tile-desc">Lake fountains & Snow Moments</div>
+        </Link>
       </div>
     </div>
   );

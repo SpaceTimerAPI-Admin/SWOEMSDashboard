@@ -1,6 +1,8 @@
 /**
  * Netlify Scheduled Function
- * Runs every 30 minutes from 8:00 AM to 6:00 PM Eastern.
+ * Runs every 30 minutes from 8:30 AM to 6:00 PM Eastern.
+ * The first reminder is 8:30 AM — 30 minutes after the 8:00 AM morning alert,
+ * so the two never post at the same time.
  * If the lake fountains have NOT been acknowledged today, posts a reminder to GroupMe.
  * Once acknowledged, stays silent for the rest of the day.
  *
@@ -23,23 +25,28 @@ import { todayBusinessDay, businessDayRange } from "./_eod-day";
 const TZ = "America/New_York";
 const SITE_BASE_URL = (process.env.SITE_BASE_URL || "https://www.swoems.com").replace(/\/$/, "");
 
-function etHour(): number {
-  return Number(
-    new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", hour12: false })
-      .formatToParts(new Date())
-      .find(p => p.type === "hour")?.value ?? 0
-  );
+// Reminder window, in minutes after midnight ET.
+const FIRST = 8 * 60 + 30; // 8:30 AM — 30 min after the morning alert
+const END   = 18 * 60;     // stop at 6:00 PM (last reminder 5:30 PM)
+const SLACK = 5;           // tolerate the cron firing a few minutes off
+
+function etMinutes(): number {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "numeric", hourCycle: "h23" })
+    .formatToParts(new Date());
+  const h = Number(parts.find(p => p.type === "hour")?.value ?? 0);
+  const m = Number(parts.find(p => p.type === "minute")?.value ?? 0);
+  return h * 60 + m;
 }
 
 // Schedule is declared HERE (in code) as well as in netlify.toml.
-// Every 30 min, 12:00-22:30 UTC; the ET-hour check below limits it to 8 AM - 6 PM ET.
+// Every 30 min, 12:00-22:30 UTC; the ET time check below limits it to 8:30 AM - 6 PM ET.
 export const handler = schedule("0,30 12-22 * * *", async () => {
   try {
-    const hour = etHour();
+    const mins = etMinutes();
 
-    // Only remind between 8 AM and 6 PM ET (after the morning alert, before EOD)
-    if (hour < 8 || hour >= 18) {
-      console.log(`[fountain-reminder] Outside reminder window (ET hour: ${hour}). Skipping.`);
+    // Only remind from 8:30 AM to 6 PM ET (30 min after the morning alert, before EOD)
+    if (mins < FIRST - SLACK || mins >= END) {
+      console.log(`[fountain-reminder] Outside reminder window (ET minutes: ${mins}). Skipping.`);
       return { statusCode: 200, body: "Outside window." };
     }
 
@@ -60,7 +67,7 @@ export const handler = schedule("0,30 12-22 * * *", async () => {
       return { statusCode: 200, body: "Already acknowledged." };
     }
 
-    const ackUrl = `${SITE_BASE_URL}/fountain-ack`;
+    const ackUrl = `${SITE_BASE_URL}/daily-signoffs`;
 
     const message = [
       `⚠️ REMINDER — Lake Fountains not yet confirmed today.`,
@@ -70,7 +77,7 @@ export const handler = schedule("0,30 12-22 * * *", async () => {
     ].join("\n");
 
     await postGroupMe(message);
-    console.log(`[fountain-reminder] Posted reminder (ET hour: ${hour}).`);
+    console.log(`[fountain-reminder] Posted reminder (ET minutes: ${mins}).`);
     return { statusCode: 200, body: "Reminder sent." };
   } catch (e: any) {
     console.error("[fountain-reminder] Error:", e?.message);

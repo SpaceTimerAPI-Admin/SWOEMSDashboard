@@ -346,6 +346,7 @@ export default function Home() {
         <Tile to="/eod"          icon="📝" title="EOD Report"      desc="Generate & email today's recap"     accent="rgba(255,84,84,0.12)" />
         <Tile to="/inventory"    icon="🗂️" title="Inventory"       desc="Track equipment & gear status"      accent="rgba(46,232,160,0.12)" />
         <Tile to="/christmas"    icon="🎄" title="Christmas"       desc="Holiday lights & decor tickets"     accent="rgba(46,232,160,0.15)" />
+        <Tile to="/daily-signoffs" icon="✅" title="Daily Sign Offs" desc="Lake fountains & Snow Moments"      accent="rgba(92,107,255,0.18)" />
         {getRole() === "admin" && (
           <Tile to="/admin" icon="🛡️" title="Admin" desc="User management & settings" accent="rgba(255,182,39,0.15)" />
         )}

@@ -70,7 +70,16 @@
 [functions."fountain-morning-alert"]
   schedule = "0 13 * * *"
 
-# Scheduled: Lake fountain reminder — every 30 min, 8 AM to 6 PM ET.
+# Scheduled: Lake fountain reminder — every 30 min, 8:30 AM to 6 PM ET.
 # Function checks the ET hour itself and skips outside that window.
 [functions."fountain-reminder"]
   schedule = "0,30 12-22 * * *"
+
+# Scheduled: Snow Moments alert — daily at 4 PM ET (21:00 UTC, EST)
+[functions."snow-alert"]
+  schedule = "0 21 * * *"
+
+# Scheduled: Snow Moments reminder — every 30 min, 4:30 PM to 8 PM ET.
+# Function checks the ET time itself and skips outside that window.
+[functions."snow-reminder"]
+  schedule = "0,30 0,1,20-23 * * *"

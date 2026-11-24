@@ -77,8 +77,9 @@ function buildPage(opts: {
   siteBaseUrl: string;
   shiftLogEntries: any[];
   fountainAck: any | null;
+  snowAck: any | null;
 }): string {
-  const { day, tickets, projects, ticketComments, projectComments, employees, siteBaseUrl, shiftLogEntries, fountainAck } = opts;
+  const { day, tickets, projects, ticketComments, projectComments, employees, siteBaseUrl, shiftLogEntries, fountainAck, snowAck } = opts;
 
   const dateDisplay = new Date(day + "T12:00:00").toLocaleDateString("en-US", {
     timeZone: TZ, weekday: "long", year: "numeric", month: "long", day: "numeric"
@@ -335,6 +336,43 @@ function buildPage(opts: {
     `}
   </div>
 
+  <!-- Snow Moments acknowledgment -->
+  <div style="margin-top:24px;margin-bottom:8px">
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:12px">
+      ❄️ Snow Moments Sign-off
+    </div>
+    ${snowAck ? (() => {
+      const ok = snowAck.status !== "issue";
+      return `
+    <div style="background:#fff;border:1px solid ${ok ? "#E8E8E8" : "#FECACA"};border-radius:12px;padding:16px 20px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:28px">${ok ? "✅" : "⚠️"}</span>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:${ok ? "#059669" : "#DC2626"}">${ok ? "Snow Moments set on the UCI for park time" : "Issue reported with Snow Moments"}</div>
+          ${!ok && snowAck.note ? `<div style="font-size:12px;color:#666;margin-top:2px">${escapeHtml(snowAck.note)}</div>` : ""}
+        </div>
+      </div>
+      <div style="font-size:12px;color:#999;margin-top:12px;padding-top:10px;border-top:1px solid #F0F0F0">
+        Signed by <strong>${escapeHtml(snowAck.employee_name)}</strong>
+        (${escapeHtml(snowAck.employee_id_text)})
+        at ${fmtDateTime(snowAck.acked_at)}
+        ${snowAck.lat != null && snowAck.lon != null
+          ? `· <a href="https://maps.google.com/?q=${snowAck.lat},${snowAck.lon}" target="_blank" style="color:#059669">📍 View location</a>`
+          : "· <span style=\"color:#bbb\">No GPS</span>"
+        }
+      </div>
+    </div>`;
+    })() : `
+    <div style="background:#fff;border:1px solid #FECACA;border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:14px">
+      <span style="font-size:28px">⚠️</span>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#DC2626">Not signed off today</div>
+        <div style="font-size:13px;color:#666;margin-top:4px">No one signed off on Snow Moments for this business day.</div>
+      </div>
+    </div>
+    `}
+  </div>
+
   <div class="footer">SeaWorld Entertainment Maintenance · EOD Report · ${escapeHtml(dateDisplay)}</div>
 </div>
 </body>
@@ -356,7 +394,7 @@ export const handler: Handler = async (event) => {
 
     const { start, end } = businessDayRange(day);
 
-    const [ticketsRes, ticketsClosedRes, ticketCommentsRes, projectsRes, projectsClosedRes, projectCommentsRes, employeesRes, shiftLogRes, fountainAckRes] = await Promise.all([
+    const [ticketsRes, ticketsClosedRes, ticketCommentsRes, projectsRes, projectsClosedRes, projectCommentsRes, employeesRes, shiftLogRes, fountainAckRes, snowAckRes] = await Promise.all([
       supabase.from("tickets").select("*").gte("created_at", start).lte("created_at", end),
       supabase.from("tickets").select("*").gte("closed_at", start).lte("closed_at", end).not("closed_at", "is", null),
       supabase.from("ticket_comments").select("*").gte("created_at", start).lte("created_at", end),
@@ -370,6 +408,12 @@ export const handler: Handler = async (event) => {
         .order("created_at", { ascending: true }),
       supabase.from("fountain_acknowledgments")
         .select("id, employee_id_text, employee_name, acked_at, lat, lon, bay_side_status, bay_side_note, lakeside_status, lakeside_note")
+        .gte("acked_at", start).lte("acked_at", end)
+        .order("acked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase.from("snow_acknowledgments")
+        .select("id, employee_id_text, employee_name, acked_at, lat, lon, status, note")
         .gte("acked_at", start).lte("acked_at", end)
         .order("acked_at", { ascending: false })
         .limit(1)
@@ -408,6 +452,7 @@ export const handler: Handler = async (event) => {
       siteBaseUrl: (process.env.SITE_BASE_URL || "").replace(/\/$/, ""),
       shiftLogEntries,
       fountainAck: fountainAckRes.data || null,
+      snowAck: snowAckRes.data || null,
     });
 
     return {
