@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import ParkHours from "../components/ParkHours";
 import { getProfile, getToken } from "../lib/auth";
 
@@ -92,7 +92,7 @@ function ShiftBriefing({ onDismiss, openCount, starting, error }: {
           </div>
 
           {/* Open ticket count + link */}
-          <Link to="/christmas?filter=open" onClick={onDismiss} style={{
+          <Link to="/christmas?filter=open" style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "10px 14px", borderRadius: 10, textDecoration: "none",
             background: openCount && openCount > 0 ? "rgba(248,113,113,0.12)" : "rgba(52,211,153,0.1)",
@@ -130,6 +130,7 @@ function ShiftBriefing({ onDismiss, openCount, starting, error }: {
 
 export default function ShowTechHome() {
   const profile = getProfile();
+  const navigate = useNavigate();
   const [showBriefing, setShowBriefing] = useState(false);
   const [openXmasCount, setOpenXmasCount] = useState<number | null>(null);
   const [tasks, setTasks] = useState<{ total: number; updated: number } | null>(null);
@@ -181,6 +182,8 @@ export default function ShowTechHome() {
       applyTasks(res);
       try { localStorage.setItem(BRIEFING_KEY, todayKey()); } catch {}
       setShowBriefing(false);
+      // Straight to their assigned tickets.
+      navigate("/todays-tasks");
     } catch {
       setStartError("Network error. Please try again.");
     } finally {
