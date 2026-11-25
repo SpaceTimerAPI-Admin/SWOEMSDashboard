@@ -350,6 +350,9 @@ export default function Home() {
         <Tile to="/christmas"    icon="🎄" title="Christmas"       desc="Holiday lights & decor tickets"     accent="rgba(46,232,160,0.15)" />
         <Tile to="/daily-signoffs" icon="✅" title="Daily Sign Offs" desc="Lake fountains & Snow Moments"      accent="rgba(92,107,255,0.18)" />
         {getRole() === "admin" && (
+          <Tile to="/todays-tasks" icon="📊" title="Show Tech Progress" desc="Tickets opened & closed by who's on shift" accent="rgba(46,232,160,0.15)" />
+        )}
+        {getRole() === "admin" && (
           <Tile to="/admin" icon="🛡️" title="Admin" desc="User management & settings" accent="rgba(255,182,39,0.15)" />
         )}
       </div>

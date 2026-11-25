@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getProfile } from "../lib/auth";
+import { getProfile, getToken } from "../lib/auth";
 
 declare const L: any;
 
 async function apiFetch(path: string, opts: RequestInit = {}) {
-  const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", ...(opts.headers || {}) } });
+  // Send the login token when there is one, so the server can record who did what.
+  const token = getToken();
+  const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(opts.headers || {}) } });
   return res.json();
 }
 

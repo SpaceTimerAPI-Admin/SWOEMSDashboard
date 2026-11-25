@@ -3,7 +3,7 @@
  * Everything is keyed by business day (4 AM ET cutoff), so shifts and assignments
  * reset by themselves each night — nothing has to be cleared.
  */
-import { todayBusinessDay } from "./_eod-day";
+import { todayBusinessDay, businessDayRange } from "./_eod-day";
 
 export const SHARE = 4; // each tech gets about 1/4 of the open tickets
 
@@ -23,8 +23,12 @@ export function shuffle<T>(items: T[]): T[] {
 }
 
 /** Today's tasks for one tech, plus who else is on shift. */
-export async function loadTasks(supabase: any, emp: { id: string }) {
-  const day = todayBusinessDay();
+export async function loadTasks(
+  supabase: any,
+  emp: { id: string },
+  opts: { day?: string; withActivity?: boolean } = {},
+) {
+  const day = opts.day || todayBusinessDay();
 
   const [shiftsRes, assignsRes] = await Promise.all([
     supabase.from("showtech_shifts").select("employee_id, employee_name, started_at")
@@ -85,6 +89,9 @@ export async function loadTasks(supabase: any, emp: { id: string }) {
   const mine = tasks.filter(t => t.employee_id === emp.id)
     .sort((a, b) => Number(a.updated) - Number(b.updated) || a.ticket_id - b.ticket_id);
 
+  // Admin view: how many Christmas tickets each on-shift tech opened and closed that day.
+  const activity = opts.withActivity ? await loadActivity(supabase, day, shifts) : null;
+
   const team = shifts.map((s: any) => {
     const theirs = tasks.filter(t => t.employee_id === s.employee_id);
     return {
@@ -93,6 +100,7 @@ export async function loadTasks(supabase: any, emp: { id: string }) {
       total: theirs.length,
       updated: theirs.filter(t => t.updated).length,
       is_me: s.employee_id === emp.id,
+      ...(activity ? activity.get(s.employee_id) : {}),
     };
   });
 
@@ -102,4 +110,47 @@ export async function loadTasks(supabase: any, emp: { id: string }) {
     tasks: mine,
     team,
   };
+}
+
+/**
+ * Per on-shift tech for one business day:
+ *   opened — Christmas tickets they created that day
+ *   closed — Christmas tickets they marked fixed that day (and that are still fixed)
+ * Uses the recorded opened/fixed events. A ticket with no recorded opener (created
+ * before tracking existed, or while logged out) is matched on the name typed on it.
+ */
+async function loadActivity(supabase: any, day: string, shifts: any[]) {
+  const { start, end } = businessDayRange(day);
+  const out = new Map<string, { opened: number; closed: number }>();
+  for (const s of shifts) out.set(s.employee_id, { opened: 0, closed: 0 });
+  if (shifts.length === 0) return out;
+
+  const [createdRes, eventsRes] = await Promise.all([
+    supabase.from("xmas_tickets").select("id, tech_name, created_at")
+      .gte("created_at", start).lte("created_at", end),
+    supabase.from("xmas_ticket_events").select("ticket_id, action, employee_id, created_at")
+      .gte("created_at", start).lte("created_at", end)
+      .order("created_at", { ascending: true }),
+  ]);
+  const created: any[] = createdRes.data || [];
+  const events: any[]  = eventsRes.data || []; // empty if the events table doesn't exist yet
+
+  // Opened
+  const openerByTicket = new Map<number, string | null>();
+  for (const e of events) if (e.action === "opened") openerByTicket.set(Number(e.ticket_id), e.employee_id);
+  const idByName = new Map<string, string>(
+    shifts.map((s: any): [string, string] => [String(s.employee_name || "").trim().toLowerCase(), s.employee_id]));
+  for (const t of created) {
+    const recorded = openerByTicket.get(Number(t.id));
+    const who = recorded || idByName.get(String(t.tech_name || "").trim().toLowerCase());
+    if (who && out.has(who)) out.get(who)!.opened++;
+  }
+
+  // Closed — the last fixed/reopened event of the day decides; reopened tickets don't count.
+  const lastByTicket = new Map<number, any>();
+  for (const e of events) if (e.action === "fixed" || e.action === "reopened") lastByTicket.set(Number(e.ticket_id), e);
+  for (const e of lastByTicket.values()) {
+    if (e.action === "fixed" && e.employee_id && out.has(e.employee_id)) out.get(e.employee_id)!.closed++;
+  }
+  return out;
 }
